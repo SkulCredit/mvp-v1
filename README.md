@@ -285,12 +285,18 @@ The edge nginx is split into modular conf.d files loaded in order:
 git clone <repo-url>
 cd SkulCredit
 
-# First run — build all images and start
+- First you must make sure you have Docker app install on you system, if not please go to google - search for Docker download, select your OS, download and install.
+
+- Next, Go to the directory where you place your this project "SkulCredit", open this folder on the cmd and type the following command below:
+
+# To build all images and start
 docker compose up -d --build
 
 # View logs
 docker compose logs -f api
 docker compose logs -f nginx
+
+# After testing the app & you want to shutdown then type the following command inside the same CLI where you build your docker image.
 
 # Stop everything
 docker compose down
