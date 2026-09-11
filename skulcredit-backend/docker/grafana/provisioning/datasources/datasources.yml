@@ -22,7 +22,6 @@ datasources:
     jsonData:
       maxLines: 1000
       derivedFields:
-        # Link log lines that contain a traceId to a Tempo trace (future use)
         - matcherRegex: '"traceId":"(\w+)"'
           name: TraceID
           url: ""

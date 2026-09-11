@@ -15,8 +15,6 @@ clients:
       max_retries: 10
 
 scrape_configs:
-
-  # ── 1. Docker container stdout/stderr (works when running via docker-compose) ─
   - job_name: docker_containers
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
@@ -40,7 +38,6 @@ scrape_configs:
         target_label: compose_service
 
     pipeline_stages:
-      # Parse the JSON line Winston emits to stdout
       - json:
           expressions:
             level:      level
@@ -55,8 +52,6 @@ scrape_configs:
             duration_ms: duration_ms
             userId:     userId
             ip:         ip
-
-      # Promote key fields to Loki stream labels (keep cardinality low)
       - labels:
           level:
           service:
@@ -65,17 +60,12 @@ scrape_configs:
       - timestamp:
           source: timestamp
           format: "2006-01-02 15:04:05"
-
-      # Drop debug in production
       - match:
           selector: '{job="skulcredit_api"}'
           stages:
             - drop:
                 expression: '"level":"debug"'
                 drop_counter_reason: debug_log_dropped
-
-  # ── 2. Log files written to ./logs/ (mounted into Promtail at /app/logs) ──────
-  #    Works both locally and in Docker when the volume is mounted.
   - job_name: skulcredit_file_logs
     static_configs:
       - targets:

@@ -1,6 +1,6 @@
 # SkulCredit
 
-SkulCredit is a production-ready school-fee financing platform. Parents apply for loans to cover tuition, schools confirm enrollment, and admins manage the full approval and disbursement pipeline.
+SkulCredit is a school-fee financing platform. Parents apply for loans to cover tuition, schools confirm enrollment, and admins manage the full approval and disbursement pipeline.
 
 The repository is a monorepo containing the backend API, the React frontend, and all infrastructure configuration (nginx, Docker Compose, monitoring).
 
@@ -191,9 +191,8 @@ Browser
 ┌─────────────────────────────────────┐
 │  nginx  (port 80 / 443)             │
 │                                     │
-│  /api/v1/*  ──────────────────────► │  Express API  :8080
-│  /socket.io/* (WebSocket upgrade) ► │    │
-│  /          ──────────────────────► │  React SPA    :80 (internal)
+│  /api/v1/*  ──────────────────────► │  Express API  :808 │
+│                                     │  React SPA    :80 (internal)
 └─────────────────────────────────────┘    │
                                            │
            ┌───────────────────────────────┼────────────────────┐
@@ -1179,8 +1178,6 @@ Provisioned dashboards are in `skulcredit-backend/docker/grafana/provisioning/da
 
 Run `docker compose exec api npx tsx scripts/seed.ts` to populate the database with:
 
-- **Parent:** John Doe — `parent@example.com` / `Password@123`
-- **School:** Greenwood High School — `school@example.com` / `Password@123`
 - **Admin:** `admin@example.com` / `Admin@secure1`
 
 All seeded accounts have `isEmailVerified: true` and `isActive: true`.

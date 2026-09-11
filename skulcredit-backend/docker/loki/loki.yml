@@ -4,8 +4,6 @@ server:
   http_listen_port: 3100
   grpc_listen_port: 9096
   log_level: warn
-
-# ── Ingester ────────────────────────────────────────────────────────────────
 ingester:
   wal:
     enabled: true
@@ -20,8 +18,6 @@ ingester:
   chunk_idle_period: 5m
   chunk_retain_period: 30s
   max_transfer_retries: 0
-
-# ── Schema config ────────────────────────────────────────────────────────────
 schema_config:
   configs:
     - from: "2024-01-01"
@@ -31,8 +27,6 @@ schema_config:
       index:
         prefix: index_
         period: 24h
-
-# ── Storage ──────────────────────────────────────────────────────────────────
 storage_config:
   tsdb_shipper:
     active_index_directory: /loki/index
@@ -40,8 +34,6 @@ storage_config:
     cache_ttl: 24h
   filesystem:
     directory: /loki/chunks
-
-# ── Compactor (handles retention) ────────────────────────────────────────────
 compactor:
   working_directory: /loki/compactor
   compaction_interval: 10m
@@ -49,26 +41,21 @@ compactor:
   retention_delete_delay: 2h
   retention_delete_worker_count: 150
   delete_request_store: filesystem
-
-# ── Limits (14-day log retention) ────────────────────────────────────────────
 limits_config:
-  retention_period: 336h        # 14 days = 14 × 24h
+  retention_period: 336h    
   reject_old_samples: true
   reject_old_samples_max_age: 168h
   ingestion_rate_mb: 16
   ingestion_burst_size_mb: 32
   max_query_series: 10000
-  max_query_lookback: 336h      # match retention period
+  max_query_lookback: 336h 
 
-# ── Query range ──────────────────────────────────────────────────────────────
 query_range:
   results_cache:
     cache:
       embedded_cache:
         enabled: true
         max_size_mb: 100
-
-# ── Ruler ────────────────────────────────────────────────────────────────────
 ruler:
   storage:
     type: local
@@ -76,8 +63,6 @@ ruler:
       directory: /loki/rules
   rule_path: /loki/rules-temp
   alertmanager_url: http://localhost:9093
-
-# ── Common ───────────────────────────────────────────────────────────────────
 common:
   path_prefix: /loki
   replication_factor: 1

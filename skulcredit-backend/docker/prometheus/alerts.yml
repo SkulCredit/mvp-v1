@@ -1,6 +1,5 @@
 groups:
 
-  # ── API Health ──────────────────────────────────────────────────────────────
   - name: api_health
     rules:
       - alert: APIDown
@@ -37,8 +36,6 @@ groups:
         annotations:
           summary: "API p95 latency exceeds 2 seconds"
           description: "95th percentile response time is {{ $value }}s on {{ $labels.instance }}."
-
-  # ── RabbitMQ ────────────────────────────────────────────────────────────────
   - name: rabbitmq_health
     rules:
       - alert: RabbitMQDown
@@ -67,8 +64,6 @@ groups:
         annotations:
           summary: "Dead-letter queue growing"
           description: "Dead-letter queue {{ $labels.queue }} has {{ $value }} messages."
-
-  # ── PostgreSQL ──────────────────────────────────────────────────────────────
   - name: postgres_health
     rules:
       - alert: PostgreSQLDown
@@ -79,8 +74,6 @@ groups:
         annotations:
           summary: "PostgreSQL is down"
           description: "PostgreSQL has been unreachable for more than 1 minute."
-
-  # ── Redis ───────────────────────────────────────────────────────────────────
   - name: redis_health
     rules:
       - alert: RedisDown
@@ -91,8 +84,6 @@ groups:
         annotations:
           summary: "Redis is down"
           description: "Redis has been unreachable for more than 1 minute. OTP service will be unavailable."
-
-  # ── Infrastructure ──────────────────────────────────────────────────────────
   - name: infrastructure
     rules:
       - alert: ContainerHighMemory
