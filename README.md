@@ -3,9 +3,7 @@
 SkulCredit is a school-fee financing platform. Parents apply for loans to cover tuition, schools confirm enrollment, and admins manage the full approval and disbursement pipeline.
 
 The repository is a monorepo containing the backend API, the React frontend, and all infrastructure configuration (nginx, Docker Compose, monitoring).
-
 ---
-
 ## Table of Contents
 
 1. [Repository Structure](#repository-structure)
