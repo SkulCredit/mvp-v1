@@ -1,0 +1,12 @@
+2026/09/11 10:11:50 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:11:51 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:11:52 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:11:53 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:11:54 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:11:56 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:12:00 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:12:07 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:12:20 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:12:46 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:13:38 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
+2026/09/11 10:14:40 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43

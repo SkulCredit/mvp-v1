@@ -1,0 +1,114 @@
+groups:
+
+  # ── API Health ──────────────────────────────────────────────────────────────
+  - name: api_health
+    rules:
+      - alert: APIDown
+        expr: up{job="skulcredit_api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SkulCredit API is down"
+          description: "The API instance {{ $labels.instance }} has been unreachable for more than 1 minute."
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{job="skulcredit_api", status=~"5.."}[5m])
+            /
+            rate(http_requests_total{job="skulcredit_api"}[5m])
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx error rate on SkulCredit API"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket{job="skulcredit_api"}[5m])
+          ) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API p95 latency exceeds 2 seconds"
+          description: "95th percentile response time is {{ $value }}s on {{ $labels.instance }}."
+
+  # ── RabbitMQ ────────────────────────────────────────────────────────────────
+  - name: rabbitmq_health
+    rules:
+      - alert: RabbitMQDown
+        expr: up{job="rabbitmq"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RabbitMQ is down"
+          description: "RabbitMQ has been unreachable for more than 1 minute."
+
+      - alert: RabbitMQHighQueueDepth
+        expr: rabbitmq_queue_messages_ready > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RabbitMQ queue depth is high"
+          description: "Queue {{ $labels.queue }} has {{ $value }} unprocessed messages."
+
+      - alert: RabbitMQDeadLetterGrowing
+        expr: rabbitmq_queue_messages{queue=~".*dead.*|.*dlq.*|.*dlx.*"} > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dead-letter queue growing"
+          description: "Dead-letter queue {{ $labels.queue }} has {{ $value }} messages."
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  - name: postgres_health
+    rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL has been unreachable for more than 1 minute."
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  - name: redis_health
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been unreachable for more than 1 minute. OTP service will be unavailable."
+
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+  - name: infrastructure
+    rules:
+      - alert: ContainerHighMemory
+        expr: |
+          (container_memory_working_set_bytes / container_spec_memory_limit_bytes) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container memory usage above 85%"
+          description: "Container {{ $labels.name }} is using {{ $value | humanizePercentage }} of its memory limit."
+
+      - alert: ContainerRestarting
+        expr: increase(container_restart_count[15m]) > 3
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container restarting frequently"
+          description: "Container {{ $labels.name }} has restarted {{ $value }} times in the last 15 minutes."

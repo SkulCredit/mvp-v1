@@ -1,0 +1,275 @@
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  prometheus_data:
+  loki_data:
+  grafana_data:
+
+networks:
+  app_net:
+    driver: bridge
+  monitoring_net:
+    driver: bridge
+
+services:
+  api:
+    build:
+      context: ./skulcredit-backend
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-prod}
+    container_name: skulcredit_api
+    restart: unless-stopped
+    env_file: ./skulcredit-backend/.env
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-skulcredit}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://skulcredit:${RABBITMQ_PASSWORD:-skulcredit_pass}@rabbitmq:5672/skulcredit_vhost
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app_net
+      - monitoring_net
+    volumes:
+      - ./skulcredit-backend/logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      logging: "promtail"
+      logging_jobname: "skulcredit_api"
+
+  frontend:
+    build:
+      context: ./skulcredit-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    container_name: skulcredit_frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      - api
+    networks:
+      - app_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1/health || wget -qO- http://[::1]/health || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      logging: "promtail"
+      logging_jobname: "skulcredit_frontend"
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: skulcredit_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks:
+      - app_net
+      - monitoring_net
+    volumes:
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      logging: "promtail"
+      logging_jobname: "skulcredit_nginx"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: skulcredit_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-skulcredit}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    networks:
+      - app_net
+      - monitoring_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-skulcredit}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      logging: "promtail"
+      logging_jobname: "postgres"
+
+  redis:
+    image: redis:7-alpine
+    container_name: skulcredit_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    expose:
+      - "6379"
+    networks:
+      - app_net
+      - monitoring_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    labels:
+      logging: "promtail"
+      logging_jobname: "redis"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: skulcredit_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: skulcredit
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-skulcredit_pass}
+      RABBITMQ_DEFAULT_VHOST: skulcredit_vhost
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./skulcredit-backend/docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    expose:
+      - "5672" # AMQP 
+      - "15672" # Management UI
+    networks:
+      - app_net
+      - monitoring_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+    labels:
+      logging: "promtail"
+      logging_jobname: "rabbitmq"
+
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: skulcredit_prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+    volumes:
+      - ./skulcredit-backend/docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./skulcredit-backend/docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    expose:
+      - "9090"
+    networks:
+      - monitoring_net
+    depends_on:
+      - api
+    labels:
+      logging: "promtail"
+      logging_jobname: "prometheus"
+
+  loki:
+    image: grafana/loki:2.9.6
+    container_name: skulcredit_loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./skulcredit-backend/docker/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    expose:
+      - "3100"
+    networks:
+      - monitoring_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  promtail:
+    image: grafana/promtail:2.9.6
+    container_name: skulcredit_promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./skulcredit-backend/docker/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./skulcredit-backend/logs:/app/logs:ro
+      - ./nginx/logs:/var/log/nginx:ro
+    networks:
+      - monitoring_net
+    depends_on:
+      - loki
+      
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: skulcredit_grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-skulcredit_grafana}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./skulcredit-backend/docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring_net
+    depends_on:
+      - prometheus
+      - loki
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
