@@ -20,7 +20,7 @@ app.use(helmet());
 
 const allowedOrigins =
   env.socketio.corsOrigin === "*"
-    ? true 
+    ? true
     : env.socketio.corsOrigin.split(",").map((o) => o.trim());
 
 app.use(
@@ -59,14 +59,18 @@ app.get("/metrics", async (req, res) => {
   }
 });
 
+// swagger-ui-express v5: use serveFiles() instead of serve to correctly
+// serve static assets (swagger-ui.css, swagger-ui-bundle.js, etc.)
+const swaggerUiOptions = {
+  customSiteTitle: "SkulCredit API Docs",
+  customCss: ".swagger-ui .topbar { background-color: #7A0E42; }",
+  swaggerOptions: { persistAuthorization: true },
+};
+
 app.use(
   "/api/v1/docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
-    customSiteTitle: "SkulCredit API Docs",
-    customCss: ".swagger-ui .topbar { background-color: #7A0E42; }",
-    swaggerOptions: { persistAuthorization: true },
-  }),
+  swaggerUi.serveFiles(swaggerSpec, swaggerUiOptions),
+  swaggerUi.setup(swaggerSpec, swaggerUiOptions),
 );
 
 app.get("/api/v1/docs.json", (req, res) => {

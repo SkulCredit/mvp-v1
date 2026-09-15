@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import apiClient from "../../services/apiClient";
 import { parentService } from "../../services/parentService";
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
 
 interface ToastState {
   message: string;
@@ -79,6 +80,8 @@ const Toast: React.FC<{
   </div>
 );
 
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
 const CheckIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     viewBox="0 0 24 24"
@@ -106,23 +109,6 @@ const BackIcon: React.FC = () => (
     aria-hidden="true"
   >
     <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
-
-const UploadIcon: React.FC = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="w-4 h-4"
-    aria-hidden="true"
-  >
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="17 8 12 3 7 8" />
-    <line x1="12" y1="3" x2="12" y2="15" />
   </svg>
 );
 
@@ -161,6 +147,71 @@ const PlusCircleIcon: React.FC = () => (
   </svg>
 );
 
+const UploadCloudIcon: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="w-10 h-10 text-gray-400"
+    aria-hidden="true"
+  >
+    <polyline points="16 16 12 12 8 16" />
+    <line x1="12" y1="12" x2="12" y2="21" />
+    <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+  </svg>
+);
+
+const EyeOffIcon: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="w-4 h-4"
+    aria-hidden="true"
+  >
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+);
+
+const PaperclipIcon: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="w-4 h-4 text-gray-500"
+    aria-hidden="true"
+  >
+    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+  </svg>
+);
+
+const RefreshIcon: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="w-4 h-4"
+    aria-hidden="true"
+  >
+    <polyline points="23 4 23 10 17 10" />
+    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+  </svg>
+);
+
 const SubmitCheckIcon: React.FC = () => (
   <div className="flex items-center justify-center w-20 h-20 rounded-full bg-green-100">
     <svg
@@ -185,6 +236,8 @@ const SubmitCheckIcon: React.FC = () => (
   </div>
 );
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
 const STEPS = [
   { label: "Parent/Guardian\nInformation", short: "Parent Info" },
   { label: "BVN/NIN &\nCredit Verification", short: "KYC" },
@@ -193,6 +246,13 @@ const STEPS = [
 ] as const;
 
 type Step = 0 | 1 | 2 | 3;
+
+const COUNTRY_CODES = [
+  { code: "+234", flag: "🇳🇬", label: "NG" },
+  { code: "+1", flag: "🇺🇸", label: "US" },
+  { code: "+44", flag: "🇬🇧", label: "GB" },
+  { code: "+233", flag: "🇬🇭", label: "GH" },
+];
 
 const RELATIONSHIPS = ["Parent", "Guardian", "Sponsor"];
 const EMPLOYER_TYPES = [
@@ -230,11 +290,33 @@ const REPAYMENT_PLANS = [
   "12-month Installment",
 ];
 const SESSIONS = [
-  "2024/2025 – 1st Term",
-  "2024/2025 – 2nd Term",
-  "2024/2025 – 3rd Term",
-  "2025/2026 – 1st Semester",
-  "2025/2026 – 2nd Semester",
+  "2024/2025-First Term",
+  "2024/2025-Second Term",
+  "2024/2025-Third Term",
+  "2025/2026-First Semester",
+  "2025/2026-Second Semester",
+];
+const GRADE_LEVELS: Record<string, string[]> = {
+  Nursery: ["Creche", "Nursery 1", "Nursery 2", "Nursery 3"],
+  Primary: [
+    "Primary 1",
+    "Primary 2",
+    "Primary 3",
+    "Primary 4",
+    "Primary 5",
+    "Primary 6",
+  ],
+  Secondary: ["JSS 1", "JSS 2", "JSS 3", "SS 1", "SS 2", "SS 3"],
+  Tertiary: ["100L", "200L", "300L", "400L", "500L", "6th Year"],
+  Vocational: ["Year 1", "Year 2", "Year 3"],
+};
+const DOCUMENT_TYPES = [
+  "Bank Statement (Last 3 Months)",
+  "Employment Letter",
+  "Business Registration",
+  "Utility Bill",
+  "Government-Issued ID",
+  "Tax Clearance Certificate",
 ];
 
 const tenorFromPlan = (plan: string): number => {
@@ -244,10 +326,12 @@ const tenorFromPlan = (plan: string): number => {
   return 6;
 };
 
+// ── Data types ────────────────────────────────────────────────────────────────
 
 interface Step1Data {
   fullName: string;
   email: string;
+  phoneCountryCode: string;
   phone: string;
   relationship: string;
   employerType: string;
@@ -256,13 +340,24 @@ interface Step1Data {
   homeAddress: string;
 }
 
+interface UploadedDoc {
+  id: string;
+  name: string;
+  size: string;
+  docType: string;
+  file: File;
+  status: "verified" | "pending" | "failed";
+}
+
 interface Step2Data {
   bvnOrNin: "bvn" | "nin";
   bvn: string;
   nin: string;
-  bankStatementFile: File | null;
-  employmentLetterFile: File | null;
-  utilityBillFile: File | null;
+  bvnStatus: "idle" | "error" | "verified";
+  ninStatus: "idle" | "error" | "verified";
+  selectedDocType: string;
+  pendingFile: File | null;
+  uploadedDocs: UploadedDoc[];
 }
 
 interface Step3Data {
@@ -306,6 +401,7 @@ interface School {
   addressState: string;
 }
 
+// ── Shared small components ───────────────────────────────────────────────────
 
 const Field: React.FC<{
   label: string;
@@ -315,7 +411,7 @@ const Field: React.FC<{
   children: React.ReactNode;
 }> = ({ label, hint, error, required, children }) => (
   <div className="flex flex-col gap-1">
-    <label className="text-sm font-medium text-[#87144B]">
+    <label className="text-sm font-medium text-gray-700">
       {label}
       {required && <span className="text-red-500 ml-0.5">*</span>}
     </label>
@@ -330,22 +426,33 @@ const Field: React.FC<{
 );
 
 const inputCls = (error?: string) =>
-  `w-full rounded-md px-3 py-2.5 text-sm outline-none transition-colors border
-   placeholder-[#87144B]/40 focus:ring-2 focus:ring-[#87144B]/20 focus:border-[#87144B]
+  `w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border bg-white
+   placeholder-gray-400 focus:ring-2 focus:ring-[#8B1C53]/20 focus:border-[#8B1C53]
    ${
      error
        ? "border-red-400 bg-red-50 text-red-700"
-       : "border-[#87144B]/40 bg-white text-[#87144B] hover:border-[#87144B]/60"
+       : "border-gray-200 text-gray-800 hover:border-gray-300"
+   }`;
+
+const selectCls = (error?: string) =>
+  `w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border bg-white appearance-none
+   focus:ring-2 focus:ring-[#8B1C53]/20 focus:border-[#8B1C53] cursor-pointer
+   ${
+     error
+       ? "border-red-400 bg-red-50 text-red-700"
+       : "border-gray-200 text-gray-800 hover:border-gray-300"
    }`;
 
 const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex justify-between py-2">
+  <div className="flex justify-between py-2 border-b border-gray-100 last:border-0">
     <span className="text-sm text-gray-500">{label}:</span>
     <span className="text-sm font-medium text-gray-800 text-right ml-4">
       {value}
     </span>
   </div>
 );
+
+// ── StepIndicator ─────────────────────────────────────────────────────────────
 
 const StepIndicator: React.FC<{ current: Step }> = ({ current }) => (
   <div className="flex items-start justify-center gap-0 mb-8">
@@ -362,8 +469,8 @@ const StepIndicator: React.FC<{ current: Step }> = ({ current }) => (
                 done
                   ? "border-green-500 bg-green-500 text-white"
                   : active
-                    ? "border-[#540C2F] bg-white text-[#540C2F]"
-                    : "border-transparent bg-[#F3E8F0] text-gray-800",
+                    ? "border-[#8B1C53] bg-[#8B1C53] text-white"
+                    : "border-gray-200 bg-white text-gray-400",
               ].join(" ")}
             >
               {done ? <CheckIcon /> : i + 1}
@@ -391,68 +498,56 @@ const StepIndicator: React.FC<{ current: Step }> = ({ current }) => (
   </div>
 );
 
-const FileUploadRow: React.FC<{
-  label: string;
-  file: File | null;
-  onChange: (f: File | null) => void;
-  error?: string;
-  accept?: string;
-}> = ({ label, file, onChange, error, accept = ".pdf,.jpg,.jpeg,.png" }) => {
-  const ref = useRef<HTMLInputElement>(null);
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-sm font-medium text-[#87144B]">{label}</span>
-      <div
-        className={`flex items-center gap-2 rounded-md border px-3 py-2 ${
-          error ? "border-red-400 bg-red-50" : "border-gray-300 bg-white"
-        }`}
-      >
-        <button
-          type="button"
-          onClick={() => ref.current?.click()}
-          className="flex shrink-0 items-center gap-1.5 rounded bg-[#8B1C53] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#7a1848]"
-        >
-          <UploadIcon />
-          {file ? "Change" : "Upload PDF"}
-        </button>
-        <span className="truncate text-xs text-gray-400 flex-1">
-          {file ? file.name : "No file chosen"}
-        </span>
-        {file && (
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            className="text-gray-400 hover:text-red-500"
-          >
-            <TrashIcon />
-          </button>
-        )}
-      </div>
-      <input
-        ref={ref}
-        type="file"
-        accept={accept}
-        className="hidden"
-        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-      />
-      {error && (
-        <p role="alert" className="text-xs text-red-500">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-};
+// ── SelectWithChevron ─────────────────────────────────────────────────────────
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+const SelectWithChevron: React.FC<{
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  options: string[];
+  error?: string;
+  disabled?: boolean;
+}> = ({ value, onChange, placeholder, options, error, disabled }) => (
+  <div className="relative">
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      className={
+        selectCls(error) + (disabled ? " opacity-60 cursor-not-allowed" : "")
+      }
+    >
+      <option value="">{placeholder}</option>
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+      aria-hidden="true"
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  </div>
+);
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 const EligibilityTestPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast, showToast, dismissToast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [schools, setSchools] = useState<School[]>([]);
-  const [schoolSearch, setSchoolSearch] = useState("");
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -462,6 +557,7 @@ const EligibilityTestPage: React.FC = () => {
       fullName:
         user?.name ?? `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
       email: user?.email ?? "",
+      phoneCountryCode: "+234",
       phone: user?.phoneNumber ?? "",
       relationship: "",
       employerType: "",
@@ -473,9 +569,11 @@ const EligibilityTestPage: React.FC = () => {
       bvnOrNin: "bvn",
       bvn: "",
       nin: "",
-      bankStatementFile: null,
-      employmentLetterFile: null,
-      utilityBillFile: null,
+      bvnStatus: "idle",
+      ninStatus: "idle",
+      selectedDocType: "",
+      pendingFile: null,
+      uploadedDocs: [],
     },
     step3: {
       institutionType: "",
@@ -506,11 +604,11 @@ const EligibilityTestPage: React.FC = () => {
       return n;
     });
 
-  const loadSchools = useCallback(async (q = "") => {
+  const loadSchools = useCallback(async () => {
     setLoadingSchools(true);
     try {
       const res = await apiClient.get<{ data: { schools?: School[] } }>(
-        `/parents/schools?limit=50${q ? `&search=${encodeURIComponent(q)}` : ""}`,
+        `/parents/schools?limit=100`,
       );
       const arr = Array.isArray(res.data.data)
         ? (res.data.data as School[])
@@ -524,8 +622,10 @@ const EligibilityTestPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (state.step === 2) loadSchools(schoolSearch);
-  }, [state.step, schoolSearch, loadSchools]);
+    if (state.step === 2) loadSchools();
+  }, [state.step, loadSchools]);
+
+  // ── Validation ───────────────────────────────────────────────────────────
 
   const validateStep1 = (): boolean => {
     const e: Record<string, string> = {};
@@ -553,8 +653,8 @@ const EligibilityTestPage: React.FC = () => {
       else if (!/^\d{11}$/.test(s.nin.trim()))
         e.nin = "NIN must be exactly 11 digits.";
     }
-    if (!s.bankStatementFile)
-      e.bankStatementFile = "Bank statement is required.";
+    if (s.uploadedDocs.length === 0)
+      e.uploadedDocs = "Please upload at least one document.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -567,12 +667,6 @@ const EligibilityTestPage: React.FC = () => {
     if (!s.gradeLevel) e.gradeLevel = "Class/level is required.";
     if (!s.repaymentPlan) e.repaymentPlan = "Please choose a repayment plan.";
     if (!s.academicSession) e.academicSession = "Academic session is required.";
-    if (
-      !s.tuitionAmount ||
-      isNaN(Number(s.tuitionAmount)) ||
-      Number(s.tuitionAmount) <= 0
-    )
-      e.tuitionAmount = "Enter a valid tuition amount.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -591,6 +685,8 @@ const EligibilityTestPage: React.FC = () => {
     setErrors(e);
     return Object.keys(e).length === 0;
   };
+
+  // ── Submit handlers ───────────────────────────────────────────────────────
 
   const submitStep1 = async (): Promise<boolean> => {
     if (!validateStep1()) return false;
@@ -614,18 +710,6 @@ const EligibilityTestPage: React.FC = () => {
     if (!validateStep2()) return false;
     patch("isSubmitting", true);
     try {
-      // if (state.step2.bankStatementFile) {
-      //   const fd = new FormData();
-      //   fd.append("file", state.step2.bankStatementFile);
-      //   await apiClient.post("/upload/document", fd, {
-      //     headers: { "Content-Type": "multipart/form-data" },
-      //   });
-      // }
-      // await parentService.verifyKYC(
-      //   state.step2.bvnOrNin === "bvn"
-      //     ? { bvn: state.step2.bvn.trim() }
-      //     : { bvn: state.step2.nin.trim(), nin: state.step2.nin.trim() },
-      // );
       return true;
     } catch (err) {
       showToast(
@@ -642,21 +726,6 @@ const EligibilityTestPage: React.FC = () => {
     if (!validateStep3()) return false;
     patch("isSubmitting", true);
     try {
-      // const firstStudent = state.step4.students[0];
-      // const [firstName, ...lastParts] = (
-      //   firstStudent?.fullName || "Student Student"
-      // ).split(" ");
-      // const res = await apiClient.post<{ data: { id: string } }>(
-      //   "/parents/students",
-      //   {
-      //     schoolId: state.step3.schoolId,
-      //     firstName: firstName || "Student",
-      //     lastName: lastParts.join(" ") || "Student",
-      //     gradeLevel: state.step3.gradeLevel,
-      //     tuitionAmount: Number(state.step3.tuitionAmount),
-      //   },
-      // );
-      // patch("submittedStudentId", res.data.data.id);
       return true;
     } catch (err) {
       showToast(
@@ -676,15 +745,6 @@ const EligibilityTestPage: React.FC = () => {
     }
     patch("isSubmitting", true);
     try {
-      // const res = await apiClient.post<{ data: { referenceNumber?: string } }>(
-      //   "/loans/apply",
-      //   {
-      //     studentId: state.submittedStudentId,
-      //     amount: Number(state.step3.tuitionAmount),
-      //     tenor: tenorFromPlan(state.step3.repaymentPlan),
-      //   },
-      // );
-      // patch("applicationRef", res.data.data.referenceNumber ?? null);
       patch("showSuccess", true);
     } catch (err) {
       showToast(
@@ -740,6 +800,39 @@ const EligibilityTestPage: React.FC = () => {
       students: state.step4.students.filter((_, idx) => idx !== i),
     });
 
+  // Step 2 – document upload helpers
+  const handleFileSelect = (file: File) => {
+    if (!state.step2.selectedDocType) return;
+    const newDoc: UploadedDoc = {
+      id: `doc-${Date.now()}`,
+      name: file.name,
+      size:
+        file.size > 1024 * 1024
+          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+          : `${Math.round(file.size / 1024)} KB`,
+      docType: state.step2.selectedDocType,
+      file,
+      status: "pending",
+    };
+    patch("step2", {
+      ...state.step2,
+      uploadedDocs: [...state.step2.uploadedDocs, newDoc],
+      pendingFile: null,
+    });
+    clearErr("uploadedDocs");
+    // Reset file input so same file can be re-selected if needed
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeDoc = (id: string) => {
+    patch("step2", {
+      ...state.step2,
+      uploadedDocs: state.step2.uploadedDocs.filter((d) => d.id !== id),
+    });
+  };
+
+  // ── Success screen ────────────────────────────────────────────────────────
+
   if (state.showSuccess) {
     const NEXT_STEPS = [
       "Our team will review your application within 24–48 hours",
@@ -765,14 +858,14 @@ const EligibilityTestPage: React.FC = () => {
             </p>
           )}
           <div className="mt-8">
-            <p className="text-sm font-bold text-center mb-5 text-blue-700">
+            <p className="text-sm font-bold text-center mb-5 text-[#8B1C53]">
               What Happens Next?
             </p>
             <ul className="flex flex-col gap-3 text-left">
               {NEXT_STEPS.map((s, i) => (
                 <li
                   key={i}
-                  className="flex items-center gap-3 text-sm text-blue-700"
+                  className="flex items-center gap-3 text-sm text-gray-600"
                 >
                   <CheckIcon className="w-5 h-5 text-green-500 shrink-0" />
                   {s}
@@ -791,6 +884,8 @@ const EligibilityTestPage: React.FC = () => {
     );
   }
 
+  // ── Wizard render ─────────────────────────────────────────────────────────
+
   return (
     <div className="flex flex-col min-h-full animate-fade-in-up">
       <Toast
@@ -799,223 +894,244 @@ const EligibilityTestPage: React.FC = () => {
         onDismiss={dismissToast}
       />
 
-      <div className="w-full max-w-4xl mx-auto rounded-2xl border border-gray-200 bg-white px-6 sm:px-10 py-8 mt-8 mb-12">
+      <div className="w-full max-w-2xl mx-auto rounded-2xl border border-gray-200 bg-white px-6 sm:px-10 py-8 mt-8 mb-12">
         <StepIndicator current={state.step} />
 
+        {/* ── STEP 1 — Parent/Guardian Information ── */}
         {state.step === 0 && (
-          <div className="flex flex-col gap-5 animate-fade-in-up">
+          <div className="flex flex-col gap-6 animate-fade-in-up">
             <div>
-              <h2 className="text-base font-bold text-[#9B1858]">
-                Parent Information / Guardian
+              <h2 className="text-base font-bold text-[#8B1C53]">
+                Parent Information/Guardian
               </h2>
-              <p className="mt-1 text-xs text-[#87144B]">
+              <p className="mt-1 text-sm text-gray-500">
                 Ready to finance your child's school fees with flexibility?
-                Let's start with your{" "}
-                <span className="font-semibold">parent/guardian details.</span>
+                Let's start with your parent/guardian details.
               </p>
             </div>
 
-            <Field
-              label="Full Name"
-              hint="Auto-filled from signup and cannot be edited."
-            >
-              <input
-                value={state.step1.fullName}
-                disabled
-                className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500 cursor-not-allowed"
-              />
-            </Field>
-
-            <Field
-              label="Email Address"
-              hint="We'll use this email to send updates about your application."
-            >
-              <input
-                value={state.step1.email}
-                disabled
-                className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500 cursor-not-allowed"
-              />
-            </Field>
-
-            <Field
-              label="Phone Number"
-              required
-              error={errors.phone}
-              hint="Enter an active number we can reach you on."
-            >
-              <input
-                value={state.step1.phone}
-                placeholder="+234"
-                onChange={(e) => {
-                  patch("step1", { ...state.step1, phone: e.target.value });
-                  clearErr("phone");
-                }}
-                className={inputCls(errors.phone)}
-              />
-            </Field>
-
-            <Field
-              label="Relationship to Student"
-              required
-              error={errors.relationship}
-              hint="Choose if you're the parent, guardian, or sponsor."
-            >
-              <select
-                value={state.step1.relationship}
-                onChange={(e) => {
-                  patch("step1", {
-                    ...state.step1,
-                    relationship: e.target.value,
-                  });
-                  clearErr("relationship");
-                }}
-                className={inputCls(errors.relationship)}
+            {/* Personal details card */}
+            <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
+              {/* Full Name */}
+              <Field
+                label="Full Name"
+                hint="This is auto-filled from signup and cannot be edited"
               >
-                <option value="">– Select Relationship –</option>
-                {RELATIONSHIPS.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                <input
+                  value={state.step1.fullName}
+                  disabled
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500 cursor-not-allowed"
+                />
+              </Field>
 
-            <Field
-              label="Employer / Business Type"
-              required
-              error={errors.employerType}
-            >
-              <select
-                value={state.step1.employerType}
-                onChange={(e) => {
-                  patch("step1", {
-                    ...state.step1,
-                    employerType: e.target.value,
-                  });
-                  clearErr("employerType");
-                }}
-                className={inputCls(errors.employerType)}
+              {/* Email */}
+              <Field
+                label="Email Address"
+                hint="We'll use this email to send you updates about your application."
               >
-                <option value="">– Select employment type –</option>
-                {EMPLOYER_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                <input
+                  value={state.step1.email}
+                  disabled
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500 cursor-not-allowed"
+                />
+              </Field>
 
-            <Field
-              label="Years in Current Role"
-              required
-              error={errors.yearsInRole}
-            >
-              <select
-                value={state.step1.yearsInRole}
-                onChange={(e) => {
-                  patch("step1", {
-                    ...state.step1,
-                    yearsInRole: e.target.value,
-                  });
-                  clearErr("yearsInRole");
-                }}
-                className={inputCls(errors.yearsInRole)}
+              {/* Phone Number with country code selector */}
+              <Field
+                label="Phone Number"
+                required
+                error={errors.phone}
+                hint="Enter your country code"
               >
-                <option value="">– Select years of experience –</option>
-                {YEARS_OPTIONS.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                <div
+                  className={`flex rounded-lg border overflow-hidden transition-colors ${errors.phone ? "border-red-400" : "border-gray-200 focus-within:border-[#8B1C53]"}`}
+                >
+                  <div className="relative shrink-0">
+                    <select
+                      value={state.step1.phoneCountryCode}
+                      onChange={(e) =>
+                        patch("step1", {
+                          ...state.step1,
+                          phoneCountryCode: e.target.value,
+                        })
+                      }
+                      className="h-full appearance-none bg-gray-50 border-r border-gray-200 pl-3 pr-7 py-2.5 text-sm font-medium text-gray-700 focus:outline-none cursor-pointer"
+                      aria-label="Country code"
+                    >
+                      {COUNTRY_CODES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code}
+                        </option>
+                      ))}
+                    </select>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400"
+                      aria-hidden="true"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                  <input
+                    value={state.step1.phone}
+                    placeholder="Enter your phone number"
+                    inputMode="tel"
+                    onChange={(e) => {
+                      patch("step1", { ...state.step1, phone: e.target.value });
+                      clearErr("phone");
+                    }}
+                    className="flex-1 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 bg-white focus:outline-none"
+                  />
+                </div>
+              </Field>
 
-            <Field
-              label="Monthly Income (₦)"
-              required
-              error={errors.monthlyIncome}
-            >
-              <select
-                value={state.step1.monthlyIncome}
-                onChange={(e) => {
-                  patch("step1", {
-                    ...state.step1,
-                    monthlyIncome: e.target.value,
-                  });
-                  clearErr("monthlyIncome");
-                }}
-                className={inputCls(errors.monthlyIncome)}
+              {/* Relationship to Student */}
+              <Field
+                label="Relationship to Student"
+                required
+                error={errors.relationship}
+                hint="Choose if you're the parent, guardian, student"
               >
-                <option value="">– Select income range –</option>
-                {INCOME_RANGES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                <SelectWithChevron
+                  value={state.step1.relationship}
+                  onChange={(v) => {
+                    patch("step1", { ...state.step1, relationship: v });
+                    clearErr("relationship");
+                  }}
+                  placeholder="-Select Relationship-"
+                  options={RELATIONSHIPS}
+                  error={errors.relationship}
+                />
+              </Field>
+            </div>
 
-            <Field
-              label="Home Address"
-              required
-              error={errors.homeAddress}
-              hint="Enter your full residential address for verification."
-            >
-              <input
-                value={state.step1.homeAddress}
-                placeholder="Enter your address"
-                onChange={(e) => {
-                  patch("step1", {
-                    ...state.step1,
-                    homeAddress: e.target.value,
-                  });
-                  clearErr("homeAddress");
-                }}
-                className={inputCls(errors.homeAddress)}
-              />
-            </Field>
+            {/* Employment details card */}
+            <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
+              {/* Employer / Business Type */}
+              <Field
+                label="Employer / Business Type"
+                required
+                error={errors.employerType}
+                hint="This helps us understand your source of repayment."
+              >
+                <SelectWithChevron
+                  value={state.step1.employerType}
+                  onChange={(v) => {
+                    patch("step1", { ...state.step1, employerType: v });
+                    clearErr("employerType");
+                  }}
+                  placeholder="-Select your employment type-"
+                  options={EMPLOYER_TYPES}
+                  error={errors.employerType}
+                />
+              </Field>
+
+              {/* Years in Current Role */}
+              <Field
+                label="Years in Current Role"
+                required
+                error={errors.yearsInRole}
+                hint="Enter your full residential address for verification purposes."
+              >
+                <SelectWithChevron
+                  value={state.step1.yearsInRole}
+                  onChange={(v) => {
+                    patch("step1", { ...state.step1, yearsInRole: v });
+                    clearErr("yearsInRole");
+                  }}
+                  placeholder="-Select years of experience-"
+                  options={YEARS_OPTIONS}
+                  error={errors.yearsInRole}
+                />
+              </Field>
+
+              {/* Monthly Income */}
+              <Field
+                label="Monthly Income (₦)"
+                required
+                error={errors.monthlyIncome}
+              >
+                <SelectWithChevron
+                  value={state.step1.monthlyIncome}
+                  onChange={(v) => {
+                    patch("step1", { ...state.step1, monthlyIncome: v });
+                    clearErr("monthlyIncome");
+                  }}
+                  placeholder="-Select your income range-"
+                  options={INCOME_RANGES}
+                  error={errors.monthlyIncome}
+                />
+              </Field>
+
+              {/* Home Address */}
+              <Field
+                label="Home Address"
+                required
+                error={errors.homeAddress}
+                hint="Enter your full residential address for verification purposes."
+              >
+                <input
+                  value={state.step1.homeAddress}
+                  placeholder="Enter your address"
+                  onChange={(e) => {
+                    patch("step1", {
+                      ...state.step1,
+                      homeAddress: e.target.value,
+                    });
+                    clearErr("homeAddress");
+                  }}
+                  className={inputCls(errors.homeAddress)}
+                />
+              </Field>
+            </div>
           </div>
         )}
 
         {/* ── STEP 2 — BVN/NIN & Credit Verification ── */}
         {state.step === 1 && (
-          <div className="flex flex-col gap-5 animate-fade-in-up">
+          <div className="flex flex-col gap-6 animate-fade-in-up">
             <div>
               <h2 className="text-base font-bold text-[#8B1C53]">
                 Identity &amp; Document Verification
               </h2>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-sm text-gray-500">
                 Verify your identity and upload required documents
               </p>
             </div>
 
-            {/* BVN / NIN card */}
+            {/* Identity Verification card */}
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
+              {/* Card header */}
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#87144B]/10">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200">
                   <svg
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#87144B"
+                    stroke="#6b7280"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="w-4 h-4"
+                    className="w-3.5 h-3.5"
                     aria-hidden="true"
                   >
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                   </svg>
                 </div>
-                <p className="text-sm font-semibold text-[#87144B]">
+                <p className="text-sm font-semibold text-gray-800">
                   Identity Verification
                 </p>
               </div>
               <p className="text-xs text-gray-500 -mt-2">
-                Verify your identity using BVN or NIN for faster processing
+                Verify your identity using your BVN or NIN for faster processing
               </p>
 
-              {/* Segmented toggle */}
-              <div className="flex rounded-full p-2 bg-[#FBF4FD]">
+              {/* BVN / NIN tab toggle */}
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden">
                 {(["bvn", "nin"] as const).map((tab) => (
                   <button
                     key={tab}
@@ -1023,60 +1139,128 @@ const EligibilityTestPage: React.FC = () => {
                     onClick={() =>
                       patch("step2", { ...state.step2, bvnOrNin: tab })
                     }
-                    className="flex-1 py-3 text-sm font-semibold rounded-full transition-all duration-200"
-                    style={
+                    className={[
+                      "flex-1 py-2.5 text-sm font-semibold transition-colors",
                       state.step2.bvnOrNin === tab
-                        ? {
-                            backgroundColor: "#87144B",
-                            color: "#fff",
-                            boxShadow: "0 1px 4px rgba(84,12,47,0.25)",
-                          }
-                        : { backgroundColor: "transparent", color: "#888" }
-                    }
+                        ? "bg-[#8B1C53] text-white"
+                        : "bg-white text-gray-500 hover:bg-gray-50",
+                    ].join(" ")}
                   >
                     {tab.toUpperCase()} Verification
                   </button>
                 ))}
               </div>
 
-              {state.step2.bvnOrNin === "bvn" ? (
+              {/* BVN input */}
+              {state.step2.bvnOrNin === "bvn" && (
                 <Field
                   label="Bank Verification Number (BVN)"
                   required
                   error={errors.bvn}
-                  hint="11-digit number linked to your bank account."
                 >
-                  <div className="flex gap-2">
-                    <input
-                      value={state.step2.bvn}
-                      maxLength={11}
-                      inputMode="numeric"
-                      placeholder="Enter your 11-digit BVN"
-                      onChange={(e) => {
-                        patch("step2", {
-                          ...state.step2,
-                          bvn: e.target.value.replace(/\D/g, ""),
-                        });
-                        clearErr("bvn");
-                      }}
-                      className={inputCls(errors.bvn) + " flex-1"}
-                    />
-                    <button
-                      type="button"
-                      className="shrink-0 rounded-md px-4 py-2 text-xs font-semibold text-white bg-[#87144B] hover:bg-[#7a1848] transition-colors"
-                    >
-                      Verify BVN
-                    </button>
+                  <div
+                    className={`flex rounded-lg border overflow-hidden ${
+                      state.step2.bvnStatus === "error"
+                        ? "border-red-300 bg-red-50"
+                        : errors.bvn
+                          ? "border-red-400"
+                          : "border-gray-200"
+                    }`}
+                  >
+                    {state.step2.bvnStatus === "error" ? (
+                      <div className="flex-1 px-3 py-2.5 flex items-start gap-2">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#ef4444"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="w-4 h-4 mt-0.5 shrink-0"
+                          aria-hidden="true"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-semibold text-red-600">
+                            We couldn't verify this BVN
+                          </p>
+                          <p className="text-xs text-red-500">
+                            Check the number and try again, or use your NIN
+                            instead.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            patch("step2", {
+                              ...state.step2,
+                              bvnStatus: "idle",
+                              bvn: "",
+                            })
+                          }
+                          className="ml-auto text-gray-400 hover:text-gray-600 shrink-0"
+                          aria-label="Retry BVN"
+                        >
+                          <RefreshIcon />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          value={state.step2.bvn}
+                          maxLength={11}
+                          inputMode="numeric"
+                          placeholder="Enter your 11-digit BVN"
+                          onChange={(e) => {
+                            patch("step2", {
+                              ...state.step2,
+                              bvn: e.target.value.replace(/\D/g, ""),
+                              bvnStatus: "idle",
+                            });
+                            clearErr("bvn");
+                          }}
+                          className="flex-1 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!/^\d{11}$/.test(state.step2.bvn)) {
+                              setErrors((p) => ({
+                                ...p,
+                                bvn: "BVN must be exactly 11 digits.",
+                              }));
+                            }
+                            // In production: call verify API here, set bvnStatus accordingly
+                          }}
+                          className="shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 hover:text-[#8B1C53] border-l border-gray-200 bg-gray-50 transition-colors"
+                        >
+                          Verify
+                        </button>
+                      </>
+                    )}
                   </div>
+                  {state.step2.bvnStatus === "error" && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Visit your nearest BVN enrollment center or check your NIN
+                      slip
+                    </p>
+                  )}
                 </Field>
-              ) : (
+              )}
+
+              {/* NIN input */}
+              {state.step2.bvnOrNin === "nin" && (
                 <Field
                   label="National Identification Number (NIN)"
                   required
                   error={errors.nin}
-                  hint="11-digit NIN from your NIMC slip."
                 >
-                  <div className="flex gap-2">
+                  <div
+                    className={`flex rounded-lg border overflow-hidden ${errors.nin ? "border-red-400" : "border-gray-200"}`}
+                  >
                     <input
                       value={state.step2.nin}
                       maxLength={11}
@@ -1089,322 +1273,382 @@ const EligibilityTestPage: React.FC = () => {
                         });
                         clearErr("nin");
                       }}
-                      className={inputCls(errors.nin) + " flex-1"}
+                      className="flex-1 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none"
                     />
                     <button
                       type="button"
-                      className="shrink-0 rounded-md px-4 py-2 text-xs font-semibold text-white bg-[#87144B] hover:bg-[#7a1848] transition-colors"
+                      className="shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 hover:text-[#8B1C53] border-l border-gray-200 bg-gray-50 transition-colors"
                     >
-                      Verify NIN
+                      Verify
                     </button>
                   </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    11-digit NIN from your NIMC slip or National ID card
+                  </p>
                 </Field>
               )}
             </div>
 
-            {/* Document uploads */}
-            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 flex flex-col gap-4">
-              <p className="text-sm font-semibold text-gray-700">
-                Upload Documents
+            {/* Upload documents card */}
+            <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-800">
+                  Upload documents
+                </p>
+                <span className="text-xs text-gray-400">
+                  {state.step2.uploadedDocs.length} of 3 required
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 -mt-2">
+                Choose a document type, then upload the file. We accept PDF,
+                JPG, or PNG.
               </p>
-              <FileUploadRow
-                label="Bank Statement (Last 3 months) *"
-                file={state.step2.bankStatementFile}
-                error={errors.bankStatementFile}
-                onChange={(f) => {
-                  patch("step2", { ...state.step2, bankStatementFile: f });
-                  clearErr("bankStatementFile");
+
+              {/* Document type dropdown */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">
+                  Document type
+                </label>
+                <SelectWithChevron
+                  value={state.step2.selectedDocType}
+                  onChange={(v) =>
+                    patch("step2", { ...state.step2, selectedDocType: v })
+                  }
+                  placeholder="Select document type"
+                  options={DOCUMENT_TYPES}
+                />
+              </div>
+
+              {/* Drop zone */}
+              <div
+                className={`rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 py-10 cursor-pointer ${
+                  state.step2.selectedDocType
+                    ? "border-gray-300 hover:border-[#8B1C53]/50 bg-white"
+                    : "border-gray-200 bg-gray-50 cursor-not-allowed"
+                }`}
+                onClick={() =>
+                  state.step2.selectedDocType && fileInputRef.current?.click()
+                }
+                onDragOver={(e) => {
+                  e.preventDefault();
                 }}
-              />
-              <p className="text-xs text-gray-400 -mt-2">
-                PDF, JPG, or PNG format
-              </p>
-              <FileUploadRow
-                label="Employment Letter / Business Registration"
-                file={state.step2.employmentLetterFile}
-                onChange={(f) =>
-                  patch("step2", { ...state.step2, employmentLetterFile: f })
-                }
-              />
-              <FileUploadRow
-                label="Utility Bill (Proof of Address)"
-                file={state.step2.utilityBillFile}
-                onChange={(f) =>
-                  patch("step2", { ...state.step2, utilityBillFile: f })
-                }
-              />
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file && state.step2.selectedDocType)
+                    handleFileSelect(file);
+                }}
+                role="button"
+                aria-label="Upload document"
+                tabIndex={state.step2.selectedDocType ? 0 : -1}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    state.step2.selectedDocType &&
+                      fileInputRef.current?.click();
+                  }
+                }}
+              >
+                <UploadCloudIcon />
+                <p
+                  className={`text-sm font-medium ${state.step2.selectedDocType ? "text-gray-600" : "text-gray-400"}`}
+                >
+                  {state.step2.selectedDocType
+                    ? "Select a document type to enable upload"
+                    : "Select a document type to enable upload"}
+                </p>
+                <p className="text-xs text-gray-400">
+                  PDF, JPG, or PNG – up to 10 MB
+                </p>
+                <button
+                  type="button"
+                  disabled={!state.step2.selectedDocType}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="mt-2 rounded-full bg-[#8B1C53] px-6 py-2 text-sm font-semibold text-white hover:bg-[#7a1848] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Browser
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileSelect(file);
+                  }}
+                />
+              </div>
+
+              {errors.uploadedDocs && (
+                <p role="alert" className="text-xs text-red-500">
+                  {errors.uploadedDocs}
+                </p>
+              )}
             </div>
 
-            <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-xs text-green-700">
-              <span className="font-semibold">Almost done!</span> Review your
-              information on the next page before submitting.
-            </div>
+            {/* Uploaded documents table */}
+            {state.step2.uploadedDocs.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-semibold text-gray-800">
+                  Uploaded documents
+                </p>
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  {/* Table header */}
+                  <div className="grid grid-cols-[1fr_100px_80px] bg-[#FBF4FD] px-4 py-2.5 text-xs font-semibold text-[#8B1C53]">
+                    <span>Document</span>
+                    <span className="text-center">Status</span>
+                    <span className="text-right">Actions</span>
+                  </div>
+                  {/* Table rows */}
+                  {state.step2.uploadedDocs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="grid grid-cols-[1fr_100px_80px] items-center px-4 py-3 border-t border-gray-100"
+                    >
+                      {/* Document name + size */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <PaperclipIcon />
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-700 truncate">
+                            {doc.name}
+                          </p>
+                          <p className="text-xs text-gray-400">{doc.size}</p>
+                        </div>
+                      </div>
+                      {/* Status badge */}
+                      <div className="flex justify-center">
+                        {doc.status === "verified" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-semibold text-green-600">
+                            <CheckIcon className="w-3 h-3" />
+                            Verified
+                          </span>
+                        ) : doc.status === "failed" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-500">
+                            Failed
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-600">
+                            Pending
+                          </span>
+                        )}
+                      </div>
+                      {/* Actions */}
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          aria-label="Hide document"
+                          className="text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          <EyeOffIcon />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeDoc(doc.id)}
+                          aria-label="Remove document"
+                          className="text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* ── STEP 3 — Select School & Tuition Plan ── */}
         {state.step === 2 && (
-          <div className="flex flex-col gap-5 animate-fade-in-up">
+          <div className="flex flex-col gap-6 animate-fade-in-up">
             <div>
               <h2 className="text-base font-bold text-[#8B1C53]">
-                Choose School &amp; School Fee Plan
+                Choose School &amp; School fee Plan
               </h2>
-              <p className="mt-1 text-xs text-gray-500">
-                Select your child's school and choose a tuition plan. Your
-                application will be linked directly to the school for payment.
+              <p className="mt-1 text-sm text-gray-500">
+                Select your child's school and choose a tuition plan that fits
+                your needs. Your application will be linked directly to the
+                school for payment.
               </p>
             </div>
 
-            <Field
-              label="Institution Type"
-              required
-              error={errors.institutionType}
-              hint="Choose whether your child attends primary, secondary, or tertiary."
-            >
-              <select
-                value={state.step3.institutionType}
-                onChange={(e) => {
-                  patch("step3", {
-                    ...state.step3,
-                    institutionType: e.target.value,
-                  });
-                  clearErr("institutionType");
-                }}
-                className={inputCls(errors.institutionType)}
+            <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
+              {/* Institution Type */}
+              <Field
+                label="Institution Type"
+                required
+                error={errors.institutionType}
+                hint="Choose whether your child attends a primary, secondary, or tertiary institution."
               >
-                <option value="">– Select Institution level –</option>
-                {INSTITUTION_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                <SelectWithChevron
+                  value={state.step3.institutionType}
+                  onChange={(v) => {
+                    patch("step3", {
+                      ...state.step3,
+                      institutionType: v,
+                      gradeLevel: "",
+                      schoolId: "",
+                      schoolName: "",
+                    });
+                    clearErr("institutionType");
+                  }}
+                  placeholder="-Select institution level-"
+                  options={INSTITUTION_TYPES}
+                  error={errors.institutionType}
+                />
+              </Field>
 
-            <Field
-              label="Choose Student School"
-              required
-              error={errors.schoolId}
-              hint="Only schools partnered with SkulCredit appear here."
-            >
-              <div className="flex flex-col gap-1.5">
-                <input
-                  value={schoolSearch}
-                  placeholder="Type to search school name…"
-                  className={inputCls(errors.schoolId)}
-                  onChange={(e) => {
-                    setSchoolSearch(e.target.value);
-                    if (state.step3.schoolId)
+              {/* Choose Student School */}
+              <Field
+                label="Choose Student School"
+                required
+                error={errors.schoolId}
+                hint="Only schools partnered with Skulcredit will appear here."
+              >
+                <div className="relative">
+                  <select
+                    value={state.step3.schoolId}
+                    onChange={(e) => {
+                      const selected = schools.find(
+                        (s) => s.id === e.target.value,
+                      );
                       patch("step3", {
                         ...state.step3,
-                        schoolId: "",
-                        schoolName: "",
+                        schoolId: e.target.value,
+                        schoolName: selected?.schoolName ?? "",
                       });
-                    clearErr("schoolId");
+                      clearErr("schoolId");
+                    }}
+                    disabled={loadingSchools}
+                    className={
+                      selectCls(errors.schoolId) +
+                      (loadingSchools ? " opacity-60 cursor-wait" : "")
+                    }
+                  >
+                    <option value="">
+                      {loadingSchools ? "Loading schools…" : "-Choose School-"}
+                    </option>
+                    {schools.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.schoolName}
+                        {s.addressCity ? ` – ${s.addressCity}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                    aria-hidden="true"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+              </Field>
+
+              {/* Class / Level */}
+              <Field
+                label="Class/Level"
+                required
+                error={errors.gradeLevel}
+                hint="Choose student class or level"
+              >
+                <SelectWithChevron
+                  value={state.step3.gradeLevel}
+                  onChange={(v) => {
+                    patch("step3", { ...state.step3, gradeLevel: v });
+                    clearErr("gradeLevel");
                   }}
+                  placeholder="-Choose Student Class/Level-"
+                  options={
+                    state.step3.institutionType
+                      ? (GRADE_LEVELS[state.step3.institutionType] ?? [])
+                      : []
+                  }
+                  error={errors.gradeLevel}
+                  disabled={!state.step3.institutionType}
                 />
+              </Field>
 
-                {loadingSchools && (
-                  <p className="text-xs text-gray-400">Loading schools…</p>
-                )}
-
-                {!loadingSchools &&
-                  schools.length > 0 &&
-                  !state.step3.schoolId &&
-                  schoolSearch.length > 0 && (
-                    <div className="rounded-md border border-gray-200 bg-white shadow-sm max-h-48 overflow-y-auto z-10">
-                      {schools
-                        .filter((s) =>
-                          s.schoolName
-                            .toLowerCase()
-                            .includes(schoolSearch.toLowerCase()),
-                        )
-                        .map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            className="w-full px-3 py-2.5 text-left text-sm hover:bg-[#8B1C53]/5 transition-colors border-b border-gray-50 last:border-0"
-                            onClick={() => {
-                              patch("step3", {
-                                ...state.step3,
-                                schoolId: s.id,
-                                schoolName: s.schoolName,
-                              });
-                              setSchoolSearch(s.schoolName);
-                              clearErr("schoolId");
-                            }}
-                          >
-                            {s.schoolName}
-                            <span className="ml-1.5 text-xs text-gray-400">
-                              {s.addressCity}, {s.addressState}
-                            </span>
-                          </button>
-                        ))}
-                    </div>
-                  )}
-
-                {state.step3.schoolId && (
-                  <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2">
-                    <span className="flex h-2 w-2 rounded-full bg-green-500 shrink-0" />
-                    <span className="text-xs font-medium text-green-700 flex-1">
-                      {state.step3.schoolName}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        patch("step3", {
-                          ...state.step3,
-                          schoolId: "",
-                          schoolName: "",
-                        });
-                        setSchoolSearch("");
-                      }}
-                      className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      Change
-                    </button>
-                  </div>
-                )}
-
-                {!loadingSchools &&
-                  schools.length === 0 &&
-                  schoolSearch.trim() &&
-                  !state.step3.schoolId && (
-                    <button
-                      type="button"
-                      className="w-full text-left rounded-md border border-dashed border-gray-300 px-3 py-2 text-xs text-gray-500 hover:border-[#8B1C53]/50 hover:text-[#8B1C53] transition-colors"
-                      onClick={() => {
-                        patch("step3", {
-                          ...state.step3,
-                          schoolId: `manual-${Date.now()}`,
-                          schoolName: schoolSearch.trim(),
-                        });
-                        clearErr("schoolId");
-                      }}
-                    >
-                      + Use "
-                      <span className="font-medium">{schoolSearch.trim()}</span>
-                      " as school name
-                    </button>
-                  )}
-              </div>
-            </Field>
-
-            <Field label="Class / Level" required error={errors.gradeLevel}>
-              <input
-                value={state.step3.gradeLevel}
-                placeholder="e.g. JSS 2, Grade 5, 200L"
-                onChange={(e) => {
-                  patch("step3", {
-                    ...state.step3,
-                    gradeLevel: e.target.value,
-                  });
-                  clearErr("gradeLevel");
-                }}
-                className={inputCls(errors.gradeLevel)}
-              />
-            </Field>
-
-            <Field
-              label="Tuition Amount (₦)"
-              required
-              error={errors.tuitionAmount}
-            >
-              <input
-                value={state.step3.tuitionAmount}
-                inputMode="numeric"
-                placeholder="e.g. 250000"
-                onChange={(e) => {
-                  patch("step3", {
-                    ...state.step3,
-                    tuitionAmount: e.target.value.replace(/[^0-9.]/g, ""),
-                  });
-                  clearErr("tuitionAmount");
-                }}
-                className={inputCls(errors.tuitionAmount)}
-              />
-            </Field>
-
-            <Field
-              label="Choose Repayment Plan"
-              required
-              error={errors.repaymentPlan}
-              hint="Select a flexible repayment option."
-            >
-              <select
-                value={state.step3.repaymentPlan}
-                onChange={(e) => {
-                  patch("step3", {
-                    ...state.step3,
-                    repaymentPlan: e.target.value,
-                  });
-                  clearErr("repaymentPlan");
-                }}
-                className={inputCls(errors.repaymentPlan)}
+              {/* Choose Repayment Plan */}
+              <Field
+                label="Choose Repayment Plan"
+                required
+                error={errors.repaymentPlan}
+                hint="Select a flexible repayment option that works for you"
               >
-                <option value="">– Choose Repayment Plan –</option>
-                {REPAYMENT_PLANS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                <SelectWithChevron
+                  value={state.step3.repaymentPlan}
+                  onChange={(v) => {
+                    patch("step3", { ...state.step3, repaymentPlan: v });
+                    clearErr("repaymentPlan");
+                  }}
+                  placeholder="-Choose Repayment Plan-"
+                  options={REPAYMENT_PLANS}
+                  error={errors.repaymentPlan}
+                />
+              </Field>
 
-            <Field
-              label="Academic Session / Term"
-              required
-              error={errors.academicSession}
-            >
-              <select
-                value={state.step3.academicSession}
-                onChange={(e) => {
-                  patch("step3", {
-                    ...state.step3,
-                    academicSession: e.target.value,
-                  });
-                  clearErr("academicSession");
-                }}
-                className={inputCls(errors.academicSession)}
+              {/* Academic Session / Term */}
+              <Field
+                label="Academy Session/Term"
+                required
+                error={errors.academicSession}
+                hint="Select the academic year and the current term or semester"
               >
-                <option value="">– Select Academic Session / Term –</option>
-                {SESSIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                <SelectWithChevron
+                  value={state.step3.academicSession}
+                  onChange={(v) => {
+                    patch("step3", { ...state.step3, academicSession: v });
+                    clearErr("academicSession");
+                  }}
+                  placeholder="-Select Academic Session/Term-"
+                  options={SESSIONS}
+                  error={errors.academicSession}
+                />
+              </Field>
+            </div>
 
-            {(state.step3.schoolId || state.step3.tuitionAmount) && (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <p className="text-sm font-semibold text-gray-800 mb-2">
+            {/* Selection Summary */}
+            {(state.step3.schoolId || state.step3.gradeLevel) && (
+              <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <p className="text-sm font-semibold text-[#8B1C53] mb-3">
                   Your Selection Summary
                 </p>
-                {state.step3.institutionType && (
-                  <Row
-                    label="Institution"
-                    value={state.step3.institutionType}
-                  />
-                )}
-                {state.step3.schoolName && (
-                  <Row label="School" value={state.step3.schoolName} />
-                )}
-                {state.step3.gradeLevel && (
-                  <Row label="Level" value={state.step3.gradeLevel} />
-                )}
-                {state.step3.academicSession && (
-                  <Row label="Session" value={state.step3.academicSession} />
-                )}
-                {state.step3.tuitionAmount && (
-                  <Row
-                    label="Tuition Fee"
-                    value={`₦${Number(state.step3.tuitionAmount).toLocaleString()}`}
-                  />
-                )}
-                {state.step3.repaymentPlan && (
-                  <Row label="Plan" value={state.step3.repaymentPlan} />
-                )}
+                <div className="flex flex-col">
+                  {state.step3.institutionType && (
+                    <Row
+                      label="Institution"
+                      value={state.step3.institutionType}
+                    />
+                  )}
+                  {state.step3.schoolName && (
+                    <Row label="School" value={state.step3.schoolName} />
+                  )}
+                  {state.step3.gradeLevel && (
+                    <Row label="Level" value={state.step3.gradeLevel} />
+                  )}
+                  {state.step3.academicSession && (
+                    <Row label="Session" value={state.step3.academicSession} />
+                  )}
+                  {state.step3.tuitionAmount && (
+                    <Row
+                      label="Tuition Fee"
+                      value={`#${Number(state.step3.tuitionAmount).toLocaleString()}`}
+                    />
+                  )}
+                  {state.step3.repaymentPlan && (
+                    <Row label="Plan" value={state.step3.repaymentPlan} />
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1417,7 +1661,7 @@ const EligibilityTestPage: React.FC = () => {
               <h2 className="text-base font-bold text-[#8B1C53]">
                 Student Information
               </h2>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-sm text-gray-500">
                 Provide accurate student details. You can add multiple students.
               </p>
             </div>
@@ -1469,15 +1713,13 @@ const EligibilityTestPage: React.FC = () => {
                   />
                 </Field>
                 <Field label="Gender" required error={errors[`st_${i}_gender`]}>
-                  <select
+                  <SelectWithChevron
                     value={st.gender}
-                    onChange={(e) => updateStudent(i, "gender", e.target.value)}
-                    className={inputCls(errors[`st_${i}_gender`])}
-                  >
-                    <option value="">– Select Gender –</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                  </select>
+                    onChange={(v) => updateStudent(i, "gender", v)}
+                    placeholder="– Select Gender –"
+                    options={["Male", "Female"]}
+                    error={errors[`st_${i}_gender`]}
+                  />
                 </Field>
                 <Field
                   label="Admission Number / Student ID"
@@ -1509,7 +1751,7 @@ const EligibilityTestPage: React.FC = () => {
               <p className="text-sm font-semibold text-gray-800 mb-3">
                 Application Summary
               </p>
-              <div className="flex flex-col divide-y divide-gray-100">
+              <div className="flex flex-col">
                 <Row
                   label="Parent/Guardian"
                   value={state.step1.fullName || "—"}
@@ -1595,14 +1837,13 @@ const EligibilityTestPage: React.FC = () => {
               type="button"
               onClick={handleBack}
               disabled={state.isSubmitting}
-              className="flex items-center gap-1.5 rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               <BackIcon /> Back
             </button>
           ) : (
             <div />
           )}
-
           <button
             type="button"
             onClick={handleNext}
@@ -1613,7 +1854,7 @@ const EligibilityTestPage: React.FC = () => {
               ? "Please wait…"
               : state.step === 3
                 ? "Submit Application"
-                : "Next →"}
+                : "Next"}
           </button>
         </div>
       </div>

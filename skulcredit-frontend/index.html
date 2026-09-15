@@ -29,6 +29,146 @@
   <body
     class="bg-[#F8FAFC] text-slate-800 font-sans selection:bg-rose-100 selection:text-rose-900"
   >
+    <!--
+      ┌─────────────────────────────────────────────────────────────────────┐
+      │  PRE-REACT AUTH MIDDLEWARE                                          │
+      │                                                                     │
+      │  Runs synchronously before React mounts — equivalent to Next.js    │
+      │  edge middleware.  Reads localStorage and makes instant redirects  │
+      │  so the user NEVER sees a flash of the wrong page.                 │
+      │                                                                     │
+      │  Rules (mirrors AppRouter + ProtectedRoute + PublicRoute):          │
+      │                                                                     │
+      │  1. Public paths  + authenticated  → role dashboard                 │
+      │  2. Private paths + unauthenticated → /auth                        │
+      │  3. Private paths + wrong role      → own role dashboard            │
+      │  4. Everything else                 → proceed normally             │
+      └─────────────────────────────────────────────────────────────────────┘
+    -->
+    <script>
+      (function () {
+        // ── Route tables (must stay in sync with src/config/routes.ts) ──────
+        var PUBLIC_EXACT = [
+          "/",
+          "/auth",
+          "/auth/parent",
+          "/auth/school",
+          "/auth/admin",
+          "/school/onboarding",
+        ];
+
+        var PUBLIC_PREFIX = []; // none currently
+
+        var PRIVATE_PREFIX = [
+          "/parent",
+          "/school/dashboard",
+          "/school/applications",
+          "/school/students",
+          "/school/disbursement",
+          "/school/settings",
+          "/admin",
+        ];
+
+        var ROLE_DASHBOARD = {
+          parent: "/parent/dashboard",
+          school: "/school/dashboard",
+          admin: "/admin/dashboard",
+        };
+
+        // The role prefix a user is ALLOWED to access.
+        var ROLE_PREFIX = {
+          parent: "/parent",
+          school: "/school",
+          admin: "/admin",
+        };
+
+        // ── Helpers ──────────────────────────────────────────────────────────
+
+        function isPublic(path) {
+          if (PUBLIC_EXACT.indexOf(path) !== -1) return true;
+          for (var i = 0; i < PUBLIC_PREFIX.length; i++) {
+            if (
+              path === PUBLIC_PREFIX[i] ||
+              path.startsWith(PUBLIC_PREFIX[i] + "/")
+            )
+              return true;
+          }
+          return false;
+        }
+
+        function isPrivate(path) {
+          for (var i = 0; i < PRIVATE_PREFIX.length; i++) {
+            var p = PRIVATE_PREFIX[i];
+            if (path === p || path.startsWith(p + "/")) return true;
+          }
+          return false;
+        }
+
+        function getUser() {
+          try {
+            var raw =
+              localStorage.getItem("sc_user") ||
+              localStorage.getItem("skulcredit_user");
+            return raw ? JSON.parse(raw) : null;
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function redirect(to) {
+          // Use replace so the invalid path is not added to browser history.
+          if (window.location.pathname !== to) {
+            window.location.replace(to);
+          }
+        }
+
+        // ── Middleware logic ─────────────────────────────────────────────────
+
+        var pathname = window.location.pathname;
+
+        // Skip asset paths (should never reach here via nginx, but be safe).
+        if (
+          pathname.startsWith("/_next") ||
+          pathname.startsWith("/api") ||
+          pathname.match(/\.[a-z0-9]+$/i)
+        ) {
+          return;
+        }
+
+        var user = getUser();
+        var isAuth = !!(user && user.role);
+        var isPublicPath = isPublic(pathname);
+        var isPrivatePath = isPrivate(pathname);
+
+        // Rule 1: authenticated user visiting a public page → own dashboard.
+        if (isAuth && isPublicPath) {
+          redirect(ROLE_DASHBOARD[user.role] || "/auth");
+          return;
+        }
+
+        // Rule 2: unauthenticated user visiting a private page → /auth.
+        if (!isAuth && isPrivatePath) {
+          redirect("/auth");
+          return;
+        }
+
+        // Rule 3: authenticated user visiting the wrong role's private area.
+        // e.g. a PARENT manually typing /admin/dashboard.
+        if (isAuth && isPrivatePath) {
+          var allowedPrefix = ROLE_PREFIX[user.role];
+          // School users are allowed on /school/* paths only.
+          // Admin users are allowed on /admin/* paths only.
+          // Parent users are allowed on /parent/* paths only.
+          if (allowedPrefix && !pathname.startsWith(allowedPrefix)) {
+            redirect(ROLE_DASHBOARD[user.role] || "/auth");
+            return;
+          }
+        }
+
+        // Rule 4: proceed normally.
+      })();
+    </script>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

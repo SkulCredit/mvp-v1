@@ -1,3 +1,26 @@
+/**
+ * AppRouter
+ *
+ * Public routes  → wrapped in <PublicRoute>
+ *   /            – home / landing page
+ *   /auth        – role-selector
+ *   /auth/parent – parent login & register
+ *   /auth/school – school login & register
+ *   /auth/admin  – admin login
+ *
+ * School onboarding is also public: a school needs to register before
+ * they have credentials to log in.
+ *   /school/onboarding
+ *
+ * Protected routes → wrapped in <ProtectedRoute allowedRoles={[...]}>
+ *
+ *   PARENT  /parent/*   – single layout route (ParentLayout as outlet)
+ *   SCHOOL  /school/*   – individually wrapped (no shared layout yet)
+ *   ADMIN   /admin/*    – individually wrapped
+ *
+ * Any unknown path falls through to the catch-all → /
+ */
+
 import React, { Suspense } from "react";
 import {
   BrowserRouter as Router,
@@ -6,26 +29,28 @@ import {
   Navigate,
 } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
+import PublicRoute from "../components/PublicRoute";
+import { AuthSpinner } from "../context/AuthContext";
 
+// ── Lazy page imports ─────────────────────────────────────────────────────────
+
+// Public / auth
 const HomePage = React.lazy(() => import("../pages/Home/HomePage"));
 const UnifiedAuthPage = React.lazy(
   () => import("../pages/Auth/UnifiedAuthPage"),
 );
 const ParentAuthPage = React.lazy(() => import("../pages/Auth/ParentAuthPage"));
-
-const EligibilityTestPage = React.lazy(
-  () => import("../pages/ParentFlow/EligibilityTestPage"),
+const SchoolAuthPage = React.lazy(
+  () => import("../pages/SchoolFlow/SchoolAuthPage"),
 );
-const StudentDetailsPage = React.lazy(
-  () => import("../pages/ParentFlow/StudentDetailsPage"),
+const AdminAuthPage = React.lazy(
+  () => import("../pages/AdminFlow/AdminAuthPage"),
 );
-const ServiceChargePage = React.lazy(
-  () => import("../pages/ParentFlow/ServiceChargePage"),
-);
-const PaymentConfirmationPage = React.lazy(
-  () => import("../pages/ParentFlow/PaymentConfirmationPage"),
+const SchoolOnboardingPage = React.lazy(
+  () => import("../pages/SchoolFlow/SchoolOnboardingPage"),
 );
 
+// Parent flow
 const ParentLayout = React.lazy(
   () => import("../pages/ParentFlow/ParentLayout"),
 );
@@ -47,13 +72,20 @@ const ParentSupportPage = React.lazy(
 const ParentSettingsPage = React.lazy(
   () => import("../pages/ParentFlow/ParentSettingsPage"),
 );
+const StudentDetailsPage = React.lazy(
+  () => import("../pages/ParentFlow/StudentDetailsPage"),
+);
+const EligibilityTestPage = React.lazy(
+  () => import("../pages/ParentFlow/EligibilityTestPage"),
+);
+const ServiceChargePage = React.lazy(
+  () => import("../pages/ParentFlow/ServiceChargePage"),
+);
+const PaymentConfirmationPage = React.lazy(
+  () => import("../pages/ParentFlow/PaymentConfirmationPage"),
+);
 
-const SchoolAuthPage = React.lazy(
-  () => import("../pages/SchoolFlow/SchoolAuthPage"),
-);
-const SchoolOnboardingPage = React.lazy(
-  () => import("../pages/SchoolFlow/SchoolOnboardingPage"),
-);
+// School flow
 const SchoolDashboardPage = React.lazy(
   () => import("../pages/SchoolFlow/SchoolDashboardPage"),
 );
@@ -69,33 +101,70 @@ const SchoolDisbursementPage = React.lazy(
 const SchoolVerificationSettingsPage = React.lazy(
   () => import("../pages/SchoolFlow/SchoolVerificationSettingsPage"),
 );
-
-const AdminAuthPage = React.lazy(
-  () => import("../pages/AdminFlow/AdminAuthPage"),
+const SchoolSupportPage = React.lazy(
+  () => import("../pages/SchoolFlow/SchoolSupportPage"),
 );
+const SchoolSettingsPage = React.lazy(
+  () => import("../pages/SchoolFlow/SchoolSettingsPage"),
+);
+
+// Admin flow
 const AdminDashboardPage = React.lazy(
   () => import("../pages/AdminFlow/AdminDashboardPage"),
 );
 
-const Loader: React.FC = () => (
-  <div className="flex h-screen w-full items-center justify-center">
-    Loading...
-  </div>
-);
+// ── Router ────────────────────────────────────────────────────────────────────
 
 const AppRouter: React.FC = () => (
   <Router>
-    <Suspense fallback={<Loader />}>
+    <Suspense fallback={<AuthSpinner />}>
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route
+          path="/"
+          element={
+            <PublicRoute>
+              <HomePage />
+            </PublicRoute>
+          }
+        />
 
-        <Route path="/auth" element={<UnifiedAuthPage />} />
-        <Route path="/auth/parent" element={<ParentAuthPage />} />
-        <Route path="/auth/school" element={<SchoolAuthPage />} />
-        <Route path="/auth/admin" element={<AdminAuthPage />} />
+        <Route
+          path="/auth"
+          element={
+            <PublicRoute>
+              <UnifiedAuthPage />
+            </PublicRoute>
+          }
+        />
 
-        <Route path="/parent/service-charge" element={<ServiceChargePage />} />
-        <Route path="/parent/payment" element={<PaymentConfirmationPage />} />
+        <Route
+          path="/auth/parent"
+          element={
+            <PublicRoute>
+              <ParentAuthPage />
+            </PublicRoute>
+          }
+        />
+
+        <Route
+          path="/auth/school"
+          element={
+            <PublicRoute>
+              <SchoolAuthPage />
+            </PublicRoute>
+          }
+        />
+
+        <Route
+          path="/auth/admin"
+          element={
+            <PublicRoute>
+              <AdminAuthPage />
+            </PublicRoute>
+          }
+        />
+
+        <Route path="/school/onboarding" element={<SchoolOnboardingPage />} />
         <Route
           element={
             <ProtectedRoute allowedRoles={["parent"]}>
@@ -120,9 +189,17 @@ const AppRouter: React.FC = () => (
           <Route path="/parent/settings" element={<ParentSettingsPage />} />
           <Route path="/parent/details" element={<StudentDetailsPage />} />
           <Route path="/parent/eligibility" element={<EligibilityTestPage />} />
+          <Route
+            path="/parent/service-charge"
+            element={<ServiceChargePage />}
+          />
+          <Route path="/parent/payment" element={<PaymentConfirmationPage />} />
         </Route>
 
-        <Route path="/school/onboarding" element={<SchoolOnboardingPage />} />
+        {/* ════════════════════════════════════════════════
+            SCHOOL ROUTES  (role: "school")
+            ════════════════════════════════════════════════ */}
+
         <Route
           path="/school/dashboard"
           element={
@@ -163,6 +240,26 @@ const AppRouter: React.FC = () => (
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/school/support"
+          element={
+            <ProtectedRoute allowedRoles={["school"]}>
+              <SchoolSupportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/school/account-settings"
+          element={
+            <ProtectedRoute allowedRoles={["school"]}>
+              <SchoolSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ════════════════════════════════════════════════
+            ADMIN ROUTES  (role: "admin")
+            ════════════════════════════════════════════════ */}
 
         <Route
           path="/admin/dashboard"
@@ -172,6 +269,10 @@ const AppRouter: React.FC = () => (
             </ProtectedRoute>
           }
         />
+
+        {/* ════════════════════════════════════════════════
+            CATCH-ALL  →  home
+            ════════════════════════════════════════════════ */}
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

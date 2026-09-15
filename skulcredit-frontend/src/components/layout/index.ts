@@ -4,6 +4,7 @@ export { default as SidebarShell } from "./SidebarShell";
 export { default as ParentSidebar } from "./ParentSidebar";
 export type { ParentTab, ParentSidebarProps } from "./ParentSidebar";
 export { default as SchoolSidebar } from "./SchoolSidebar";
+export { default as SchoolTopBar } from "./SchoolTopBar";
 export { default as AdminSidebar } from "./AdminSidebar";
 export type { AdminTab } from "./AdminSidebar";
 export { default as AppFlowHeader } from "./AppFlowHeader";

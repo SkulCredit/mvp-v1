@@ -1,195 +1,360 @@
-import React from "react";
+import React, { useState } from "react";
 import Icon from "../../components/Icon";
 import {
   DashboardLayout,
-  DashboardTopBar,
   SchoolSidebar,
+  SchoolTopBar,
 } from "../../components/layout";
 
-interface DisbursementRow {
-  initials: string;
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type DisbStatus = "Completed" | "Pending";
+
+interface DisbRow {
+  id: string;
   name: string;
-  amount: string;
+  amount: number;
   date: string;
-  status: "completed" | "pending";
+  status: DisbStatus;
   ref: string;
 }
 
-const ROWS: DisbursementRow[] = [
+// ── Mock data ─────────────────────────────────────────────────────────────────
+
+const ROWS: DisbRow[] = [
   {
-    initials: "AN",
+    id: "DISB-20250113-001",
     name: "Amaka N.",
-    amount: "₦150,000",
+    amount: 150000,
     date: "20 Nov",
-    status: "completed",
+    status: "Completed",
     ref: "SCH-23832",
   },
   {
-    initials: "JO",
+    id: "DISB-20250114-001",
     name: "John O.",
-    amount: "₦200,000",
+    amount: 200000,
     date: "18 Nov",
-    status: "completed",
+    status: "Completed",
     ref: "SCH-23835",
   },
   {
-    initials: "SA",
+    id: "DISB-20250115-001",
     name: "Sarah A.",
-    amount: "₦120,000",
+    amount: 120000,
     date: "Pending",
-    status: "pending",
+    status: "Pending",
     ref: "SCH-23836",
   },
   {
-    initials: "IK",
+    id: "DISB-20250116-001",
     name: "Ibrahim K.",
-    amount: "₦180,000",
+    amount: 180000,
     date: "19 Nov",
-    status: "completed",
+    status: "Completed",
     ref: "SCH-23837",
   },
   {
-    initials: "CP",
+    id: "DISB-20250117-001",
     name: "Chioma P.",
-    amount: "₦95,000",
+    amount: 95000,
     date: "17 Nov",
-    status: "pending",
+    status: "Pending",
     ref: "SCH-238390",
   },
   {
-    initials: "YM",
+    id: "DISB-20250118-001",
     name: "Yusuf M.",
-    amount: "₦200,000",
+    amount: 200000,
     date: "19 Nov",
-    status: "completed",
+    status: "Completed",
     ref: "SCH-238323",
   },
 ];
 
-const SchoolDisbursementPage: React.FC = () => (
-  <DashboardLayout
-    sidebar={<SchoolSidebar />}
-    header={<DashboardTopBar notificationCount={1} />}
-  >
-    <div className="max-w-[1200px] mx-auto space-y-8 pt-6">
-      {/* Page heading */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Disbursement</h1>
-        <p className="text-sm text-slate-500 font-medium">
-          Track all tuition payments successfully remitted to your school.
-        </p>
-      </div>
+const TOTAL_DISBURSED = ROWS.filter((r) => r.status === "Completed").reduce(
+  (s, r) => s + r.amount,
+  0,
+);
+const TOTAL_PENDING = ROWS.filter((r) => r.status === "Pending").reduce(
+  (s, r) => s + r.amount,
+  0,
+);
+const LAST_PAYMENT = "20 Nov 2025";
 
-      {/* Summary cards */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-          {[
-            {
-              icon: "bar-chart",
-              label: "Total Disbursed",
-              value: "₦4,250,000",
-            },
-            { icon: "clock", label: "Pending Disbursement", value: "₦320,000" },
-            {
-              icon: "calendar-check",
-              label: "Last Payment",
-              value: "20 Nov 2025",
-            },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="pt-4 md:pt-0 md:pl-12 first:pl-0 first:pt-0"
-            >
-              <p className="text-sm font-bold text-slate-500 mb-2 flex items-center gap-2">
-                <Icon name={item.icon} className="w-4 h-4" /> {item.label}
-              </p>
-              <h2 className="text-3xl font-extrabold text-brand">
-                {item.value}
-              </h2>
-            </div>
-          ))}
-        </div>
-      </div>
+const STATUS_CLS: Record<DisbStatus, string> = {
+  Completed: "bg-emerald-50 text-emerald-600 border border-emerald-200",
+  Pending: "bg-amber-50  text-amber-600  border border-amber-200",
+};
 
-      {/* Table controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <h2 className="text-xl font-bold text-slate-900">
-          Disbursement History
-        </h2>
-        <button className="w-full sm:w-auto px-6 py-2.5 bg-brand text-white text-sm font-bold rounded-xl shadow-sm hover:bg-brand-hover transition-all flex items-center justify-center gap-2">
-          <Icon name="calendar" className="w-4 h-4" /> All Status
-        </button>
-      </div>
+// ── Detail view ───────────────────────────────────────────────────────────────
 
-      {/* Table */}
-      <div className="space-y-3 pb-10">
-        <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">
-          <div className="col-span-3">Student</div>
-          <div className="col-span-2">Amount</div>
-          <div className="col-span-2">Date</div>
-          <div className="col-span-2">Status</div>
-          <div className="col-span-2 text-center">Payment Ref</div>
-          <div className="col-span-1 text-right">Action</div>
-        </div>
+const DetailRow: React.FC<{ label: string; value: React.ReactNode }> = ({
+  label,
+  value,
+}) => (
+  <div className="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0">
+    <span className="text-sm text-slate-500">{label}</span>
+    <span className="text-sm font-semibold text-slate-800 text-right">
+      {value}
+    </span>
+  </div>
+);
 
-        {ROWS.map((row) => (
-          <div
-            key={row.ref}
-            className="bg-white border border-slate-200 rounded-2xl p-5 lg:p-4 lg:px-6 relative flex flex-col lg:grid lg:grid-cols-12 gap-4 items-start lg:items-center"
+const SectionCard: React.FC<{ title: string; children: React.ReactNode }> = ({
+  title,
+  children,
+}) => (
+  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <h3 className="text-sm font-bold text-brand mb-3 pb-2 border-b border-slate-100">
+      {title}
+    </h3>
+    {children}
+  </div>
+);
+
+const DisbursementDetail: React.FC<{ row: DisbRow; onBack: () => void }> = ({
+  row,
+  onBack,
+}) => (
+  <div className="max-w-2xl mx-auto pt-8 space-y-5 animate-fade-in-up">
+    {/* Back link */}
+    <button
+      onClick={onBack}
+      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+    >
+      <Icon name="arrow-left" className="w-4 h-4" />
+      Back to Disbursements
+    </button>
+
+    <h1 className="text-xl font-bold text-slate-900">Disbursement Details</h1>
+
+    {/* Disbursement Summary */}
+    <SectionCard title="Disbursement Summary">
+      <DetailRow
+        label="Amount Disbursed:"
+        value={`₦${row.amount.toLocaleString()}`}
+      />
+      <DetailRow
+        label="Status:"
+        value={
+          <span
+            className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${STATUS_CLS[row.status]}`}
           >
-            {row.status === "pending" && (
-              <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-l-2xl" />
-            )}
-            <div className="col-span-3 flex items-center gap-4 w-full">
-              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold shrink-0">
-                {row.initials}
-              </div>
-              <h4 className="font-extrabold text-slate-900 text-sm lg:text-base">
-                {row.name}
-              </h4>
-            </div>
-            <div className="col-span-2 w-full">
-              <p className="text-sm font-black text-slate-800">{row.amount}</p>
-            </div>
-            <div className="col-span-2 w-full">
-              <p className="text-sm font-bold text-slate-600">{row.date}</p>
-            </div>
-            <div className="col-span-2 w-full">
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border w-max ${row.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}
-              >
-                {row.status === "completed" ? "Completed" : "Pending"}
-              </span>
-            </div>
-            <div className="col-span-2 text-left lg:text-center w-full">
-              <p className="text-xs font-mono text-slate-500">{row.ref}</p>
-            </div>
-            <div className="col-span-1 flex justify-start lg:justify-end w-full mt-2 lg:mt-0">
-              {row.status === "completed" ? (
-                <button className="px-5 py-1.5 bg-brand-50 hover:bg-brand text-brand hover:text-white border border-brand/20 font-bold text-xs rounded-lg transition-colors">
-                  View
-                </button>
-              ) : (
-                <button className="px-5 py-1.5 bg-slate-100 text-slate-400 font-bold text-xs rounded-lg cursor-not-allowed">
-                  View
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+            {row.status}
+          </span>
+        }
+      />
+      <DetailRow label="Disbursement ID:" value={row.id} />
+      <DetailRow
+        label="Amount Disbursed:"
+        value={`₦${row.amount.toLocaleString()}`}
+      />
+      <DetailRow label="Payment Reference:" value="SC-REF-985234" />
+    </SectionCard>
 
-      {/* Export actions */}
-      <div className="flex gap-4 pb-4">
-        <button className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-brand font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm text-sm">
-          <Icon name="download" className="w-4 h-4" /> Export CSV
+    {/* Student Information */}
+    <SectionCard title="Student Information">
+      <DetailRow label="Student Name:" value="Chidi Okafor" />
+      <DetailRow label="Level:" value="Secondary" />
+      <DetailRow label="Class:" value="SS2" />
+      <DetailRow label="Student ID:" value="STU-2048" />
+      <DetailRow label="Payment Reference:" value="SC-REF-985234" />
+    </SectionCard>
+
+    {/* Parent Information */}
+    <SectionCard title="Parent Information">
+      <DetailRow label="Parent/Guardian:" value="Mrs. Okafor" />
+      <DetailRow label="Phone:" value="0803 123 4567" />
+      <DetailRow label="Relationship:" value="Mother" />
+    </SectionCard>
+
+    {/* Bank Payment Details */}
+    <SectionCard title="Bank Payment Details">
+      <DetailRow label="Paid To:" value="Springfield High School" />
+      <DetailRow label="Account Number:" value="0123456789" />
+      <DetailRow label="Bank:" value="Zenith Bank" />
+      <DetailRow
+        label="Payment Method::"
+        value={`₦${row.amount.toLocaleString()}`}
+      />
+      <DetailRow
+        label="Receipt:"
+        value={
+          <button className="flex items-center gap-1.5 text-brand text-sm font-semibold hover:underline">
+            <Icon name="download" className="w-4 h-4" />
+            Download Receipt
+          </button>
+        }
+      />
+    </SectionCard>
+
+    {/* Action */}
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <h3 className="text-sm font-bold text-slate-800 mb-3">Action</h3>
+      <div className="flex gap-3">
+        <button className="flex items-center gap-2 border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-slate-50 transition-colors">
+          <Icon name="download" className="w-4 h-4" />
+          Download PDF
         </button>
-        <button className="px-6 py-3 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm text-sm">
-          <Icon name="file-text" className="w-4 h-4" /> Download Statement
+        <button className="flex items-center gap-2 bg-brand text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-[#7a1848] transition-colors">
+          <Icon name="headset" className="w-4 h-4" />
+          Contact Support
         </button>
       </div>
     </div>
-  </DashboardLayout>
+  </div>
 );
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+const SchoolDisbursementPage: React.FC = () => {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All Status");
+  const [detail, setDetail] = useState<DisbRow | null>(null);
+
+  const visible = ROWS.filter((r) => {
+    const matchStatus =
+      statusFilter === "All Status" || r.status === statusFilter;
+    const matchSearch =
+      !search ||
+      r.name.toLowerCase().includes(search.toLowerCase()) ||
+      r.ref.toLowerCase().includes(search.toLowerCase());
+    return matchStatus && matchSearch;
+  });
+
+  return (
+    <DashboardLayout sidebar={<SchoolSidebar />} header={<SchoolTopBar />}>
+      {detail ? (
+        <DisbursementDetail row={detail} onBack={() => setDetail(null)} />
+      ) : (
+        <div className="max-w-3xl mx-auto pt-8 space-y-6 animate-fade-in-up">
+          {/* Summary card */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h1 className="text-lg font-bold text-slate-900">Disbursement</h1>
+            <p className="text-sm text-slate-500 mb-5">
+              Track all tuition payments sent to your school
+            </p>
+            <div className="grid grid-cols-3 gap-4 divide-x divide-slate-100">
+              <div className="text-center pr-4">
+                <p className="text-xs text-slate-500 mb-1">Total Disbursed</p>
+                <p className="text-xl font-bold text-slate-900">
+                  ₦{TOTAL_DISBURSED.toLocaleString()}
+                </p>
+              </div>
+              <div className="text-center px-4">
+                <p className="text-xs text-slate-500 mb-1">
+                  Pending Disbursement
+                </p>
+                <p className="text-xl font-bold text-slate-900">
+                  ₦{TOTAL_PENDING.toLocaleString()}
+                </p>
+              </div>
+              <div className="text-center pl-4">
+                <p className="text-xs text-slate-500 mb-1">Last Payment</p>
+                <p className="text-xl font-bold text-brand">{LAST_PAYMENT}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Search + filter */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+            <div className="relative flex-1">
+              <Icon
+                name="search"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+              />
+              <input
+                type="text"
+                placeholder="-Search by student or payment reference ID-"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-full border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              />
+            </div>
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="appearance-none bg-brand text-white text-sm font-semibold pl-4 pr-9 py-2.5 rounded-lg focus:outline-none cursor-pointer"
+              >
+                {["All Status", "Completed", "Pending"].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <Icon
+                name="calendar"
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white pointer-events-none"
+              />
+            </div>
+          </div>
+
+          {/* History table */}
+          <div>
+            <h2 className="text-base font-bold text-slate-800 mb-3">
+              Disbursement History
+            </h2>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              {/* Header */}
+              <div className="grid grid-cols-[2fr_1.5fr_1fr_1.5fr_2fr_1fr] px-5 py-3 border-b border-slate-100 text-sm font-semibold text-brand">
+                <span>Student</span>
+                <span>Amount</span>
+                <span>Date</span>
+                <span>Status</span>
+                <span>Payment Ref</span>
+                <span>Action</span>
+              </div>
+
+              {visible.map((r, i) => (
+                <div
+                  key={`${r.ref}-${i}`}
+                  className="grid grid-cols-[2fr_1.5fr_1fr_1.5fr_2fr_1fr] items-center px-5 py-3.5 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                >
+                  <span className="text-sm font-semibold text-slate-800">
+                    {r.name}
+                  </span>
+                  <span className="text-sm text-slate-700">
+                    ₦{r.amount.toLocaleString()}
+                  </span>
+                  <span className="text-sm text-slate-500">{r.date}</span>
+                  <span>
+                    <span
+                      className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${STATUS_CLS[r.status]}`}
+                    >
+                      {r.status}
+                    </span>
+                  </span>
+                  <span className="text-sm font-mono text-slate-500">
+                    {r.ref}
+                  </span>
+                  <button
+                    onClick={() => setDetail(r)}
+                    className="border border-brand text-brand text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-brand/5 transition-colors w-fit"
+                  >
+                    View
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Export row */}
+          <div className="flex gap-3 pb-4">
+            <button className="flex items-center gap-2 border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-slate-50 transition-colors">
+              <Icon name="download" className="w-4 h-4" />
+              Export CVS
+            </button>
+            <button className="flex items-center gap-2 bg-brand text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-[#7a1848] transition-colors">
+              <Icon name="file-text" className="w-4 h-4" />
+              Download Statement
+            </button>
+          </div>
+        </div>
+      )}
+    </DashboardLayout>
+  );
+};
 
 export default SchoolDisbursementPage;

@@ -1,55 +1,111 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Icon from "../../components/Icon";
-import DataTable, { Column } from "../../components/DataTable";
 import {
   DashboardLayout,
-  DashboardTopBar,
   SchoolSidebar,
+  SchoolTopBar,
 } from "../../components/layout";
 import { useAuth } from "../../context/AuthContext";
-import { dashboardService } from "../../services/dashboardService";
 import { schoolService } from "../../services/schoolService";
+import { dashboardService } from "../../services/dashboardService";
 import { AxiosError } from "axios";
 
-type DashboardStatus = "pending" | "approved" | "active";
-type ActiveTab =
-  | "dashboard"
-  | "students"
-  | "applications"
-  | "verification"
-  | "disbursements";
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-interface AppRow {
-  id: string;
-  parentName?: string;
-  amount: number;
-  date?: string;
-  status: string;
-  [key: string]: unknown;
-}
-interface DisbRow {
-  id: string;
-  amount: number;
-  status: string;
-  date?: string;
-  [key: string]: unknown;
-}
+type DashboardStatus = "pending" | "approved" | "active";
+
 interface DashboardData {
   school?: Record<string, unknown>;
-  applications?: AppRow[];
+  applications?: {
+    id: string;
+    status: string;
+    amount?: number;
+    createdAt?: string;
+  }[];
   students?: unknown[];
-  disbursements?: DisbRow[];
+  disbursements?: { id: string; amount?: number; status: string }[];
 }
+
 interface RegForm {
   bankName: string;
   accountNumber: string;
   accountName: string;
-  contactPerson: string;
 }
 
+// ── Small shared pieces ───────────────────────────────────────────────────────
+
+const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="flex justify-between py-2 border-b border-slate-50 last:border-0">
+    <span className="text-sm text-slate-500">{label}</span>
+    <span className="text-sm font-semibold text-slate-800">{value}</span>
+  </div>
+);
+
+const StatCard: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  linkLabel: string;
+  to: string;
+  onClick: () => void;
+}> = ({ icon, label, value, sub, linkLabel, onClick }) => (
+  <div className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-3 shadow-sm">
+    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center">
+      {icon}
+    </div>
+    <div>
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className="text-xl font-bold text-brand mt-0.5">{value}</p>
+      {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+    </div>
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 text-sm font-semibold text-brand hover:underline mt-auto"
+    >
+      {linkLabel}
+      <Icon name="arrow-right" className="w-3.5 h-3.5" />
+    </button>
+  </div>
+);
+
+const QuickAction: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}> = ({ icon, label, onClick }) => (
+  <button
+    onClick={onClick}
+    className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col items-center gap-3 hover:border-brand/40 hover:shadow-sm transition-all text-center"
+  >
+    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center">
+      {icon}
+    </div>
+    <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+      {label}
+      <Icon name="arrow-right" className="w-3.5 h-3.5 text-brand" />
+    </span>
+  </button>
+);
+
+// ── Activity icons by keyword ─────────────────────────────────────────────────
+const activityIcon = (text: string) => {
+  if (/application/i.test(text)) return "file-text";
+  if (/payment|disbursement/i.test(text)) return "credit-card";
+  if (/document|proof|upload/i.test(text)) return "paperclip";
+  if (/verified|verification/i.test(text)) return "shield-check";
+  if (/support|ticket/i.test(text)) return "headset";
+  return "activity";
+};
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 const SchoolDashboardPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>("dashboard");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     school: {},
     applications: [],
@@ -63,19 +119,36 @@ const SchoolDashboardPage: React.FC = () => {
     bankName: "",
     accountNumber: "",
     accountName: "",
-    contactPerson: "",
   });
   const [regSubmitting, setRegSubmitting] = useState(false);
   const [regError, setRegError] = useState("");
 
-  const navigate = useNavigate();
-  const location = useLocation();
+  const schoolName =
+    (user?.schoolName ?? user?.name ?? "Partner School") + " - Partner Portal";
 
-  const myApplications: AppRow[] = (dashboardData.applications ??
-    []) as AppRow[];
-  const myDisbursements: DisbRow[] = (dashboardData.disbursements ??
-    []) as DisbRow[];
+  const myApplications = dashboardData.applications ?? [];
+  const pendingCount = myApplications.filter(
+    (a) => a.status === "pending_school_approval",
+  ).length;
+  const verifiedCount = myApplications.filter((a) =>
+    ["school_approved", "disbursed"].includes(a.status),
+  ).length;
   const totalStudents = dashboardData.students?.length ?? 0;
+  const totalDisbursed = (dashboardData.disbursements ?? []).reduce(
+    (s, d) => s + (d.amount ?? 0),
+    0,
+  );
+
+  const RECENT_ACTIVITIES = [
+    "New tuition application submitted for *Sarah A.*",
+    "Parent uploaded proof-of-income for *Samuel O.*",
+    "Student *John Okoro* was marked as verified by the school.",
+    "School received a payment of ₦150,000 for *Amaka N*",
+    "Pending document update request submitted by the school admin",
+    "Application for *Chioma Peter* moved from Pending → Under Review",
+    "Disbursement alert: ₦200,000 processed for *HND 1 Students*",
+    "Support ticket #20321 was updated by the SchoolCredit team",
+  ];
 
   useEffect(() => {
     (async () => {
@@ -97,11 +170,11 @@ const SchoolDashboardPage: React.FC = () => {
     if (s) setDashboardStatus(s);
   }, [location]);
 
-  const completeRegistration = async (e: React.FormEvent) => {
+  const handleBankSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError("");
     if (!/^\d{10}$/.test(regForm.accountNumber)) {
-      setRegError("Account number must be exactly 10 numeric digits.");
+      setRegError("Account number must be exactly 10 digits.");
       return;
     }
     setRegSubmitting(true);
@@ -111,10 +184,6 @@ const SchoolDashboardPage: React.FC = () => {
         accountName: regForm.accountName,
         accountNumber: regForm.accountNumber,
       });
-      if (regForm.contactPerson)
-        await schoolService.updateProfile({
-          contactPerson: regForm.contactPerson,
-        });
       setDashboardStatus("active");
       navigate("/school/dashboard");
     } catch (err) {
@@ -125,194 +194,196 @@ const SchoolDashboardPage: React.FC = () => {
       setRegError(
         ax.response?.data?.errors?.[0]?.message ??
           ax.response?.data?.message ??
-          "Failed to complete registration.",
+          "Failed to save bank details.",
       );
     } finally {
       setRegSubmitting(false);
     }
   };
 
-  const appColumns: Column<AppRow>[] = [
-    {
-      header: "App ID",
-      accessor: "id",
-      render: (r) => <div className="font-mono text-xs">{r.id}</div>,
-    },
-    {
-      header: "Parent Name",
-      accessor: "parentName",
-      render: (r) => <div className="font-bold">{r.parentName ?? "—"}</div>,
-    },
-    {
-      header: "Amount",
-      accessor: "amount",
-      render: (r) => `₦${r.amount.toLocaleString()}`,
-    },
-    { header: "Date", accessor: "date" },
-    {
-      header: "Status",
-      accessor: "status",
-      render: (r) => (
-        <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
-          {String(r.status).replace(/_/g, " ").toUpperCase()}
-        </span>
-      ),
-    },
-  ];
+  const inputCls =
+    "w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand";
 
-  /* ── Top-bar right: user avatar ─── */
-  const avatarBtn = (
-    <button className="flex items-center gap-3 bg-white/60 backdrop-blur-md p-1.5 pr-4 rounded-full border border-white shadow-sm hover:bg-white transition-all">
-      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand to-brand-light flex items-center justify-center text-white shadow-inner">
-        <Icon name="user" className="w-4 h-4" />
-      </div>
-      <span className="text-sm font-bold text-slate-700 hidden sm:block">
-        Admin
-      </span>
-      <Icon
-        name="chevron-down"
-        className="w-4 h-4 text-slate-400 hidden sm:block"
-      />
-    </button>
-  );
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <DashboardLayout
       sidebar={<SchoolSidebar />}
-      header={
-        <DashboardTopBar
-          notificationCount={dashboardStatus === "approved" ? 1 : 0}
-          rightExtra={avatarBtn}
-        />
-      }
-      bgDecorations={
-        <>
-          <div className="fixed top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-rose-200/20 rounded-full blur-[100px] pointer-events-none -z-10" />
-          <div className="fixed bottom-[-10%] right-[-5%] w-[30vw] h-[30vw] bg-blue-200/20 rounded-full blur-[100px] pointer-events-none -z-10" />
-        </>
-      }
+      header={<SchoolTopBar notificationCount={pendingCount} />}
     >
-      {/* ═══ PENDING ═══ */}
-      {dashboardStatus === "pending" && activeTab === "dashboard" && (
-        <div className="max-w-[800px] mx-auto space-y-8 pt-6 animate-fade-in-up">
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-sm flex items-start gap-4">
-            <Icon
-              name="clock"
-              className="w-6 h-6 text-amber-600 shrink-0 mt-0.5"
-            />
-            <div>
-              <h3 className="font-bold text-amber-900 text-lg mb-1">
-                Your application is currently under review.
-              </h3>
-              <p className="text-amber-700 text-sm font-medium">
-                Verification usually takes up to 24 hours. We'll notify you once
-                a decision has been made.
-              </p>
-            </div>
+      {/* ════ PENDING ════ */}
+      {dashboardStatus === "pending" && (
+        <div className="max-w-3xl mx-auto pt-8 space-y-6 animate-fade-in-up">
+          {/* Welcome */}
+          <div>
+            <h1 className="text-xl font-bold text-brand">
+              Welcome to your Dashboard
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5">{schoolName}</p>
           </div>
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm text-center">
-            <p className="text-sm text-slate-500 mb-4">
-              We'll notify you once a decision has been made.
-            </p>
-            <button
-              onClick={() => setDashboardStatus("approved")}
-              className="text-xs font-bold text-brand border border-brand/20 bg-brand/5 px-4 py-2 rounded-lg hover:bg-brand/10 transition-colors"
-            >
-              [Prototype] Simulate Approval
+
+          {/* Verification complete banner */}
+          <div className="flex items-center justify-between bg-slate-100 rounded-xl px-5 py-3.5">
+            <span className="text-sm font-medium text-slate-700">
+              Verification Complete
+            </span>
+            <span className="text-sm text-slate-400">
+              You can now manage students, applications, and disbursements.
+            </span>
+            <button className="text-slate-400 hover:text-slate-600">
+              <Icon name="info" className="w-5 h-5" />
             </button>
+          </div>
+
+          {/* Under review card */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 flex gap-4">
+            <div className="w-12 h-12 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
+              <Icon name="clock" className="w-6 h-6 text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-amber-800 mb-1">
+                Application Under Review
+              </h3>
+              <p className="text-sm text-amber-700 mb-4">
+                Thank you for registering with SkulCredit! Your school
+                application is currently being reviewed by our team.
+              </p>
+
+              <div className="bg-white rounded-xl p-4 border border-amber-100">
+                <p className="text-sm font-semibold text-slate-700 mb-3">
+                  What happens next?
+                </p>
+                {[
+                  {
+                    n: 1,
+                    title: "Document Review",
+                    desc: "Our team is reviewing your submitted documents and school information",
+                  },
+                  {
+                    n: 2,
+                    title: "On-Site Verification",
+                    desc: "We will schedule a visit to verify your school facilities and operations",
+                  },
+                  {
+                    n: 3,
+                    title: "Accreditation",
+                    desc: "Once approved, you'll be notified to submit bank details to receive disbursements",
+                  },
+                ].map(({ n, title, desc }) => (
+                  <div key={n} className="flex gap-3 mb-3 last:mb-0">
+                    <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {n}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {title}
+                      </p>
+                      <p className="text-xs text-slate-500">{desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-6 mt-4">
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Icon name="clock" className="w-4 h-4 text-amber-600" />
+                  <span>
+                    Estimated Review Time
+                    <br />
+                    <strong>3–5 business days</strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Icon name="phone" className="w-4 h-4 text-amber-600" />
+                  <span>
+                    Questions?
+                    <br />
+                    <strong>Schools@skulcredit.com</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ═══ APPROVED – complete registration ═══ */}
-      {dashboardStatus === "approved" && activeTab === "dashboard" && (
-        <div className="max-w-[800px] mx-auto space-y-8 pt-6 animate-fade-in-up">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 bg-emerald-500 rounded-full text-white flex items-center justify-center shadow-lg">
-              <Icon name="party-popper" className="w-6 h-6" />
+      {/* ════ APPROVED — bank details ════ */}
+      {dashboardStatus === "approved" && (
+        <div className="max-w-lg mx-auto pt-10 animate-fade-in-up">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                <Icon
+                  name="check-circle"
+                  className="w-5 h-5 text-emerald-600"
+                />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-900">
+                  Your School Has Been Approved!
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Submit bank details to activate your dashboard.
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-emerald-900 text-xl mb-1">
-                Your school has been approved! 🎉
-              </h3>
-              <p className="text-emerald-700 text-sm font-medium">
-                Please complete your registration to activate your dashboard.
-              </p>
-            </div>
-          </div>
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight mb-6 border-b border-slate-100 pb-4">
-              Complete Registration
-            </h2>
-            <form onSubmit={completeRegistration} className="space-y-6">
+            <form className="space-y-4" onSubmit={handleBankSubmit}>
               {regError && (
-                <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl font-medium border border-red-100">
+                <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg">
                   {regError}
                 </div>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {[
-                  {
-                    label: "Bank Name*",
-                    key: "bankName",
-                    placeholder: "e.g. Zenith Bank",
-                    colSpan: "",
-                  },
-                  {
-                    label: "Account Number*",
-                    key: "accountNumber",
-                    placeholder: "0123456789",
-                    colSpan: "",
-                  },
-                  {
-                    label: "Account Name (Must match School Name)*",
-                    key: "accountName",
-                    placeholder: "Official Account Name",
-                    colSpan: "md:col-span-2",
-                  },
-                  {
-                    label: "Primary Contact Person for Finance*",
-                    key: "contactPerson",
-                    placeholder: "Full Name",
-                    colSpan: "md:col-span-2",
-                  },
-                ].map(({ label, key, placeholder, colSpan }) => (
-                  <div key={key} className={colSpan}>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      {label}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={placeholder}
-                      required
-                      value={regForm[key as keyof RegForm]}
-                      onChange={(e) =>
-                        setRegForm({
-                          ...regForm,
-                          [key]:
-                            key === "accountNumber"
-                              ? e.target.value.replace(/\D/g, "")
-                              : e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand outline-none transition-all text-sm shadow-sm"
-                    />
-                  </div>
-                ))}
-              </div>
+              {[
+                {
+                  label: "Bank Name*",
+                  key: "bankName",
+                  placeholder: "e.g. Zenith Bank",
+                },
+                {
+                  label: "Account Number*",
+                  key: "accountNumber",
+                  placeholder: "0123456789",
+                },
+                {
+                  label: "Account Name*",
+                  key: "accountName",
+                  placeholder: "Official school account name",
+                },
+              ].map(({ label, key, placeholder }) => (
+                <div key={key}>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {label}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={placeholder}
+                    required
+                    value={regForm[key as keyof RegForm]}
+                    onChange={(e) =>
+                      setRegForm({
+                        ...regForm,
+                        [key]:
+                          key === "accountNumber"
+                            ? e.target.value.replace(/\D/g, "")
+                            : e.target.value,
+                      })
+                    }
+                    className={inputCls}
+                  />
+                </div>
+              ))}
               <button
                 type="submit"
                 disabled={regSubmitting}
-                className="w-full bg-brand hover:bg-brand-hover text-white font-bold py-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mt-4 group disabled:opacity-70"
+                className="w-full bg-brand text-white font-bold py-3 rounded-full hover:bg-[#7a1848] transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
               >
-                {regSubmitting
-                  ? "Activating…"
-                  : "Complete Setup & Activate Dashboard"}
-                {!regSubmitting && (
-                  <Icon
-                    name="arrow-right"
-                    className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                  />
+                {regSubmitting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
+                    Saving…
+                  </>
+                ) : (
+                  "Activate Dashboard →"
                 )}
               </button>
             </form>
@@ -320,231 +391,158 @@ const SchoolDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* ═══ ACTIVE – loading ═══ */}
-      {dashboardStatus === "active" &&
-        activeTab === "dashboard" &&
-        isLoading && (
-          <div className="flex h-64 items-center justify-center">
-            <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin" />
+      {/* ════ ACTIVE — main dashboard ════ */}
+      {dashboardStatus === "active" && (
+        <div className="max-w-4xl mx-auto pt-8 space-y-8 animate-fade-in-up">
+          {/* Header */}
+          <div>
+            <h1 className="text-xl font-bold text-brand">Dashboard</h1>
+            <div className="flex items-center gap-2 mt-1 text-sm text-slate-600">
+              <Icon name="check-circle" className="w-4 h-4 text-emerald-500" />
+              <span className="font-semibold text-slate-700">
+                Your Verification is Complete
+              </span>
+            </div>
+            <p className="text-sm text-slate-500 mt-0.5 ml-6">
+              Your school is fully onboarded and ready to receive payments.
+              Start managing students and applications.
+            </p>
           </div>
-        )}
 
-      {/* ═══ ACTIVE – main dashboard ═══ */}
-      {dashboardStatus === "active" &&
-        activeTab === "dashboard" &&
-        !isLoading && (
-          <div className="max-w-[1200px] mx-auto space-y-8 pt-6 animate-fade-in-up">
-            {/* Verified banner */}
-            <div className="relative overflow-hidden rounded-3xl bg-white border border-emerald-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-              <div className="flex items-start gap-5">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow-lg shrink-0">
-                  <Icon name="shield-check" className="w-7 h-7" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">
-                    Dashboard Activated
-                  </h2>
-                  <p className="text-slate-500 font-medium">
-                    Your institution is verified and ready to process
-                    applications.
-                  </p>
+          {/* Overview stat cards */}
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                <h2 className="text-sm font-bold text-brand mb-4">Overview</h2>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <StatCard
+                    icon={
+                      <Icon
+                        name="graduation-cap"
+                        className="w-6 h-6 text-brand"
+                      />
+                    }
+                    label="Total Student"
+                    value={String(totalStudents || 140)}
+                    sub=""
+                    linkLabel="View Students"
+                    to="/school/students"
+                    onClick={() => navigate("/school/students")}
+                  />
+                  <StatCard
+                    icon={
+                      <Icon name="file-text" className="w-6 h-6 text-brand" />
+                    }
+                    label="New Applications"
+                    value={`${pendingCount || 12} Pending`}
+                    sub=""
+                    linkLabel="Review Now"
+                    to="/school/applications"
+                    onClick={() => navigate("/school/applications")}
+                  />
+                  <StatCard
+                    icon={
+                      <Icon
+                        name="shield-check"
+                        className="w-6 h-6 text-brand"
+                      />
+                    }
+                    label="Verified Applications"
+                    value={`${verifiedCount || 86} Verified`}
+                    sub=""
+                    linkLabel="View List"
+                    to="/school/applications"
+                    onClick={() => navigate("/school/applications")}
+                  />
+                  <StatCard
+                    icon={
+                      <Icon name="credit-card" className="w-6 h-6 text-brand" />
+                    }
+                    label="Payments Received"
+                    value={
+                      totalDisbursed > 0
+                        ? `₦${totalDisbursed.toLocaleString()}`
+                        : "₦4,250,000"
+                    }
+                    sub=""
+                    linkLabel="View Payments"
+                    to="/school/disbursement"
+                    onClick={() => navigate("/school/disbursement")}
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {[
-                {
-                  label: "Total Students",
-                  value: totalStudents,
-                  icon: "users",
-                },
-                {
-                  label: "New Applications",
-                  value: myApplications.filter(
-                    (a) => a.status === "pending_school_approval",
-                  ).length,
-                  icon: "file-clock",
-                },
-                {
-                  label: "Verified Apps",
-                  value: myApplications.filter((a) => a.status === "disbursed")
-                    .length,
-                  icon: "file-check-2",
-                },
-                {
-                  label: "Disbursed Funds",
-                  value: `₦${myDisbursements.reduce((acc, d) => acc + d.amount, 0).toLocaleString()}`,
-                  icon: "badge-dollar-sign",
-                },
-              ].map((s, i) => (
-                <div
-                  key={i}
-                  className="rounded-[2rem] bg-white/40 p-6 border border-white cursor-pointer group"
-                >
-                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-brand shadow-sm border border-brand/10 mb-4 group-hover:scale-110 transition-transform duration-300">
-                    <Icon name={s.icon} className="w-6 h-6" />
-                  </div>
-                  <p className="text-sm font-bold text-slate-500 mb-1">
-                    {s.label}
-                  </p>
-                  <h3 className="text-3xl font-black text-slate-900 tracking-tight">
-                    {s.value}
-                  </h3>
+              {/* Quick actions */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                <h2 className="text-sm font-bold text-slate-800 mb-4">
+                  Quick Actions
+                </h2>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <QuickAction
+                    icon={
+                      <Icon name="user-plus" className="w-6 h-6 text-brand" />
+                    }
+                    label="Add New Student"
+                    onClick={() => navigate("/school/students")}
+                  />
+                  <QuickAction
+                    icon={
+                      <Icon name="bar-chart-2" className="w-6 h-6 text-brand" />
+                    }
+                    label="Generate Report"
+                    onClick={() => navigate("/school/disbursement")}
+                  />
+                  <QuickAction
+                    icon={
+                      <Icon name="headset" className="w-6 h-6 text-brand" />
+                    }
+                    label="Contact Support"
+                    onClick={() => navigate("/school/support")}
+                  />
+                  <QuickAction
+                    icon={<Icon name="users" className="w-6 h-6 text-brand" />}
+                    label="View All Students"
+                    onClick={() => navigate("/school/students")}
+                  />
                 </div>
-              ))}
-            </div>
+              </div>
 
-            {/* Quick actions */}
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-900 tracking-tight mb-5">
-                Quick Actions
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {[
-                  {
-                    icon: "user-plus",
-                    title: "Add Student",
-                    sub: "Register new profile",
-                    onClick: () => setActiveTab("students"),
-                    primary: false,
-                  },
-                  {
-                    icon: "bar-chart-3",
-                    title: "Generate Report",
-                    sub: "Download CSV data",
-                    onClick: () => {},
-                    primary: false,
-                  },
-                  {
-                    icon: "headset",
-                    title: "Get Support",
-                    sub: "Open a new ticket",
-                    onClick: () => {},
-                    primary: false,
-                  },
-                  {
-                    icon: "arrow-right",
-                    title: "Review Applications",
-                    sub: `${myApplications.length} requests`,
-                    onClick: () => setActiveTab("applications"),
-                    primary: true,
-                  },
-                ].map((a, i) => (
-                  <button
-                    key={i}
-                    onClick={a.onClick}
-                    className={`rounded-3xl p-6 flex items-center gap-4 hover:-translate-y-1 transition-all duration-300 group text-left ${a.primary ? "bg-gradient-to-br from-brand to-brand-light hover:shadow-[0_15px_30px_-10px_rgba(136,19,55,0.4)]" : "bg-white/80 backdrop-blur-md border border-white hover:shadow-[0_12px_24px_-10px_rgba(136,19,55,0.1)]"}`}
-                  >
+              {/* Recent activities */}
+              <div>
+                <h2 className="text-base font-bold text-slate-800 mb-4">
+                  Recent Activities
+                </h2>
+                <div className="flex flex-col divide-y divide-slate-100 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  {RECENT_ACTIVITIES.map((text, i) => (
                     <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${a.primary ? "bg-white/20 text-white group-hover:scale-110" : "bg-slate-50 text-slate-600 group-hover:bg-brand-50 group-hover:text-brand"}`}
+                      key={i}
+                      className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors"
                     >
-                      <Icon name={a.icon} className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4
-                        className={`font-bold text-sm ${a.primary ? "text-white" : "text-slate-900"}`}
-                      >
-                        {a.title}
-                      </h4>
+                      <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
+                        <Icon
+                          name={activityIcon(text)}
+                          className="w-4 h-4 text-brand"
+                        />
+                      </div>
                       <p
-                        className={`text-xs font-medium ${a.primary ? "text-brand-50" : "text-slate-500"}`}
-                      >
-                        {a.sub}
-                      </p>
+                        className="text-sm text-slate-600"
+                        dangerouslySetInnerHTML={{
+                          __html: text.replace(
+                            /\*(.*?)\*/g,
+                            "<strong>$1</strong>",
+                          ),
+                        }}
+                      />
                     </div>
-                  </button>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-
-      {/* ═══ APPLICATIONS TAB ═══ */}
-      {dashboardStatus === "active" && activeTab === "applications" && (
-        <div className="max-w-[1200px] mx-auto space-y-6 pt-6 animate-fade-in-up">
-          <h2 className="text-2xl font-extrabold text-slate-900">
-            Student Applications
-          </h2>
-          <DataTable
-            columns={appColumns}
-            data={myApplications}
-            searchPlaceholder="Search applications…"
-          />
-        </div>
-      )}
-
-      {/* ═══ STUDENTS TAB ═══ */}
-      {dashboardStatus === "active" && activeTab === "students" && (
-        <div className="max-w-[1200px] mx-auto space-y-6 pt-6 animate-fade-in-up">
-          <h2 className="text-2xl font-extrabold text-slate-900">
-            Students Directory
-          </h2>
-          <div className="bg-white/60 backdrop-blur-md p-10 rounded-3xl border border-white text-center shadow-sm">
-            <Icon
-              name="users"
-              className="w-12 h-12 text-slate-300 mx-auto mb-4"
-            />
-            <h3 className="text-lg font-bold text-slate-700">
-              Student list will appear here
-            </h3>
-            <p className="text-sm text-slate-500">
-              Integration with school database pending.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ VERIFICATION TAB ═══ */}
-      {dashboardStatus === "active" && activeTab === "verification" && (
-        <div className="max-w-[1200px] mx-auto space-y-6 pt-6 animate-fade-in-up">
-          <h2 className="text-2xl font-extrabold text-slate-900">
-            Verification
-          </h2>
-          <div className="bg-white/60 backdrop-blur-md p-10 rounded-3xl border border-white text-center shadow-sm">
-            <Icon
-              name="shield-check"
-              className="w-12 h-12 text-emerald-300 mx-auto mb-4"
-            />
-            <h3 className="text-lg font-bold text-emerald-700">
-              School KYC Verified
-            </h3>
-            <p className="text-sm text-slate-500">
-              Your institution has been successfully verified by SkulCredit.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ DISBURSEMENTS TAB ═══ */}
-      {dashboardStatus === "active" && activeTab === "disbursements" && (
-        <div className="max-w-[1200px] mx-auto space-y-6 pt-6 animate-fade-in-up">
-          <h2 className="text-2xl font-extrabold text-slate-900">
-            Disbursements
-          </h2>
-          <DataTable
-            columns={[
-              { header: "Disbursement ID", accessor: "id" },
-              {
-                header: "Amount",
-                accessor: "amount",
-                render: (r) => `₦${(r as DisbRow).amount.toLocaleString()}`,
-              },
-              {
-                header: "Status",
-                accessor: "status",
-                render: (r) => (
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
-                    {String((r as DisbRow).status).toUpperCase()}
-                  </span>
-                ),
-              },
-              { header: "Date", accessor: "date" },
-            ]}
-            data={myDisbursements as Record<string, unknown>[]}
-            searchPlaceholder="Search disbursements…"
-          />
+            </>
+          )}
         </div>
       )}
     </DashboardLayout>

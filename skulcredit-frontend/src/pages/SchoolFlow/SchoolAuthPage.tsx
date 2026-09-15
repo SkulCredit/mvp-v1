@@ -1,300 +1,757 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import Icon from '../../components/Icon';
+import React, { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import Icon from "../../components/Icon";
+import apiClient from "../../services/apiClient";
+import { AxiosError } from "axios";
 
-type SchoolView = 'login' | 'signup' | 'forgot';
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type SchoolView = "login" | "signup" | "otp" | "forgot";
 
 interface RegData {
   schoolName: string;
-  contactPerson: string;
-  phoneNumber: string;
   email: string;
-  address: string;
-  website: string;
-  population: string;
+  phoneNumber: string;
   password: string;
   confirmPassword: string;
+  agreedToTerms: boolean;
 }
 
+type RegErrors = Partial<Record<keyof RegData | "form", string>>;
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+const inputCls = (hasError?: boolean) =>
+  [
+    "w-full px-4 py-3 rounded-lg border text-sm text-slate-800 placeholder-slate-400",
+    "outline-none transition-all bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand",
+    hasError
+      ? "border-red-400 bg-red-50"
+      : "border-slate-200 hover:border-slate-300",
+  ].join(" ");
+
+const EyeBtn: React.FC<{ show: boolean; toggle: () => void }> = ({
+  show,
+  toggle,
+}) => (
+  <button
+    type="button"
+    onClick={toggle}
+    aria-label={show ? "Hide password" : "Show password"}
+    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+  >
+    <Icon name={show ? "eye" : "eye-off"} className="w-4 h-4" />
+  </button>
+);
+
+const FieldErr: React.FC<{ msg?: string }> = ({ msg }) =>
+  msg ? (
+    <p role="alert" className="text-xs text-red-500 mt-1">
+      {msg}
+    </p>
+  ) : null;
+
+const Spinner: React.FC = () => (
+  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+);
+
+// ── Verification modal (shown after OTP verified) ─────────────────────────────
+
+const VerificationModal: React.FC<{ onStart: () => void }> = ({ onStart }) => (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="verify-modal-title"
+  >
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+
+    <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 animate-fade-in-up">
+      {/* heading card */}
+      <div className="rounded-xl border border-brand/30 bg-rose-50/60 px-5 py-4 mb-5 text-center">
+        <h2
+          id="verify-modal-title"
+          className="text-lg font-bold text-brand mb-2"
+        >
+          Complete Your School Verification
+        </h2>
+        <p className="text-sm text-slate-600 leading-relaxed">
+          Provide your school details and accreditation documents to activate
+          your account and access the dashboard.
+        </p>
+      </div>
+
+      {/* checklist */}
+      <div className="rounded-xl border border-brand/20 bg-white px-5 py-4 mb-6">
+        <p className="text-sm font-semibold text-brand mb-3">
+          What You'll Need:
+        </p>
+        <ul className="space-y-2">
+          {[
+            "Basic school information",
+            "Location & contact details",
+            "Government approval/accreditation documents",
+          ].map((item) => (
+            <li
+              key={item}
+              className="flex items-center gap-2 text-sm text-brand"
+            >
+              <span>•</span>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <button
+        type="button"
+        onClick={onStart}
+        className="w-full flex items-center justify-center gap-2 bg-brand text-white font-bold py-3.5 rounded-full hover:bg-[#7a1848] transition-colors shadow-lg shadow-brand/20"
+      >
+        Start Verification
+        <Icon name="arrow-right" className="w-4 h-4" />
+      </button>
+    </div>
+  </div>
+);
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 const SchoolAuthPage: React.FC = () => {
-  const [view, setView] = useState<SchoolView>('login');
-  const [email, setEmail] = useState('school@test.com');
-  const [password, setPassword] = useState('school123');
-  const [error, setError] = useState('');
-  const [regError, setRegError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [regData, setRegData] = useState<RegData>({
-    schoolName: '',
-    contactPerson: '',
-    phoneNumber: '',
-    email: '',
-    address: '',
-    website: '',
-    population: '',
-    password: '',
-    confirmPassword: '',
-  });
   const navigate = useNavigate();
   const { login, register } = useAuth();
 
-  useEffect(() => {
-    if ((window as unknown as { lucide?: { createIcons?: () => void } }).lucide?.createIcons) {
-      (window as unknown as { lucide: { createIcons: () => void } }).lucide.createIcons();
-    }
-  }, [view]);
+  // ── view state ───────────────────────────────────────────────────────────
+  const [view, setView] = useState<SchoolView>("login");
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+
+  // ── login ────────────────────────────────────────────────────────────────
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [showLoginPw, setShowLoginPw] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // ── registration ─────────────────────────────────────────────────────────
+  const [reg, setReg] = useState<RegData>({
+    schoolName: "",
+    email: "",
+    phoneNumber: "",
+    password: "",
+    confirmPassword: "",
+    agreedToTerms: false,
+  });
+  const [regErrors, setRegErrors] = useState<RegErrors>({});
+  const [showRegPw, setShowRegPw] = useState(false);
+  const [showConfPw, setShowConfPw] = useState(false);
+
+  // ── otp ──────────────────────────────────────────────────────────────────
+  const [registeredEmail, setRegisteredEmail] = useState("");
+  const [otpValue, setOtpValue] = useState("");
+  const [otpError, setOtpError] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── shared ───────────────────────────────────────────────────────────────
+  const [isLoading, setIsLoading] = useState(false);
+
+  // ── helpers ──────────────────────────────────────────────────────────────
+
+  const startCooldown = () => {
+    setResendCooldown(60);
+    countdownRef.current = setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  };
+
+  const upd = (field: keyof RegData, value: string | boolean) => {
+    setReg((p) => ({ ...p, [field]: value }));
+    if (regErrors[field as keyof RegErrors])
+      setRegErrors((p) => ({ ...p, [field]: undefined }));
+  };
+
+  // ── login handler ────────────────────────────────────────────────────────
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setLoginError("");
     setIsLoading(true);
     try {
-      await login(email, password, 'school');
-      navigate('/school/dashboard');
+      await login(loginEmail, loginPassword, "school");
+      navigate("/school/dashboard");
     } catch (err) {
-      setError((err as Error).message ?? 'Invalid school credentials.');
+      setLoginError((err as Error).message ?? "Invalid school credentials.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // ── register handler ─────────────────────────────────────────────────────
+
+  const validateReg = (): boolean => {
+    const e: RegErrors = {};
+    if (!reg.schoolName.trim()) e.schoolName = "School name is required.";
+    if (!reg.email.trim()) e.email = "Email address is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reg.email))
+      e.email = "Enter a valid email address.";
+    if (!reg.password) e.password = "Password is required.";
+    else if (reg.password.length < 6)
+      e.password = "Password must be at least 6 characters.";
+    if (!reg.confirmPassword)
+      e.confirmPassword = "Please re-enter your password.";
+    else if (reg.password !== reg.confirmPassword)
+      e.confirmPassword = "Passwords do not match.";
+    if (!reg.agreedToTerms) e.agreedToTerms = "You must agree to the terms.";
+    setRegErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRegError('');
+    if (!validateReg()) return;
     setIsLoading(true);
-    if (regData.password !== regData.confirmPassword) {
-      setIsLoading(false);
-      setRegError('Passwords do not match.');
-      return;
-    }
+    setRegErrors({});
     try {
       await register(
         {
-          schoolName: regData.schoolName,
-          contactPerson: regData.contactPerson,
-          email: regData.email,
-          password: regData.password,
-          phoneNumber: regData.phoneNumber,
+          schoolName: reg.schoolName.trim(),
+          contactPerson: reg.schoolName.trim(),
+          email: reg.email.trim(),
+          password: reg.password,
+          phoneNumber: reg.phoneNumber.trim(),
         },
-        'school',
+        "school",
       );
-      navigate('/school/dashboard?status=pending');
+      // Registration succeeded → go to OTP verification
+      setRegisteredEmail(reg.email.trim());
+      setOtpValue("");
+      setOtpError("");
+      startCooldown();
+      setView("otp");
     } catch (err) {
-      setRegError((err as Error).message ?? 'Failed to register. Try again.');
+      const axErr = err as AxiosError<{
+        errors?: { message: string }[];
+        message?: string;
+      }>;
+      setRegErrors({
+        form:
+          axErr.response?.data?.errors?.[0]?.message ??
+          axErr.response?.data?.message ??
+          (err as Error).message ??
+          "Registration failed. Please try again.",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateReg = (field: keyof RegData, value: string) =>
-    setRegData((p) => ({ ...p, [field]: value }));
+  // ── OTP handlers ─────────────────────────────────────────────────────────
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpValue.length !== 6) {
+      setOtpError("Please enter the 6-digit code.");
+      return;
+    }
+    setOtpError("");
+    setIsLoading(true);
+    try {
+      await apiClient.post("/auth/verify-otp", {
+        email: registeredEmail,
+        otp: otpValue,
+      });
+      // OTP confirmed → show the school verification modal
+      setShowVerifyModal(true);
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      setOtpError(
+        axErr.response?.data?.message ??
+          "Invalid or expired code. Please try again.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    try {
+      await apiClient.post("/auth/send-otp", { email: registeredEmail });
+      startCooldown();
+    } catch {
+      /* silent */
+    }
+  };
+
+  // ── render ────────────────────────────────────────────────────────────────
 
   return (
     <>
-      <div className="fixed inset-0 w-full h-full pointer-events-none -z-10 flex justify-center items-center overflow-hidden">
-        <div className="absolute top-[10%] left-[15%] w-[400px] h-[400px] bg-slate-200/60 rounded-full mix-blend-multiply filter blur-[80px] animate-blob" />
-        <div className="absolute top-[20%] right-[15%] w-[400px] h-[400px] bg-rose-200/40 rounded-full mix-blend-multiply filter blur-[80px] animate-blob" style={{ animationDelay: '2s' }} />
-      </div>
-
-      <div className="w-full max-w-[500px] bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-white p-8 md:p-12 shadow-[0_30px_60px_-15px_rgba(136,19,55,0.1)] relative z-10 transition-all duration-500">
-
-        {/* LOGIN */}
-        {view === 'login' && (
-          <div className="block animate-fade-in-up">
+      {/* Verification modal — shown after OTP is confirmed */}
+      {showVerifyModal && (
+        <VerificationModal
+          onStart={() => {
+            setShowVerifyModal(false);
+            navigate("/school/onboarding");
+          }}
+        />
+      )}
+      <div className="min-h-screen w-full flex items-center justify-center px-4">
+        {/* ══ LOGIN ══ */}
+        {view === "login" && (
+          <div className="w-full max-w-md animate-fade-in-up bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="text-center mb-8">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <img src="/logo.png" alt="Skulcredit Logo" className="w-10 h-10 object-contain" />
-                <h1 className="text-2xl font-extrabold text-brand tracking-tight">SkulCredit</h1>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-slate-200">
-                <Icon name="building-2" className="w-3.5 h-3.5" /> Partner Portal
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-1.5">Welcome Back</h2>
-              <p className="text-sm text-slate-500 font-medium">Log in to manage your students and disbursements.</p>
+              <img
+                src="/logo_nav.png"
+                alt="SkulCredit"
+                className="h-10 w-auto mx-auto mb-4"
+              />
+              <h1 className="text-2xl font-bold text-brand mb-1">
+                School Login
+              </h1>
+              <p className="text-sm text-slate-500">
+                Log in to manage your students and disbursements.
+              </p>
             </div>
-            <form className="space-y-5" onSubmit={handleLogin}>
-              {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl font-medium">{error}</div>}
-              <div className="group">
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">School Admin Email*</label>
-                <input type="email" placeholder="admin@school.edu.ng" required value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400" />
-              </div>
-              <div className="group">
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">Password*</label>
-                <div className="relative">
-                  <input type={showPassword ? 'text' : 'password'} placeholder="Enter your password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400 pr-12" />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand transition-colors">
-                    <Icon name={showPassword ? 'eye' : 'eye-off'} className="w-5 h-5" />
+
+            <div className="">
+              <form className="space-y-5" onSubmit={handleLogin} noValidate>
+                {loginError && (
+                  <div
+                    role="alert"
+                    className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl font-medium"
+                  >
+                    {loginError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    School Admin Email*
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="admin@school.edu.ng"
+                    required
+                    autoComplete="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className={inputCls()}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Password*
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showLoginPw ? "text" : "password"}
+                      placeholder="Enter your password"
+                      required
+                      autoComplete="current-password"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className={inputCls() + " pr-10"}
+                    />
+                    <EyeBtn
+                      show={showLoginPw}
+                      toggle={() => setShowLoginPw(!showLoginPw)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 accent-brand rounded"
+                    />
+                    <span className="text-sm text-slate-600">Remember me</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setView("forgot")}
+                    className="text-sm font-semibold text-brand hover:underline"
+                  >
+                    Forgot password?
                   </button>
                 </div>
-              </div>
-              <div className="flex items-center justify-between pt-2">
-                <label className="flex items-center gap-2.5 cursor-pointer group">
-                  <div className="relative flex items-center justify-center">
-                    <input type="checkbox" className="peer appearance-none w-5 h-5 rounded-md border-2 border-slate-300 checked:bg-brand checked:border-brand transition-all cursor-pointer outline-none focus:ring-4 focus:ring-brand/20" />
-                    <Icon name="check" className="absolute text-white w-3 h-3 opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none stroke-[3]" />
-                  </div>
-                  <span className="text-sm text-slate-600 font-medium">Remember me</span>
-                </label>
-                <button type="button" onClick={() => setView('forgot')} className="text-sm font-bold text-brand hover:text-brand-light transition-colors">
-                  Forgot password?
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-brand text-white font-bold py-3.5 rounded-full hover:bg-[#7a1848] transition-colors shadow-md shadow-brand/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <Spinner /> Signing In…
+                    </>
+                  ) : (
+                    "Sign In →"
+                  )}
                 </button>
-              </div>
-              <button type="submit" disabled={isLoading}
-                className="relative w-full bg-brand text-white font-bold py-4 rounded-2xl hover:bg-brand-hover hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(136,19,55,0.5)] mt-6 flex items-center justify-center gap-2 group disabled:opacity-70">
-                <span>{isLoading ? 'Signing In...' : 'Sign In to Dashboard'}</span>
-                {!isLoading && <Icon name="arrow-right" className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
-              </button>
-              <p className="text-center text-sm text-slate-500 font-medium mt-6">
-                Not registered yet?
-                <button type="button" onClick={() => setView('signup')} className="font-bold text-brand hover:text-brand-light transition-colors ml-1">Apply as Partner</button>
-              </p>
-            </form>
-          </div>
-        )}
 
-        {/* SIGN UP */}
-        {view === 'signup' && (
-          <div className="block animate-fade-in-up">
-            <div className="text-center mb-6">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <img src="/logo.png" alt="Skulcredit Logo" className="w-10 h-10 object-contain" />
-                <h1 className="text-2xl font-extrabold text-brand tracking-tight">SkulCredit</h1>
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-1.5">Create Partner Account</h2>
-              <p className="text-sm text-slate-500 font-medium">Join our network to receive fast tuition payments.</p>
+                <p className="text-center text-sm text-slate-500">
+                  Not registered yet?{" "}
+                  <button
+                    type="button"
+                    onClick={() => setView("signup")}
+                    className="font-bold text-brand hover:underline"
+                  >
+                    Create Account
+                  </button>
+                </p>
+              </form>
             </div>
-            <form className="space-y-4" onSubmit={handleRegister}>
-              {regError && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl font-medium">{regError}</div>}
-
-              <div className="group">
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">School Name*</label>
-                <input type="text" placeholder="Official Institution Name" required value={regData.schoolName} onChange={(e) => updateReg('schoolName', e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="group">
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">Contact Person*</label>
-                  <input type="text" placeholder="Full Name" required value={regData.contactPerson} onChange={(e) => updateReg('contactPerson', e.target.value)}
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400" />
-                </div>
-                <div className="group">
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">Phone Number*</label>
-                  <input type="tel" placeholder="+234..." required value={regData.phoneNumber} onChange={(e) => updateReg('phoneNumber', e.target.value)}
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400" />
-                </div>
-              </div>
-
-              <div className="group">
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">Official Email Address*</label>
-                <input type="email" placeholder="admin@school.edu.ng" required value={regData.email} onChange={(e) => updateReg('email', e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400" />
-              </div>
-
-              <div className="group">
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">School Address*</label>
-                <textarea rows={2} placeholder="Full physical address" required value={regData.address} onChange={(e) => updateReg('address', e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400 resize-none" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="group">
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">Website / Social Media*</label>
-                  <input type="text" placeholder="https:// or @handle" required value={regData.website} onChange={(e) => updateReg('website', e.target.value)}
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400" />
-                </div>
-                <div className="group">
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">School Population*</label>
-                  <input type="number" placeholder="Estimated students" required min="10" value={regData.population} onChange={(e) => updateReg('population', e.target.value)}
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400" />
-                </div>
-              </div>
-
-              <div className="group">
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">CAC / School Licence Upload*</label>
-                <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-300 rounded-2xl cursor-pointer hover:bg-slate-100 bg-slate-50 transition-colors">
-                  <div className="flex flex-col items-center text-center px-4">
-                    <Icon name="upload-cloud" className="w-6 h-6 text-brand mb-1" />
-                    <p className="text-xs text-slate-600 font-bold">Click to upload document</p>
-                  </div>
-                  <input type="file" required onChange={() => {}} className="hidden" />
-                </label>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="group">
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">Password*</label>
-                  <div className="relative">
-                    <input type={showPassword ? 'text' : 'password'} placeholder="Min 8 chars" required value={regData.password} onChange={(e) => updateReg('password', e.target.value)}
-                      className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400 pr-10" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand transition-colors">
-                      <Icon name={showPassword ? 'eye' : 'eye-off'} className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="group">
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">Confirm*</label>
-                  <div className="relative">
-                    <input type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-enter" required value={regData.confirmPassword} onChange={(e) => updateReg('confirmPassword', e.target.value)}
-                      className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400 pr-10" />
-                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand transition-colors">
-                      <Icon name={showConfirmPassword ? 'eye' : 'eye-off'} className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3 pb-1 text-center text-xs text-slate-500 font-medium leading-relaxed">
-                By registering, you agree to the Partner
-                <a href="#" className="font-bold text-brand hover:underline ml-1">Terms of Service</a>
-              </div>
-
-              <button type="submit" disabled={isLoading}
-                className="relative w-full bg-brand text-white font-bold py-4 rounded-2xl hover:bg-brand-hover hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(136,19,55,0.5)] flex items-center justify-center gap-2 group disabled:opacity-70">
-                <span>{isLoading ? 'Submitting...' : 'Submit Application'}</span>
-                {!isLoading && <Icon name="arrow-right" className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
-              </button>
-
-              <p className="text-center text-sm text-slate-500 font-medium mt-6">
-                Already a partner?
-                <button type="button" onClick={() => setView('login')} className="font-bold text-brand hover:text-brand-light transition-colors ml-1">Sign In</button>
-              </p>
-            </form>
           </div>
         )}
 
-        {/* FORGOT */}
-        {view === 'forgot' && (
-          <div className="block animate-fade-in-up py-6">
+        {/* ══ SIGN UP ══ */}
+        {view === "signup" && (
+          <div className="w-full max-w-md animate-fade-in-up bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-slate-50 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-200">
-                <Icon name="key-round" className="w-8 h-8" />
-              </div>
-              <h1 className="text-2xl font-extrabold text-slate-900 mb-3">Admin Password Reset</h1>
-              <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-[90%] mx-auto">
-                Enter your registered school email address. We'll send instructions to reset your access.
+              <img
+                src="/logo_nav.png"
+                alt="SkulCredit"
+                className="h-10 w-auto mx-auto mb-4"
+              />
+              <h1 className="text-2xl font-bold text-brand">SkulCredit</h1>
+              <h2 className="text-lg font-semibold text-slate-800 mt-1">
+                Create School Account
+              </h2>
+              <p className="text-sm text-brand mt-1.5">
+                Join us to build consistent revenue and stronger educational
+                impact
               </p>
             </div>
-            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-              <div className="group">
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 group-focus-within:text-brand transition-colors">Official Email Address*</label>
-                <input type="email" placeholder="admin@school.edu.ng" required
-                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all duration-300 text-sm text-slate-800 placeholder-slate-400" />
+
+            <div className="bg-white rounded-2xl border border-brand/30 shadow-sm p-6">
+              {regErrors.form && (
+                <div
+                  role="alert"
+                  className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl font-medium"
+                >
+                  {regErrors.form}
+                </div>
+              )}
+
+              <form className="space-y-5" onSubmit={handleRegister} noValidate>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    School Name*
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="John Doe"
+                    value={reg.schoolName}
+                    onChange={(e) => upd("schoolName", e.target.value)}
+                    className={inputCls(!!regErrors.schoolName)}
+                  />
+                  <FieldErr msg={regErrors.schoolName} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    School Email Address*
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    value={reg.email}
+                    onChange={(e) => upd("email", e.target.value)}
+                    className={inputCls(!!regErrors.email)}
+                  />
+                  <FieldErr msg={regErrors.email} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="+234 800 000 0000"
+                    autoComplete="tel"
+                    value={reg.phoneNumber}
+                    onChange={(e) => upd("phoneNumber", e.target.value)}
+                    className={inputCls()}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Password*
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showRegPw ? "text" : "password"}
+                      placeholder="At least 6 characters"
+                      autoComplete="new-password"
+                      value={reg.password}
+                      onChange={(e) => upd("password", e.target.value)}
+                      className={inputCls(!!regErrors.password) + " pr-10"}
+                    />
+                    <EyeBtn
+                      show={showRegPw}
+                      toggle={() => setShowRegPw(!showRegPw)}
+                    />
+                  </div>
+                  <FieldErr msg={regErrors.password} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Confirm Password*
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfPw ? "text" : "password"}
+                      placeholder="Re-enter password"
+                      autoComplete="new-password"
+                      value={reg.confirmPassword}
+                      onChange={(e) => upd("confirmPassword", e.target.value)}
+                      className={
+                        inputCls(!!regErrors.confirmPassword) + " pr-10"
+                      }
+                    />
+                    <EyeBtn
+                      show={showConfPw}
+                      toggle={() => setShowConfPw(!showConfPw)}
+                    />
+                  </div>
+                  <FieldErr msg={regErrors.confirmPassword} />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={reg.agreedToTerms}
+                      onChange={(e) => upd("agreedToTerms", e.target.checked)}
+                      className="w-4 h-4 accent-brand rounded flex-shrink-0"
+                    />
+                    <span className="text-sm text-slate-600">
+                      I agree to the{" "}
+                      <a
+                        href="#"
+                        className="font-bold text-brand hover:underline"
+                      >
+                        Terms of Service
+                      </a>{" "}
+                      and{" "}
+                      <a
+                        href="#"
+                        className="font-bold text-brand hover:underline"
+                      >
+                        Privacy Policy
+                      </a>
+                    </span>
+                  </label>
+                  <FieldErr msg={regErrors.agreedToTerms} />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-brand text-white font-bold py-3.5 rounded-full hover:bg-[#7a1848] transition-colors shadow-md shadow-brand/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <Spinner /> Creating Account…
+                    </>
+                  ) : (
+                    "Create Account"
+                  )}
+                </button>
+
+                <p className="text-center text-sm text-slate-500">
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => setView("login")}
+                    className="font-bold text-brand hover:underline"
+                  >
+                    Login
+                  </button>
+                </p>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ══ OTP VERIFICATION ══ */}
+        {view === "otp" && (
+          <div className="w-full max-w-md animate-fade-in-up bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="text-center mb-8">
+              {/* mail icon circle */}
+              <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-5 shadow-sm">
+                <Icon name="mail" className="w-8 h-8 text-brand" />
               </div>
-              <button type="submit"
-                className="relative w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all duration-300 shadow-md flex items-center justify-center gap-2 group">
-                <span>Send Reset Link</span>
-                <Icon name="send" className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-              </button>
-              <p className="text-center text-sm text-slate-500 font-medium mt-6">
-                Remembered your password?
-                <button type="button" onClick={() => setView('login')} className="font-bold text-brand hover:text-brand-light transition-colors ml-1">Back to Login</button>
+              <h1 className="text-2xl font-bold text-slate-900 mb-3">
+                Verify Your Email
+              </h1>
+              <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-[85%] mx-auto">
+                We sent a 6-digit code to{" "}
+                <span className="font-bold text-slate-800">
+                  {registeredEmail}
+                </span>
+                . Enter it below to activate your account.
               </p>
-            </form>
+            </div>
+
+            <div className="">
+              <form className="space-y-5" onSubmit={handleVerifyOtp} noValidate>
+                {otpError && (
+                  <div
+                    role="alert"
+                    className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl font-medium"
+                  >
+                    {otpError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2 text-center">
+                    6-digit Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="• • • • • •"
+                    maxLength={6}
+                    autoFocus
+                    value={otpValue}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                      setOtpValue(val);
+                      if (otpError) setOtpError("");
+                    }}
+                    className={
+                      "w-full px-4 py-4 rounded-2xl border text-3xl tracking-[0.6em] text-center " +
+                      "font-bold text-slate-800 bg-slate-50 outline-none transition-all " +
+                      "focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 " +
+                      (otpError ? "border-red-400" : "border-slate-200")
+                    }
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading || otpValue.length !== 6}
+                  className={[
+                    "w-full font-bold py-3.5 rounded-full transition-all flex items-center justify-center gap-2",
+                    isLoading || otpValue.length !== 6
+                      ? "bg-brand/30 text-brand/50 cursor-not-allowed"
+                      : "bg-brand text-white hover:bg-[#7a1848] shadow-md shadow-brand/20",
+                  ].join(" ")}
+                >
+                  {isLoading ? (
+                    <>
+                      <Spinner /> Verifying…
+                    </>
+                  ) : (
+                    "Verify & Continue"
+                  )}
+                </button>
+
+                <p className="text-center text-sm text-slate-500">
+                  Didn't receive a code?{" "}
+                  {resendCooldown > 0 ? (
+                    <span className="text-slate-400 font-medium">
+                      Resend in {resendCooldown}s
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      className="font-bold text-brand hover:underline transition-colors"
+                    >
+                      Resend code
+                    </button>
+                  )}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setView("signup")}
+                  className="w-full flex items-center justify-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <Icon name="arrow-left" className="w-4 h-4" />
+                  Back to sign up
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ══ FORGOT PASSWORD ══ */}
+        {view === "forgot" && (
+          <div className="w-full max-w-md animate-fade-in-up bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="text-center mb-8">
+              <img
+                src="/logo_nav.png"
+                alt="SkulCredit"
+                className="h-10 w-auto mx-auto mb-4"
+              />
+              <h1 className="text-2xl font-bold text-slate-900 mb-2">
+                Reset Your Password
+              </h1>
+              <p className="text-sm text-slate-500 max-w-xs mx-auto">
+                Enter your registered school email and we'll send a reset link.
+              </p>
+            </div>
+
+            <div className="">
+              <form
+                className="space-y-5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setView("login");
+                }}
+              >
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Official Email Address*
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="admin@school.edu.ng"
+                    required
+                    className={inputCls()}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-brand text-white font-bold py-3.5 rounded-full hover:bg-[#7a1848] transition-colors shadow-md shadow-brand/20 flex items-center justify-center gap-2"
+                >
+                  Send Reset Link
+                  <Icon name="send" className="w-4 h-4" />
+                </button>
+
+                <p className="text-center text-sm text-slate-500">
+                  Remembered your password?{" "}
+                  <button
+                    type="button"
+                    onClick={() => setView("login")}
+                    className="font-bold text-brand hover:underline"
+                  >
+                    Back to Login
+                  </button>
+                </p>
+              </form>
+            </div>
           </div>
         )}
       </div>
