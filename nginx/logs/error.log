@@ -21,3 +21,7 @@
 2026/09/11 10:23:55 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
 2026/09/11 10:24:58 [emerg] 1#1: "client_max_body_size" directive invalid value in /etc/nginx/conf.d/05-server-http.conf:43
 2026/09/15 06:05:26 [notice] 193#193: signal process started
+2026/09/17 05:18:11 [warn] 31#31: *8 a client request body is buffered to a temporary file /var/cache/nginx/client_temp/0000000001, client: 172.20.0.1, server: _, request: "POST /api/v1/upload/document HTTP/1.1", host: "localhost", referrer: "http://localhost/parent/eligibility"
+2026/09/17 05:18:49 [warn] 30#30: *2 a client request body is buffered to a temporary file /var/cache/nginx/client_temp/0000000002, client: 172.20.0.1, server: _, request: "POST /api/v1/upload/document HTTP/1.1", host: "localhost", referrer: "http://localhost/parent/eligibility"
+2026/09/17 05:18:50 [warn] 31#31: *8 a client request body is buffered to a temporary file /var/cache/nginx/client_temp/0000000003, client: 172.20.0.1, server: _, request: "POST /api/v1/upload/document HTTP/1.1", host: "localhost", referrer: "http://localhost/parent/eligibility"
+2026/09/17 05:18:57 [warn] 31#31: *8 a client request body is buffered to a temporary file /var/cache/nginx/client_temp/0000000004, client: 172.20.0.1, server: _, request: "POST /api/v1/upload/document HTTP/1.1", host: "localhost", referrer: "http://localhost/parent/eligibility"

@@ -1,20 +1,34 @@
-import { Request, Response, NextFunction } from 'express';
-import storageService from '../integrations/storage/storage.service';
-import { successResponse } from '../utils/response';
-import ApiError from '../utils/apiError';
+import { Request, Response, NextFunction } from "express";
+import path from "path";
+import env from "../config/env";
+import { successResponse } from "../utils/response";
+import ApiError from "../utils/apiError";
 
 class UploadController {
-  async uploadDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async uploadDocument(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      if (!req.file) throw new ApiError(400, 'No file uploaded');
+      if (!req.file) throw new ApiError(400, "No file uploaded");
 
-      const result = await storageService.uploadFile(req.file.buffer, 'skulcredit_docs');
-      successResponse(res, 200, 'File uploaded successfully', {
-        url:       result.secure_url,
-        publicId:  result.public_id,
-        format:    result.format,
+      // req.file.path is the absolute disk path written by multer disk storage
+      // Convert to a portable relative path for DB storage
+      const relPath = path
+        .relative(process.cwd(), req.file.path)
+        .replace(/\\/g, "/");
+
+      const publicUrl = `${env.appUrl.replace(/\/$/, "")}/${relPath}`;
+
+      successResponse(res, 200, "File uploaded successfully", {
+        url: publicUrl,
+        filePath: relPath,
+        filename: req.file.filename,
       });
-    } catch (error) { next(error); }
+    } catch (error) {
+      next(error);
+    }
   }
 }
 
