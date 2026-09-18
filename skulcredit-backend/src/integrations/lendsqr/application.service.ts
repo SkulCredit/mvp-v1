@@ -35,6 +35,42 @@ export interface BookLoanPayload {
   location?: string;
 }
 
+export interface LoanScorePayload {
+  product_id: number;
+  bvn: string;
+  requested_amount: number;
+  location: string;
+}
+
+export interface LoanScoreResponse {
+  status: string;
+  message: string;
+  data: {
+    credit_score: string;
+    decision_data: {
+      pass: boolean;
+      decision: string;
+      engine: string;
+      total_weighted_score: number;
+      total_weight: number;
+      score: string;
+      applicant_score: number;
+      advisory_amount: number;
+      process_time: number;
+      offers?: {
+        success: boolean;
+        data: Array<{ pass: boolean; offer: number }>;
+      };
+    };
+    proposed_amount: number;
+    loan_profile?: Record<string, unknown>;
+  };
+  meta?: {
+    cost: number;
+    balance: number;
+  };
+}
+
 export interface BookLoanResponse {
   status: string;
   message: string;
@@ -62,6 +98,17 @@ class LendsqrApplicationService extends LendsqrBaseService {
 
   getApplicationStatus(applicationId: string): Promise<unknown> {
     return this.client.get(`/v1/loans/applications/${applicationId}`);
+  }
+
+  /**
+   * Check a borrower's loan score / karma before KYC.
+   * POST /v2/customers/loans/score
+   */
+  checkLoanScore(payload: LoanScorePayload): Promise<LoanScoreResponse> {
+    return this.client.post(
+      "/v2/customers/loans/score",
+      payload,
+    ) as Promise<LoanScoreResponse>;
   }
 
   /**

@@ -69,7 +69,17 @@ export const addStudentSchema = z.object({
     lastName: z.string().min(2, "Last name is required"),
     studentId: z.string().optional(),
     gradeLevel: z.string().min(1, "Grade level is required"),
-    tuitionAmount: z.number().positive("Tuition amount must be positive"),
+    tuitionAmount: z
+      .preprocess(
+        (v) =>
+          v === undefined || v === null || v === ""
+            ? 0
+            : typeof v === "string"
+              ? parseFloat(v)
+              : v,
+        z.number().nonnegative("Tuition amount must be 0 or greater"),
+      )
+      .optional(),
   }),
 });
 

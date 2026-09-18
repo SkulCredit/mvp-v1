@@ -1,7 +1,3 @@
-/**
- * Shared top bar for every school dashboard page.
- * Matches the Figma: logo | (optional left slot) | ── flex grow ── | 🔔 Notification | avatar
- */
 import React, { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";

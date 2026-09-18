@@ -20,6 +20,8 @@ interface Child {
   schoolName?: string;
   schoolId?: string;
   photo?: string;
+  /** Tuition amount from the student record — used to pre-fill repayment plans */
+  tuitionAmount?: number;
 }
 
 interface School {
@@ -117,7 +119,6 @@ const MOCK_SCHOOLS: School[] = [
 ];
 
 const ACADEMIC_SESSIONS = ["2024/2025", "2025/2026", "2026/2027"];
-
 const TERMS = [
   "Term 1",
   "Term 2",
@@ -126,12 +127,15 @@ const TERMS = [
   "Second Semester",
 ];
 
-const STEPS: { label: string }[] = [
-  { label: "Select Child" },
-  { label: "Select School" },
-  { label: "Tuition Details" },
-  { label: "Review" },
-  { label: "Submit Application" },
+// Fallback display amount when a child has no tuitionAmount on record yet
+const FALLBACK_TUITION_AMOUNT = 450_000;
+
+const STEPS: { label: string; short: string }[] = [
+  { label: "Select Child", short: "Child" },
+  { label: "Select School", short: "School" },
+  { label: "Tuition Details", short: "Tuition" },
+  { label: "Review", short: "Review" },
+  { label: "Submit", short: "Submit" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,7 +163,7 @@ function buildRepaymentPlans(tuitionAmount: number): RepaymentPlan[] {
     {
       id: "3month",
       label: "3-month plan",
-      sub: `${fmt(Math.round((tuitionAmount + fee3) / 3))}/month · 4% service fee`,
+      sub: `${fmt(Math.round((tuitionAmount + fee3) / 3))}/mo · 4% fee`,
       total: tuitionAmount + fee3,
       monthlyAmount: Math.round((tuitionAmount + fee3) / 3),
       serviceFeeRate: 0.04,
@@ -167,7 +171,7 @@ function buildRepaymentPlans(tuitionAmount: number): RepaymentPlan[] {
     {
       id: "6month",
       label: "6-month plan",
-      sub: `${fmt(Math.round((tuitionAmount + fee6) / 6))}/month · 7% service fee`,
+      sub: `${fmt(Math.round((tuitionAmount + fee6) / 6))}/mo · 7% fee`,
       total: tuitionAmount + fee6,
       monthlyAmount: Math.round((tuitionAmount + fee6) / 6),
       serviceFeeRate: 0.07,
@@ -182,21 +186,21 @@ function tenorFromPlanId(id: "full" | "3month" | "6month"): number {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared sub-components
+// Stepper — shows short labels on mobile, full labels on sm+
 // ─────────────────────────────────────────────────────────────────────────────
 
 const Stepper: React.FC<{ current: Step; completedChild?: Child | null }> = ({
   current,
   completedChild,
 }) => (
-  <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm px-4 sm:px-6 py-5 flex items-center justify-between gap-2 overflow-hidden">
+  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-3 sm:px-6 py-4 flex items-center justify-between gap-1 overflow-hidden">
     {STEPS.map((s, i) => {
       const num = (i + 1) as Step;
       const done = num < current;
       const active = num === current;
       return (
         <React.Fragment key={num}>
-          <div className="flex flex-col items-center gap-1.5 shrink-0 relative z-10">
+          <div className="flex flex-col items-center gap-1 shrink-0 relative z-10 min-w-0">
             {done && num === 1 && completedChild && (
               <img
                 src={
@@ -204,7 +208,7 @@ const Stepper: React.FC<{ current: Step; completedChild?: Child | null }> = ({
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(completedChild.firstName)}&background=881337&color=fff&size=36`
                 }
                 alt={completedChild.firstName}
-                className="absolute -top-4 w-9 h-9 rounded-full object-cover ring-2 ring-white shadow"
+                className="absolute -top-4 w-8 h-8 rounded-full object-cover ring-2 ring-white shadow"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
                     `https://ui-avatars.com/api/?name=${encodeURIComponent(completedChild.firstName)}&background=881337&color=fff&size=36`;
@@ -212,7 +216,7 @@ const Stepper: React.FC<{ current: Step; completedChild?: Child | null }> = ({
               />
             )}
             <div
-              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+              className={`w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold transition-all shrink-0 ${
                 done
                   ? "bg-[#881337] text-white"
                   : active
@@ -228,7 +232,8 @@ const Stepper: React.FC<{ current: Step; completedChild?: Child | null }> = ({
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="w-4 h-4"
+                  className="w-3.5 h-3.5"
+                  aria-hidden="true"
                 >
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
@@ -236,8 +241,9 @@ const Stepper: React.FC<{ current: Step; completedChild?: Child | null }> = ({
                 num
               )}
             </div>
+            {/* Short label on mobile, full label on sm+ */}
             <span
-              className={`text-[10px] sm:text-[11px] font-semibold whitespace-nowrap hidden sm:block ${
+              className={`text-[9px] sm:text-[11px] font-semibold text-center leading-tight w-full truncate ${
                 active
                   ? "text-[#881337]"
                   : done
@@ -245,12 +251,13 @@ const Stepper: React.FC<{ current: Step; completedChild?: Child | null }> = ({
                     : "text-[#D4879A]"
               }`}
             >
-              {s.label}
+              <span className="sm:hidden">{s.short}</span>
+              <span className="hidden sm:inline">{s.label}</span>
             </span>
           </div>
           {i < STEPS.length - 1 && (
             <div
-              className={`flex-1 h-px transition-colors ${num < current ? "bg-[#881337]/40" : "bg-gray-200"}`}
+              className={`flex-1 h-px min-w-0 transition-colors mx-0.5 sm:mx-1 ${num < current ? "bg-[#881337]/40" : "bg-gray-200"}`}
             />
           )}
         </React.Fragment>
@@ -258,6 +265,10 @@ const Stepper: React.FC<{ current: Step; completedChild?: Child | null }> = ({
     })}
   </div>
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NavBar — fixed bottom bar, stacks gracefully on small screens
+// ─────────────────────────────────────────────────────────────────────────────
 
 const NavBar: React.FC<{
   onBack: () => void;
@@ -276,12 +287,12 @@ const NavBar: React.FC<{
 }) => {
   if (hidden) return null;
   return (
-    <div className="fixed bottom-0 left-0 w-full px-6 sm:px-8 py-8 z-50">
-      <div className="flex items-center justify-between">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm border-t border-gray-100 px-4 sm:px-8 py-3 sm:py-4">
+      <div className="flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 border-2 border-[#881337] text-[#881337] font-bold px-5 py-2.5 rounded-full hover:bg-[#881337]/5 transition-colors text-sm"
+          className="inline-flex items-center gap-1.5 border-2 border-[#881337] text-[#881337] font-bold px-4 sm:px-5 py-2.5 rounded-full hover:bg-[#881337]/5 transition-colors text-sm whitespace-nowrap"
         >
           <svg
             viewBox="0 0 24 24"
@@ -301,7 +312,7 @@ const NavBar: React.FC<{
           type="button"
           onClick={onContinue}
           disabled={continueDisabled || loading}
-          className={`inline-flex items-center gap-2 font-bold px-6 py-2.5 rounded-full text-sm transition-all ${
+          className={`inline-flex items-center gap-2 font-bold px-5 sm:px-6 py-2.5 rounded-full text-sm transition-all whitespace-nowrap ${
             continueDisabled || loading
               ? "bg-[#881337]/20 text-[#881337]/50 cursor-not-allowed"
               : "bg-[#881337] text-white hover:bg-[#4c0519] shadow-sm"
@@ -366,7 +377,7 @@ const StepSelectChild: React.FC<{
 }> = ({ children, selectedId, onSelect, onAddNew }) => (
   <div className="space-y-6">
     <div>
-      <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900">
+      <h2 className="text-lg sm:text-2xl font-extrabold text-gray-900">
         Who are you applying for?
       </h2>
       <p className="mt-1 text-sm text-gray-500">
@@ -375,7 +386,7 @@ const StepSelectChild: React.FC<{
     </div>
 
     {children.length > 0 && (
-      <div className="mt-10">
+      <div className="mt-4">
         <p className="text-sm font-bold text-gray-700 mb-3">
           Existing Children
         </p>
@@ -398,7 +409,7 @@ const StepSelectChild: React.FC<{
                     `https://ui-avatars.com/api/?name=${encodeURIComponent(child.firstName)}&background=881337&color=fff&size=44`
                   }
                   alt={child.firstName}
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shrink-0"
+                  className="w-10 h-10 rounded-full object-cover shrink-0"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
                       `https://ui-avatars.com/api/?name=${encodeURIComponent(child.firstName)}&background=881337&color=fff&size=44`;
@@ -409,7 +420,7 @@ const StepSelectChild: React.FC<{
                     {child.firstName} {child.lastName}
                   </p>
                   {child.schoolName && (
-                    <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-400 truncate">
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
                       <svg
                         viewBox="0 0 24 24"
                         fill="none"
@@ -455,28 +466,13 @@ const StepSelectChild: React.FC<{
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <div
-                    className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selected ? "border-[#881337]" : "border-gray-300"}`}
-                  >
-                    {selected && (
-                      <div className="w-2 h-2 rounded-full bg-[#881337]" />
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelect(child.id);
-                    }}
-                    className={`border-2 rounded-full px-3 py-1 text-xs font-bold transition-colors whitespace-nowrap ${
-                      selected
-                        ? "border-[#881337] bg-[#881337] text-white"
-                        : "border-[#881337] text-[#881337] hover:bg-[#881337]/5"
-                    }`}
-                  >
-                    {selected ? "Selected" : "Select"}
-                  </button>
+                {/* Radio dot only — no extra "Select" button to avoid cramping */}
+                <div
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "border-[#881337]" : "border-gray-300"}`}
+                >
+                  {selected && (
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#881337]" />
+                  )}
                 </div>
               </div>
             );
@@ -485,12 +481,13 @@ const StepSelectChild: React.FC<{
       </div>
     )}
 
+    {/* Add new child */}
     <button
       type="button"
       onClick={onAddNew}
       className="w-full flex items-center gap-3 bg-white rounded-2xl border border-gray-200 hover:border-[#881337]/40 px-3 sm:px-5 py-3 sm:py-4 transition-all text-left group"
     >
-      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#881337]/10 flex items-center justify-center shrink-0 group-hover:bg-[#881337]/20 transition-colors">
+      <div className="w-10 h-10 rounded-full bg-[#881337]/10 flex items-center justify-center shrink-0 group-hover:bg-[#881337]/20 transition-colors">
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -498,7 +495,7 @@ const StepSelectChild: React.FC<{
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="w-6 h-6 text-[#881337]"
+          className="w-5 h-5 text-[#881337]"
           aria-hidden="true"
         >
           <line x1="12" y1="5" x2="12" y2="19" />
@@ -507,9 +504,8 @@ const StepSelectChild: React.FC<{
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-bold text-gray-900 text-sm">Add a new child</p>
-        <p className="mt-0.5 text-xs text-gray-500">
-          Add your child's details once. You can use their profile for future
-          applications
+        <p className="mt-0.5 text-xs text-gray-500 leading-snug">
+          Add your child's details once. Reuse for future applications.
         </p>
       </div>
       <svg
@@ -529,7 +525,7 @@ const StepSelectChild: React.FC<{
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 2 — Select School (dropdown-based, matching Figma)
+// Step 2 — Select School
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ChevronDown: React.FC = () => (
@@ -548,7 +544,7 @@ const ChevronDown: React.FC = () => (
 );
 
 const selectCls = (hasError = false) =>
-  `w-full rounded-lg border bg-white px-3 py-3 text-sm appearance-none outline-none transition-colors cursor-pointer pr-10 ${
+  `w-full rounded-xl border bg-white px-3 py-3 text-sm appearance-none outline-none transition-colors cursor-pointer pr-10 ${
     hasError
       ? "border-red-400 text-red-700"
       : "border-gray-200 text-gray-800 hover:border-gray-300 focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/15"
@@ -581,13 +577,12 @@ const StepSelectSchool: React.FC<{
   onSchoolChange,
   onGradeLevelChange,
 }) => {
-  // Flatten class levels for the dropdown
   const flatClasses = classLevelGroups.flatMap((g) => g.classes);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900">
+        <h2 className="text-lg sm:text-2xl font-extrabold text-gray-900">
           Which school does your child attend?
         </h2>
         <p className="mt-1 text-sm text-gray-500">
@@ -608,9 +603,13 @@ const StepSelectSchool: React.FC<{
               onInstitutionTypeChange(e.target.value, opt?.name ?? "");
             }}
             disabled={loadingTypes}
-            className={selectCls()}
+            className={
+              selectCls() + (loadingTypes ? " opacity-50 cursor-wait" : "")
+            }
           >
-            <option value="">-Select type-</option>
+            <option value="">
+              {loadingTypes ? "Loading…" : "-Select type-"}
+            </option>
             {institutionTypes.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -642,7 +641,11 @@ const StepSelectSchool: React.FC<{
             }
           >
             <option value="">
-              {loadingSchools ? "Loading schools…" : "-Choose School-"}
+              {loadingSchools
+                ? "Loading schools…"
+                : !selectedInstitutionTypeId
+                  ? "Select a type first"
+                  : "-Choose School-"}
             </option>
             {catalogSchools.map((s) => (
               <option key={s.id} value={s.id}>
@@ -672,7 +675,11 @@ const StepSelectSchool: React.FC<{
             }
           >
             <option value="">
-              {loadingClasses ? "Loading classes…" : "-Choose Class-"}
+              {loadingClasses
+                ? "Loading classes…"
+                : !selectedSchoolId
+                  ? "Select a school first"
+                  : "-Choose Class-"}
             </option>
             {flatClasses.map((c) => (
               <option key={c.id} value={c.name}>
@@ -688,17 +695,17 @@ const StepSelectSchool: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 3 — Tuition Details (Figma: radio-button plan cards only, no inputs)
+// Step 3 — Tuition Details
 // ─────────────────────────────────────────────────────────────────────────────
 
 const StepTuitionDetails: React.FC<{
-  /** Pre-determined tuition amount from the child/school record */
+  /** Actual tuition amount from the selected child's record */
   tuitionAmount: number;
   selectedPlanId: "full" | "3month" | "6month" | null;
   onSelectPlan: (id: "full" | "3month" | "6month") => void;
 }> = ({ tuitionAmount, selectedPlanId, onSelectPlan }) => {
-  // Use ₦450,000 as the display default when no amount is set yet
-  const amount = tuitionAmount > 0 ? tuitionAmount : 450_000;
+  // Use child's tuition amount, fall back to ₦450,000 for display when 0
+  const amount = tuitionAmount > 0 ? tuitionAmount : FALLBACK_TUITION_AMOUNT;
   const plans = buildRepaymentPlans(amount);
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null;
   const serviceFee = selectedPlan
@@ -709,16 +716,15 @@ const StepTuitionDetails: React.FC<{
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl sm:text-2xl font-extrabold text-[#881337]">
+        <h2 className="text-lg sm:text-2xl font-extrabold text-[#881337]">
           Tuition &amp; repayment details
         </h2>
         <p className="mt-1 text-sm text-gray-500">
-          Choose the term and a repayment plan that fits your budget
+          Choose a repayment plan that fits your budget
         </p>
       </div>
 
-      {/* Plan cards — exactly matching Figma */}
-      <div className="space-y-3 mt-4">
+      <div className="space-y-3 mt-2">
         {plans.map((plan) => {
           const selected = selectedPlanId === plan.id;
           return (
@@ -726,33 +732,31 @@ const StepTuitionDetails: React.FC<{
               key={plan.id}
               type="button"
               onClick={() => onSelectPlan(plan.id)}
-              className={`w-full flex items-center justify-between rounded-2xl border px-5 py-4 text-left transition-all ${
+              className={`w-full flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all ${
                 selected
                   ? "border-[#881337] ring-2 ring-[#881337]/15 bg-white"
                   : "border-gray-200 bg-white hover:border-[#881337]/40"
               }`}
             >
-              <div className="flex items-center gap-3">
-                {/* Radio circle */}
-                <div
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                    selected ? "border-[#881337]" : "border-[#F2C4D0]"
-                  }`}
-                >
-                  {selected && (
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#881337]" />
-                  )}
-                </div>
-                {/* Label + sub-text */}
-                <div>
-                  <p className="text-sm font-bold text-gray-900">
-                    {plan.label}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">{plan.sub}</p>
-                </div>
+              {/* Radio circle */}
+              <div
+                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                  selected ? "border-[#881337]" : "border-[#F2C4D0]"
+                }`}
+              >
+                {selected && (
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#881337]" />
+                )}
               </div>
-              {/* Amount — right-aligned, brand colour */}
-              <span className="text-sm font-extrabold text-[#881337] ml-4 shrink-0">
+              {/* Label — grows to fill space */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900">{plan.label}</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-snug">
+                  {plan.sub}
+                </p>
+              </div>
+              {/* Amount — never shrinks, wraps below on very small screens */}
+              <span className="text-sm font-extrabold text-[#881337] shrink-0 text-right">
                 {fmt(plan.total)}
               </span>
             </button>
@@ -760,9 +764,9 @@ const StepTuitionDetails: React.FC<{
         })}
       </div>
 
-      {/* Summary card — always visible once a plan is selected */}
+      {/* Summary card */}
       {selectedPlan && (
-        <div className="rounded-2xl bg-[#FDF0F4] border border-[#F2C4D0] px-5 py-4 space-y-2 mt-2">
+        <div className="rounded-2xl bg-[#FDF0F4] border border-[#F2C4D0] px-4 py-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Tuition amount</span>
             <span className="font-semibold text-gray-900">{fmt(amount)}</span>
@@ -784,7 +788,7 @@ const StepTuitionDetails: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 4 — Review (matching Figma)
+// Step 4 — Review
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ReviewRow: React.FC<{
@@ -792,15 +796,15 @@ const ReviewRow: React.FC<{
   value: string;
   onEdit: () => void;
 }> = ({ label, value, onEdit }) => (
-  <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+  <div className="flex items-start justify-between gap-2 py-3 border-b border-gray-100 last:border-0">
     <div className="flex-1 min-w-0">
-      <span className="text-sm text-gray-500">{label}: </span>
-      <span className="text-sm font-semibold text-gray-900">{value}</span>
+      <p className="text-xs text-gray-500 mb-0.5">{label}</p>
+      <p className="text-sm font-semibold text-gray-900 break-words">{value}</p>
     </div>
     <button
       type="button"
       onClick={onEdit}
-      className="ml-4 shrink-0 text-gray-400 hover:text-[#881337] transition-colors"
+      className="shrink-0 mt-0.5 text-gray-400 hover:text-[#881337] transition-colors p-1"
       aria-label={`Edit ${label}`}
     >
       <svg
@@ -836,9 +840,9 @@ const StepReview: React.FC<{
   const planLabel = selectedPlan?.label ?? tuitionDetails.repaymentPlanId;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h2 className="text-xl sm:text-2xl font-extrabold text-[#881337]">
+        <h2 className="text-lg sm:text-2xl font-extrabold text-[#881337]">
           Review your application
         </h2>
         <p className="mt-1 text-sm text-gray-500">
@@ -846,7 +850,7 @@ const StepReview: React.FC<{
         </p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-1">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 sm:px-5 py-1">
         <ReviewRow
           label="Child"
           value={child ? `${child.firstName} ${child.lastName}` : "—"}
@@ -858,12 +862,12 @@ const StepReview: React.FC<{
           onEdit={onEditSchool}
         />
         <ReviewRow
-          label="Class/Level"
+          label="Class / Level"
           value={tuitionDetails.gradeLevel || "—"}
           onEdit={onEditSchool}
         />
         <ReviewRow
-          label="Session/Term"
+          label="Session / Term"
           value={
             tuitionDetails.academicSession && tuitionDetails.term
               ? `${tuitionDetails.academicSession} - ${tuitionDetails.term}`
@@ -877,11 +881,11 @@ const StepReview: React.FC<{
           onEdit={onEditTuition}
         />
 
-        <div className="flex justify-between pt-4 pb-2">
+        <div className="flex items-center justify-between pt-4 pb-2">
           <span className="text-sm font-bold text-[#881337]">
             Total amount due
           </span>
-          <span className="text-sm font-extrabold text-[#881337]">
+          <span className="text-base font-extrabold text-[#881337]">
             {fmt(total)}
           </span>
         </div>
@@ -891,7 +895,7 @@ const StepReview: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 5 — Confirmation (matching Figma success screen)
+// Step 5 — Confirmation
 // ─────────────────────────────────────────────────────────────────────────────
 
 const StepConfirmation: React.FC<{
@@ -915,17 +919,17 @@ const StepConfirmation: React.FC<{
   const total = selectedPlan?.total ?? numAmount;
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh] py-12 px-4">
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-md w-full max-w-md px-8 py-10 text-center">
-        {/* Green check circle */}
-        <div className="flex items-center justify-center w-20 h-20 rounded-full bg-green-50 mx-auto mb-6">
+    <div className="flex items-center justify-center min-h-[60vh] py-10 px-2 sm:px-4">
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-md w-full max-w-sm sm:max-w-md px-5 sm:px-8 py-8 sm:py-10 text-center">
+        {/* Success icon */}
+        <div className="flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-green-50 mx-auto mb-5">
           <svg
             viewBox="0 0 24 24"
             fill="none"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="w-10 h-10"
+            className="w-8 h-8 sm:w-10 sm:h-10"
             aria-hidden="true"
           >
             <circle
@@ -940,29 +944,31 @@ const StepConfirmation: React.FC<{
           </svg>
         </div>
 
-        <h2 className="text-2xl font-extrabold text-[#881337] mb-2">
+        <h2 className="text-xl sm:text-2xl font-extrabold text-[#881337] mb-2">
           Application submitted
         </h2>
-        <p className="text-sm text-gray-500 mb-1">
+        <p className="text-sm text-gray-500 mb-1 leading-relaxed">
           We've received{" "}
           {child ? `${child.firstName} ${child.lastName}'s` : "your"}{" "}
           application for {tuitionDetails.schoolName}. You'll get an update once
           it's reviewed.
         </p>
         <p className="text-sm text-gray-500 mb-6">
-          Reference number:{" "}
-          <span className="font-bold text-[#881337]">{referenceNumber}</span>
+          Ref:{" "}
+          <span className="font-bold text-[#881337] break-all">
+            {referenceNumber}
+          </span>
         </p>
 
         {/* Status summary */}
-        <div className="rounded-2xl bg-[#FDF9EE] border border-[#F0E0A0] px-5 py-4 mb-8 text-left space-y-3">
-          <div className="flex items-center justify-between">
+        <div className="rounded-2xl bg-[#FDF9EE] border border-[#F0E0A0] px-4 py-4 mb-6 text-left space-y-3">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-sm text-gray-500">Status</span>
-            <span className="inline-flex items-center rounded-full bg-amber-100 border border-amber-200 text-amber-700 text-xs font-semibold px-3 py-1">
+            <span className="inline-flex items-center rounded-full bg-amber-100 border border-amber-200 text-amber-700 text-xs font-semibold px-2.5 py-1">
               Under review
             </span>
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-sm text-gray-500">Total amount</span>
             <span className="text-sm font-extrabold text-[#881337]">
               {fmt(total)}
@@ -970,14 +976,14 @@ const StepConfirmation: React.FC<{
           </div>
         </div>
 
-        {/* CTA buttons */}
-        <div className="flex gap-3">
+        {/* CTA — stacks on very small screens */}
+        <div className="flex flex-col xs:flex-row gap-2.5 sm:gap-3">
           <button
             type="button"
             onClick={onDashboard}
             className="flex-1 rounded-full border-2 border-[#881337] text-[#881337] font-bold py-2.5 text-sm hover:bg-[#881337]/5 transition-colors"
           >
-            Go to Dashboard
+            Dashboard
           </button>
           <button
             type="button"
@@ -1005,14 +1011,15 @@ const Toast: React.FC<{
     role="alert"
     aria-live="assertive"
     className={[
-      "fixed top-5 left-1/2 z-[9999] flex items-center gap-3 rounded-xl px-5 py-3.5 shadow-lg",
+      "fixed top-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[9999]",
+      "flex items-center gap-3 rounded-xl px-4 py-3 shadow-lg",
       "bg-white border border-red-200 text-red-700 text-sm font-medium",
       "transition-all duration-300 ease-out",
+      "sm:max-w-sm",
       visible
-        ? "-translate-x-1/2 translate-y-0 opacity-100"
-        : "-translate-x-1/2 -translate-y-4 opacity-0 pointer-events-none",
+        ? "opacity-100 translate-y-0"
+        : "opacity-0 -translate-y-2 pointer-events-none",
     ].join(" ")}
-    style={{ minWidth: "320px", maxWidth: "520px" }}
   >
     <svg
       viewBox="0 0 24 24"
@@ -1028,11 +1035,11 @@ const Toast: React.FC<{
       <line x1="12" y1="8" x2="12" y2="12" />
       <line x1="12" y1="16" x2="12.01" y2="16" />
     </svg>
-    <span className="flex-1">{message}</span>
+    <span className="flex-1 text-xs sm:text-sm">{message}</span>
     <button
       type="button"
       onClick={onDismiss}
-      className="text-red-400 hover:text-red-600 transition-colors ml-1"
+      className="text-red-400 hover:text-red-600 transition-colors ml-1 shrink-0"
       aria-label="Dismiss"
     >
       <svg
@@ -1058,7 +1065,6 @@ const Toast: React.FC<{
 const StudentDetailsPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // ── Global ─────────────────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>(1);
   const [toastMsg, setToastMsg] = useState("");
   const [toastVisible, setToastVisible] = useState(false);
@@ -1081,15 +1087,42 @@ const StudentDetailsPage: React.FC = () => {
     parentService
       .getStudents()
       .then((data) => {
-        const arr = Array.isArray(data) ? (data as Child[]) : [];
-        if (arr.length > 0) setChildren(arr);
+        const raw = Array.isArray(data) ? data : [];
+        if (raw.length === 0) return;
+
+        // The API returns students with a nested `school` object.
+        // Normalize into the flat Child shape the component expects.
+        const normalized: Child[] = (
+          raw as Array<{
+            id: string;
+            firstName: string;
+            lastName: string;
+            gradeLevel?: string;
+            tuitionAmount?: number;
+            schoolId?: string;
+            school?: { id?: string; schoolName?: string };
+          }>
+        ).map((s) => ({
+          id: s.id,
+          firstName: s.firstName,
+          lastName: s.lastName,
+          gradeLevel: s.gradeLevel,
+          tuitionAmount: s.tuitionAmount ?? 0,
+          schoolId: s.school?.id ?? s.schoolId,
+          schoolName: s.school?.schoolName,
+          photo: undefined, // Student model has no photo field
+        }));
+
+        setChildren(normalized);
       })
-      .catch(() => {});
+      .catch(() => {
+        // Keep mock children as fallback so UI doesn't go blank
+      });
   }, []);
 
   const selectedChild = children.find((c) => c.id === selectedChildId) ?? null;
 
-  // ── Step 2: school (dropdown-based) ───────────────────────────────────────
+  // ── Step 2: school ─────────────────────────────────────────────────────────
   const [institutionTypes, setInstitutionTypes] = useState<
     CatalogInstitutionType[]
   >([]);
@@ -1110,9 +1143,11 @@ const StudentDetailsPage: React.FC = () => {
   const [loadingClasses, setLoadingClasses] = useState(false);
   const [selectedGradeLevel, setSelectedGradeLevel] = useState("");
 
-  // Fallback for step-2 carousel (used in Figma step 1 look for school)
+  // Unused but kept to avoid breaking imports
   const [_schools] = useState<School[]>(MOCK_SCHOOLS);
   void _schools;
+  void ACADEMIC_SESSIONS;
+  void TERMS;
 
   useEffect(() => {
     if (step !== 2) return;
@@ -1152,20 +1187,16 @@ const StudentDetailsPage: React.FC = () => {
       .finally(() => setLoadingClasses(false));
   }, [selectedSchoolId, selectedInstitutionTypeId, showToast]);
 
-  // ── Step 3: tuition details ────────────────────────────────────────────────
-  // tuitionAmount comes from the selected child's record (set during KYC wizard)
+  // ── Step 3: repayment plan + tuition amount ───────────────────────────────
   const [selectedPlanId, setSelectedPlanId] = useState<
     "full" | "3month" | "6month" | null
   >(null);
 
-  // ── Step 5: submission result ──────────────────────────────────────────────
+  // ── Step 5: result ─────────────────────────────────────────────────────────
   const [submittedRef, setSubmittedRef] = useState("");
 
-  // ── Derived tuitionDetails object ─────────────────────────────────────────
-  // Use child's tuitionAmount if available, else fall back to ₦450,000 (display default)
-  const childTuitionAmount =
-    (selectedChild as unknown as { tuitionAmount?: number })?.tuitionAmount ??
-    0;
+  // Tuition amount from the selected child — falls back to 0 (shown as ₦450,000 on cards)
+  const childTuitionAmount = selectedChild?.tuitionAmount ?? 0;
 
   const tuitionDetails: TuitionDetails = {
     institutionTypeId: selectedInstitutionTypeId,
@@ -1173,13 +1204,15 @@ const StudentDetailsPage: React.FC = () => {
     schoolId: selectedSchoolId,
     schoolName: selectedSchoolName,
     gradeLevel: selectedGradeLevel,
-    tuitionAmount: childTuitionAmount,
+    // Use the same amount StepTuitionDetails shows on the plan cards
+    tuitionAmount:
+      childTuitionAmount > 0 ? childTuitionAmount : FALLBACK_TUITION_AMOUNT,
     repaymentPlanId: selectedPlanId ?? "full",
     academicSession: "",
     term: "",
   };
 
-  // ── Navigation helpers ─────────────────────────────────────────────────────
+  // ── Navigation ─────────────────────────────────────────────────────────────
   const handleBack = (): void => {
     if (step > 1) {
       setStep((s) => (s - 1) as Step);
@@ -1200,7 +1233,8 @@ const StudentDetailsPage: React.FC = () => {
         institutionTypeId: selectedInstitutionTypeId,
         institutionTypeName: selectedInstitutionTypeName,
         gradeLevel: selectedGradeLevel,
-        tuitionAmount: childTuitionAmount,
+        tuitionAmount:
+          childTuitionAmount > 0 ? childTuitionAmount : FALLBACK_TUITION_AMOUNT,
         repaymentPlanId: selectedPlanId ?? "full",
         tenor: tenorFromPlanId(selectedPlanId ?? "full"),
       });
@@ -1241,11 +1275,9 @@ const StudentDetailsPage: React.FC = () => {
       showToast("Please select institution type, school, and class.");
       return;
     }
-    if (step === 3) {
-      if (!selectedPlanId) {
-        showToast("Please select a repayment plan.");
-        return;
-      }
+    if (step === 3 && !selectedPlanId) {
+      showToast("Please select a repayment plan.");
+      return;
     }
     if (step === 4) {
       void handleSubmitApplication();
@@ -1273,23 +1305,23 @@ const StudentDetailsPage: React.FC = () => {
     (step === 4 && isSubmitting);
 
   const continueLabel = step === 4 ? "Submit Application" : "Continue";
-  const pageTitle = step === 1 ? "Applications" : "New Tuition Application";
 
   return (
-    <div className="pb-28 pt-6 animate-fade-in-up px-4 sm:px-8 w-[90%] mx-auto">
+    /* Full-width on mobile, constrained + centered on desktop */
+    <div className="pb-24 pt-4 sm:pt-6 animate-fade-in-up px-4 sm:px-6 w-full">
       <Toast
         message={toastMsg}
         visible={toastVisible}
         onDismiss={dismissToast}
       />
 
-      {/* Page header — hidden on confirmation */}
+      {/* Page header */}
       {step !== 5 && (
-        <div className="mt-8 mb-8">
+        <div className="mt-4 sm:mt-8 mb-5 sm:mb-8">
           <p className="text-xs font-semibold text-gray-500 mb-1">
-            {pageTitle}
+            {step === 1 ? "Applications" : "New Tuition Application"}
           </p>
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-2 sm:gap-3">
             <button
               type="button"
               onClick={handleBack}
@@ -1310,29 +1342,29 @@ const StudentDetailsPage: React.FC = () => {
                 <polyline points="12 19 5 12 12 5" />
               </svg>
             </button>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-tight">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-extrabold text-gray-900 leading-tight">
                 {step === 1
-                  ? "Start new applications"
+                  ? "Start new application"
                   : "New Tuition Application"}
               </h1>
               <p className="text-xs text-gray-400 mt-0.5">
-                Create a new tuition application for another child
+                Create a new tuition application for your child
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Stepper — hidden on confirmation */}
+      {/* Stepper */}
       {step !== 5 && (
-        <div className="space-y-6">
+        <div className="mb-5 sm:mb-6">
           <Stepper current={step} completedChild={selectedChild} />
         </div>
       )}
 
       {/* Step content */}
-      <div className={step !== 5 ? "mt-6" : ""}>
+      <div>
         {step === 1 && (
           <StepSelectChild
             children={children}

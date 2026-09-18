@@ -23,6 +23,7 @@ import logger from "../config/logger";
 import { buildInitialStateMachine } from "../models/LoanLedger";
 import { publishLoanBooking } from "../queues/loan.queue";
 import type { BookLoanPayload } from "../integrations/lendsqr/application.service";
+import applicationService from "../integrations/lendsqr/application.service";
 
 const LENDSQR_PRODUCT_ID = parseInt(process.env.LENDSQR_PRODUCT_ID ?? "74", 10);
 
@@ -161,6 +162,72 @@ class ParentService {
     return response.data;
   }
 
+  /**
+   * Run a Lendsqr loan-score / karma check before allowing the parent to
+   * complete KYC.  Returns whether the applicant passes the credit gate and
+   * the raw decision data so the caller can decide what to do.
+   *
+   * If the check fails (pass === false) we also set isActive=false on the
+   * user account so the parent cannot re-enter the application funnel.
+   */
+  async checkLoanScore(
+    userId: string,
+    bvn: string,
+    requestedAmount: number,
+    location: string,
+  ): Promise<{
+    pass: boolean;
+    decision: string;
+    creditScore: string;
+    advisoryAmount: number;
+  }> {
+    const parent = await ParentRepository.findOne({ userId });
+    const user = await UserRepository.findById(userId);
+    if (!parent || !user) throw new ApiError(404, "Parent profile not found");
+
+    const payload = {
+      product_id: LENDSQR_PRODUCT_ID,
+      bvn,
+      requested_amount: requestedAmount,
+      location: location || "Lagos",
+    };
+
+    let scoreRes;
+    try {
+      scoreRes = await applicationService.checkLoanScore(payload);
+    } catch (err) {
+      // If the score endpoint itself errors (network / Lendsqr outage), log and
+      // allow the parent to continue — we don't want a 3rd-party outage to
+      // permanently block a legitimate user.
+      logger.error("Loan score check failed (non-fatal): " + String(err));
+      return {
+        pass: true,
+        decision: "score_unavailable",
+        creditScore: "N/A",
+        advisoryAmount: 0,
+      };
+    }
+
+    const dd = scoreRes.data?.decision_data;
+    const pass = dd?.pass ?? true;
+
+    if (!pass) {
+      // Block the account so the parent cannot attempt again until manually
+      // re-enabled by an admin.
+      await user.update({ isActive: false });
+      logger.warn(
+        `Loan score FAILED for userId=${userId} — decision="${dd?.decision}" — account deactivated.`,
+      );
+    }
+
+    return {
+      pass,
+      decision: dd?.decision ?? "unknown",
+      creditScore: scoreRes.data?.credit_score ?? "0%",
+      advisoryAmount: dd?.advisory_amount ?? 0,
+    };
+  }
+
   async addStudent(userId: string, studentData: Record<string, unknown>) {
     const parent = await ParentRepository.findOne({ userId });
     if (!parent) throw new ApiError(404, "Parent profile not found");
@@ -170,7 +237,11 @@ class ParentService {
     if (school.status !== "approved")
       throw new ApiError(400, "School is not an active partner");
 
-    return Student.create({ parentId: parent.id, ...studentData } as never);
+    return Student.create({
+      parentId: parent.id,
+      tuitionAmount: 0, // default — updated later when parent applies
+      ...studentData,
+    } as never);
   }
 
   async getStudents(userId: string) {

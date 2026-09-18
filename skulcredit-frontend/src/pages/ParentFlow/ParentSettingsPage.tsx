@@ -1,10 +1,89 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import apiClient from "../../services/apiClient";
+import {
+  catalogService,
+  CatalogInstitutionType,
+  CatalogSchool,
+  CatalogClassLevelGroup,
+} from "../../services/parentService";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface ParentProfile {
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  dob: string | null;
+  addressStreet: string | null;
+  addressCity: string | null;
+  addressLga: string | null;
+  addressState: string | null;
+  addressPostalCode: string | null;
+  addressCountry: string | null;
+  profilePhotoUrl: string | null;
+  kycStatus: string;
+  bvn: string | null;
+  nin: string | null;
+  user: {
+    email: string;
+    phoneNumber: string | null;
+    isEmailVerified: boolean;
+    lastLogin: string | null;
+  };
+}
+
+interface Student {
+  id: string;
+  firstName: string;
+  lastName: string;
+  studentId: string | null;
+  gradeLevel: string;
+  tuitionAmount: number;
+  schoolId: string;
+  school?: {
+    id: string;
+    name: string;
+    city?: string;
+    state?: string;
+  };
+  createdAt?: string;
+}
+
+interface PersonalFormData {
+  firstName: string;
+  lastName: string;
+  middleName: string;
+  dob: string;
+  addressStreet: string;
+  addressCity: string;
+  addressLga: string;
+  addressState: string;
+  addressCountry: string;
+}
+
+interface EmploymentFormData {
+  employmentStatus: string;
+  employer: string;
+  monthlyIncome: string;
+}
+
+interface StudentFormData {
+  firstName: string;
+  lastName: string;
+  institutionTypeId: string;
+  institutionTypeName: string;
+  schoolId: string;
+  schoolName: string;
+  gradeLevel: string;
+  tuitionAmount: string;
+  studentId: string;
+}
+
+// ── Icons ──────────────────────────────────────────────────────────────────
 
 const UserIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
-    xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -21,7 +100,6 @@ const UserIcon: React.FC<{ className?: string }> = ({ className }) => (
 
 const PencilIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
-    xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -38,7 +116,6 @@ const PencilIcon: React.FC<{ className?: string }> = ({ className }) => (
 
 const TrashIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
-    xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -55,87 +132,204 @@ const TrashIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-const PinIcon: React.FC<{ className?: string }> = ({ className }) => (
+const PlusIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
-    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className ?? "w-3.5 h-3.5"}
+    aria-hidden="true"
+  >
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+
+const GradCapIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className ?? "w-5 h-5"}
+    aria-hidden="true"
+  >
+    <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+    <path d="M6 12v5c3 3 9 3 12 0v-5" />
+  </svg>
+);
+
+const XIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
-    className={className ?? "w-4 h-4"}
+    className={className ?? "w-5 h-5"}
     aria-hidden="true"
   >
-    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-    <circle cx="12" cy="10" r="3" />
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
 
-const WarningIcon: React.FC = () => (
+const ChevronDownIcon: React.FC = () => (
   <svg
-    xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
     fill="none"
-    stroke="#8B1C53"
+    stroke="currentColor"
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
-    className="w-10 h-10"
+    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
     aria-hidden="true"
   >
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="8" x2="12" y2="12" />
-    <line x1="12" y1="16" x2="12.01" y2="16" />
+    <polyline points="6 9 12 15 18 9" />
   </svg>
 );
 
-// ── Shared styles ───────
+// ── Shared primitives ──────────────────────────────────────────────────────
 
 const inputCls =
-  "w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 " +
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 " +
   "placeholder-gray-400 outline-none transition-colors " +
-  "focus:border-[#8B1C53] focus:ring-2 focus:ring-[#8B1C53]/20 focus:bg-white";
+  "focus:border-[#8B1C53] focus:ring-2 focus:ring-[#8B1C53]/20";
 
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({
-  label,
-  children,
-}) => (
+const selectCls =
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 " +
+  "appearance-none outline-none transition-colors cursor-pointer pr-9 " +
+  "focus:border-[#8B1C53] focus:ring-2 focus:ring-[#8B1C53]/20 " +
+  "disabled:opacity-50 disabled:cursor-not-allowed";
+
+const FieldRow: React.FC<{
+  label: string;
+  value: string | null | undefined;
+}> = ({ label, value }) => (
+  <div className="flex flex-col gap-0.5">
+    <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+      {label}
+    </span>
+    <span className="text-sm font-medium text-gray-800">
+      {value && value.trim() ? value : "—"}
+    </span>
+  </div>
+);
+
+const FormField: React.FC<{
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}> = ({ label, required, children }) => (
   <div className="flex flex-col gap-1.5">
-    <label className="text-sm font-medium text-gray-700">{label}</label>
+    <label className="text-xs font-semibold text-gray-600">
+      {label}
+      {required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
     {children}
   </div>
 );
 
-// ── Delete photo confirmation modal ────────────────
+const SelectField: React.FC<{
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+  selectProps: React.SelectHTMLAttributes<HTMLSelectElement>;
+}> = ({ label, required, children, selectProps }) => (
+  <FormField label={label} required={required}>
+    <div className="relative">
+      <select className={selectCls} {...selectProps}>
+        {children}
+      </select>
+      <ChevronDownIcon />
+    </div>
+  </FormField>
+);
 
-const DeletePhotoModal: React.FC<{
-  isDeleting: boolean;
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function maskSensitive(val: string | null | undefined): string {
+  if (!val) return "—";
+  if (val.length <= 3) return "•".repeat(val.length);
+  return "•".repeat(val.length - 2) + val.slice(-2);
+}
+
+const Spinner: React.FC<{ className?: string }> = ({ className }) => (
+  <div
+    className={`animate-spin rounded-full border-2 border-current border-t-transparent ${className ?? "h-4 w-4"}`}
+  />
+);
+
+// ── Modal shell ────────────────────────────────────────────────────────────
+
+const Modal: React.FC<{
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+}> = ({ title, onClose, children, footer }) => (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+    role="dialog"
+    aria-modal="true"
+    onClick={(e) => {
+      if (e.target === e.currentTarget) onClose();
+    }}
+  >
+    <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+        <h2 className="text-base font-bold text-gray-900">{title}</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+        >
+          <XIcon className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+      {footer && (
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
+          {footer}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+// ── Confirm modal ──────────────────────────────────────────────────────────
+
+const ConfirmModal: React.FC<{
+  message: string;
+  loading: boolean;
   onConfirm: () => void;
   onCancel: () => void;
-}> = ({ isDeleting, onConfirm, onCancel }) => (
+}> = ({ message, loading, onConfirm, onCancel }) => (
   <div
     className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
     role="dialog"
     aria-modal="true"
-    aria-labelledby="delete-photo-title"
   >
     <div className="w-full max-w-sm rounded-2xl bg-white px-8 py-8 text-center shadow-xl">
       <div className="flex justify-center mb-4">
-        <WarningIcon />
+        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+          <TrashIcon className="w-5 h-5 text-red-500" />
+        </div>
       </div>
-      <h2 id="delete-photo-title" className="text-base font-bold text-gray-800">
-        Delete Profile Photo?
-      </h2>
-      <p className="mt-2 text-sm text-gray-500 leading-relaxed">
-        Your profile photo will be permanently removed. Your avatar will revert
-        to the default icon.
-      </p>
+      <h2 className="text-base font-bold text-gray-800">Are you sure?</h2>
+      <p className="mt-2 text-sm text-gray-500 leading-relaxed">{message}</p>
       <div className="mt-6 flex gap-3">
         <button
           type="button"
           onClick={onCancel}
-          disabled={isDeleting}
+          disabled={loading}
           className="flex-1 rounded-full border border-gray-300 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
         >
           Cancel
@@ -143,135 +337,343 @@ const DeletePhotoModal: React.FC<{
         <button
           type="button"
           onClick={onConfirm}
-          disabled={isDeleting}
-          className="flex-1 rounded-full bg-[#8B1C53] py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-60"
+          disabled={loading}
+          className="flex-1 rounded-full bg-[#8B1C53] py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
         >
-          {isDeleting ? "Deleting…" : "Yes, Delete"}
+          {loading && <Spinner className="h-3.5 w-3.5" />}
+          {loading ? "Deleting…" : "Yes, Delete"}
         </button>
       </div>
     </div>
   </div>
 );
 
-// ── SecurityRow ─────────
+// ── Toast ──────────────────────────────────────────────────────────────────
 
-const SecurityRow: React.FC<{
-  label: string;
-  detail: string;
-  action: string;
-  onAction: () => void;
-}> = ({ label, detail, action, onAction }) => (
-  <div className="flex items-center justify-between py-4 gap-4">
-    <div>
-      <p className="text-sm font-medium text-gray-800">{label}</p>
-      <p className="text-xs text-gray-400 mt-0.5">{detail}</p>
-    </div>
-    <button
-      type="button"
-      onClick={onAction}
-      className="shrink-0 rounded-lg border border-gray-300 px-4 py-1.5 text-xs font-medium text-gray-700 hover:border-[#8B1C53] hover:text-[#8B1C53] transition-colors focus:outline-none"
-    >
-      {action}
-    </button>
+const Toast: React.FC<{ message: string; type: "success" | "error" }> = ({
+  message,
+  type,
+}) => (
+  <div
+    className={`fixed bottom-6 right-6 z-[60] flex items-center gap-3 rounded-xl px-5 py-3.5 shadow-lg text-sm font-medium
+    ${type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white"}`}
+  >
+    {message}
   </div>
 );
 
-// ── Profile form state ──
+// ── Modal footer helpers ───────────────────────────────────────────────────
 
-interface ProfileState {
-  fullName: string;
-  email: string;
-  phone: string;
-  homeAddress: string;
-  city: string;
-  state: string;
-  bvnNin: string;
-  employmentStatus: string;
-  employer: string;
-  monthlyIncome: string;
-  studentFullName: string;
-  schoolName: string;
-  schoolLocation: string;
-  sessionTerm: string;
-}
+const ModalFooter: React.FC<{
+  saving: boolean;
+  onCancel: () => void;
+  saveLabel?: string;
+  formId: string;
+}> = ({ saving, onCancel, saveLabel = "Save Changes", formId }) => (
+  <>
+    <button
+      type="button"
+      onClick={onCancel}
+      className="rounded-full border border-gray-300 px-5 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+    >
+      Cancel
+    </button>
+    <button
+      type="submit"
+      form={formId}
+      disabled={saving}
+      className="flex items-center gap-2 rounded-full bg-[#8B1C53] px-5 py-2 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-60"
+    >
+      {saving && <Spinner className="h-3.5 w-3.5" />}
+      {saving ? "Saving…" : saveLabel}
+    </button>
+  </>
+);
 
-// ── Page ────────────────
+// ── EditButton (card top-right) ────────────────────────────────────────────
+
+const EditButton: React.FC<{ onClick: () => void; label?: string }> = ({
+  onClick,
+  label = "Edit",
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex items-center gap-1.5 rounded-lg border border-[#e8a0bf] bg-[#fdf0f6] px-3 py-1.5 text-xs font-semibold text-[#8B1C53] hover:bg-[#fce4f0] transition-colors shrink-0"
+  >
+    <PencilIcon className="w-3 h-3" />
+    {label}
+  </button>
+);
+
+// ── Skeleton rows ──────────────────────────────────────────────────────────
+
+const SkeletonRows: React.FC<{ count?: number }> = ({ count = 4 }) => (
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={i} className="flex flex-col gap-1">
+        <div className="h-3 w-20 bg-gray-100 rounded animate-pulse" />
+        <div className="h-4 w-32 bg-gray-100 rounded animate-pulse" />
+      </div>
+    ))}
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────────────────────
 
 const ParentSettingsPage: React.FC = () => {
   const { user } = useAuth();
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const fullName = user?.firstName
-    ? `${user.firstName} ${user.lastName ?? ""}`.trim()
-    : (user?.name ?? user?.email?.split("@")[0] ?? "—");
+  // ── Remote data ────────────────────────────────────────────
+
+  const [profile, setProfile] = useState<ParentProfile | null>(null);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadingStudents, setLoadingStudents] = useState(true);
+
+  // Catalog data for student modal
+  const [institutionTypes, setInstitutionTypes] = useState<
+    CatalogInstitutionType[]
+  >([]);
+  const [catalogSchools, setCatalogSchools] = useState<CatalogSchool[]>([]);
+  const [classLevelGroups, setClassLevelGroups] = useState<
+    CatalogClassLevelGroup[]
+  >([]);
+  const [loadingTypes, setLoadingTypes] = useState(false);
+  const [loadingSchools, setLoadingSchools] = useState(false);
+  const [loadingClasses, setLoadingClasses] = useState(false);
+
+  // ── Modal visibility ───────────────────────────────────────
+
+  const [showPersonalModal, setShowPersonalModal] = useState(false);
+  const [showEmploymentModal, setShowEmploymentModal] = useState(false);
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
+  const [showDeleteStudentConfirm, setShowDeleteStudentConfirm] =
+    useState(false);
+
+  // ── Form data ──────────────────────────────────────────────
+
+  const [personalForm, setPersonalForm] = useState<PersonalFormData>({
+    firstName: "",
+    lastName: "",
+    middleName: "",
+    dob: "",
+    addressStreet: "",
+    addressCity: "",
+    addressLga: "",
+    addressState: "",
+    addressCountry: "",
+  });
+
+  // Employment is stored locally (no backend field for it on the Parent model)
+  const [employmentForm, setEmploymentForm] = useState<EmploymentFormData>({
+    employmentStatus: "",
+    employer: "",
+    monthlyIncome: "",
+  });
+  // Persisted employment display values (saved locally per-session after edit)
+  const [savedEmployment, setSavedEmployment] = useState<EmploymentFormData>({
+    employmentStatus: "",
+    employer: "",
+    monthlyIncome: "",
+  });
+
+  const [studentForm, setStudentForm] = useState<StudentFormData>({
+    firstName: "",
+    lastName: "",
+    institutionTypeId: "",
+    institutionTypeName: "",
+    schoolId: "",
+    schoolName: "",
+    gradeLevel: "",
+    tuitionAmount: "",
+    studentId: "",
+  });
+
+  // ── Operation states ───────────────────────────────────────
+
+  const [savingPersonal, setSavingPersonal] = useState(false);
+  const [savingStudent, setSavingStudent] = useState(false);
+  const [deletingStudentLoading, setDeletingStudentLoading] = useState(false);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  // ── Helpers ────────────────────────────────────────────────
+
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const fullName = profile
+    ? `${profile.firstName} ${profile.lastName}`.trim()
+    : user?.firstName
+      ? `${user.firstName} ${user.lastName ?? ""}`.trim()
+      : (user?.email?.split("@")[0] ?? "—");
 
   const memberSince = user?.createdAt
-    ? new Date(user.createdAt).toLocaleDateString("en-GB", {
+    ? new Date(user.createdAt).toLocaleDateString("en-NG", {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
       })
     : "—";
 
-  const [profile, setProfile] = useState<ProfileState>({
-    fullName,
-    email: user?.email ?? "",
-    phone: user?.phoneNumber ?? "",
-    homeAddress: "",
-    city: "",
-    state: "",
-    bvnNin: "",
-    employmentStatus: "",
-    employer: "",
-    monthlyIncome: "",
-    studentFullName: "",
-    schoolName: user?.schoolName ?? "",
-    schoolLocation: "",
-    sessionTerm: "",
-  });
+  const email = profile?.user?.email ?? user?.email ?? "—";
+  const phone = profile?.user?.phoneNumber ?? user?.phoneNumber ?? "—";
+  const photoUrl = profile?.profilePhotoUrl ?? null;
 
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [photoLoading, setPhotoLoading] = useState(false);
-  const [photoError, setPhotoError] = useState("");
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  // ── On mount: fetch profile + students ────────────────────
 
-  const set =
-    (field: keyof ProfileState) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setProfile((prev) => ({ ...prev, [field]: e.target.value }));
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoadingProfile(true);
+      try {
+        const res = await apiClient.get<{ data: ParentProfile }>(
+          "/parents/profile",
+        );
+        const p = res.data.data;
+        setProfile(p);
+        setPersonalForm({
+          firstName: p.firstName ?? "",
+          lastName: p.lastName ?? "",
+          middleName: p.middleName ?? "",
+          dob: p.dob ?? "",
+          addressStreet: p.addressStreet ?? "",
+          addressCity: p.addressCity ?? "",
+          addressLga: p.addressLga ?? "",
+          addressState: p.addressState ?? "",
+          addressCountry: p.addressCountry ?? "",
+        });
+      } catch {
+        // non-blocking – fall back to auth context values
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
 
-  // ── Photo upload ────
+    const fetchStudents = async () => {
+      setLoadingStudents(true);
+      try {
+        const res = await apiClient.get<{ data: Student[] }>(
+          "/parents/students",
+        );
+        setStudents(res.data.data ?? []);
+      } catch {
+        setStudents([]);
+      } finally {
+        setLoadingStudents(false);
+      }
+    };
+
+    // Load institution types once (for student modal)
+    const fetchInstitutionTypes = async () => {
+      setLoadingTypes(true);
+      try {
+        const types = await catalogService.getInstitutionTypes();
+        setInstitutionTypes(types);
+      } catch {
+        setInstitutionTypes([]);
+      } finally {
+        setLoadingTypes(false);
+      }
+    };
+
+    fetchProfile();
+    fetchStudents();
+    fetchInstitutionTypes();
+  }, []);
+
+  // ── Catalog cascade: institution type → schools ───────────
+
+  const handleInstitutionTypeChange = async (id: string, name: string) => {
+    setStudentForm((p) => ({
+      ...p,
+      institutionTypeId: id,
+      institutionTypeName: name,
+      schoolId: "",
+      schoolName: "",
+      gradeLevel: "",
+    }));
+    setCatalogSchools([]);
+    setClassLevelGroups([]);
+    if (!id) return;
+
+    setLoadingSchools(true);
+    try {
+      const schools = await catalogService.getSchools(id);
+      setCatalogSchools(schools);
+    } catch {
+      setCatalogSchools([]);
+    } finally {
+      setLoadingSchools(false);
+    }
+  };
+
+  // ── Catalog cascade: school → class levels ────────────────
+
+  const handleSchoolChange = async (id: string, name: string) => {
+    setStudentForm((p) => ({
+      ...p,
+      schoolId: id,
+      schoolName: name,
+      gradeLevel: "",
+    }));
+    setClassLevelGroups([]);
+    if (!id || !studentForm.institutionTypeId) return;
+
+    setLoadingClasses(true);
+    try {
+      const groups = await catalogService.getClassLevels(
+        id,
+        studentForm.institutionTypeId,
+      );
+      setClassLevelGroups(groups);
+    } catch {
+      setClassLevelGroups([]);
+    } finally {
+      setLoadingClasses(false);
+    }
+  };
+
+  const flatClasses = classLevelGroups.flatMap((g) => g.classes);
+
+  // ── Photo upload ───────────────────────────────────────────
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
-      setPhotoError("Please select an image file (JPG, PNG, etc.).");
+      setPhotoError("Please select an image file.");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
       setPhotoError("Image must be smaller than 5 MB.");
       return;
     }
-
     setPhotoError("");
     setPhotoLoading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await apiClient.post<{ data: { url: string } }>(
+      const uploadRes = await apiClient.post<{ data: { url: string } }>(
         "/upload/document",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } },
       );
-      const url = res.data.data.url;
+      const url = uploadRes.data.data.url;
       await apiClient.put("/parents/profile/photo", { profilePhotoUrl: url });
-      setPhotoUrl(url);
+      setProfile((prev) => (prev ? { ...prev, profilePhotoUrl: url } : prev));
+      showToast("Profile photo updated.", "success");
     } catch {
       setPhotoError("Photo upload failed. Please try again.");
     } finally {
@@ -280,143 +682,591 @@ const ParentSettingsPage: React.FC = () => {
     }
   };
 
-  // ── Photo delete ────
+  // ── Save personal info ─────────────────────────────────────
 
-  const handleDeleteConfirm = async () => {
-    setIsDeleting(true);
-    try {
-      await apiClient.delete("/parents/profile/photo");
-      setPhotoUrl(null);
-      setShowDeleteModal(false);
-    } catch {
-      setPhotoError("Failed to delete photo.");
-      setShowDeleteModal(false);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  // ── Profile save ────
-
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSavePersonal = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
-    setSaveSuccess(false);
+    setSavingPersonal(true);
     try {
-      await apiClient.put("/parents/profile", {
-        addressStreet: profile.homeAddress || undefined,
-        addressCity: profile.city || undefined,
-        addressState: profile.state || undefined,
-      });
-      setIsEditing(false);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      const payload: Record<string, string | undefined> = {
+        addressStreet: personalForm.addressStreet || undefined,
+        addressCity: personalForm.addressCity || undefined,
+        addressLga: personalForm.addressLga || undefined,
+        addressState: personalForm.addressState || undefined,
+        addressCountry: personalForm.addressCountry || undefined,
+      };
+      if (personalForm.dob) payload.dob = personalForm.dob;
+      if (personalForm.middleName) payload.middleName = personalForm.middleName;
+
+      const res = await apiClient.put<{ data: ParentProfile }>(
+        "/parents/profile",
+        payload,
+      );
+      setProfile(res.data.data);
+      setShowPersonalModal(false);
+      showToast("Personal information updated.", "success");
     } catch {
-      /* errors surfaced via toast in a future iteration */
+      showToast("Failed to update profile. Please try again.", "error");
     } finally {
-      setIsSaving(false);
+      setSavingPersonal(false);
     }
   };
 
-  const readOnly = !isEditing;
+  // ── Save employment info (local only — no backend field) ───
+
+  const handleSaveEmployment = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavedEmployment({ ...employmentForm });
+    setShowEmploymentModal(false);
+    showToast("Employment information updated.", "success");
+  };
+
+  const openEmploymentModal = () => {
+    setEmploymentForm({ ...savedEmployment });
+    setShowEmploymentModal(true);
+  };
+
+  // ── Open student modal ─────────────────────────────────────
+
+  const openAddStudent = () => {
+    setEditingStudent(null);
+    setStudentForm({
+      firstName: "",
+      lastName: "",
+      institutionTypeId: "",
+      institutionTypeName: "",
+      schoolId: "",
+      schoolName: "",
+      gradeLevel: "",
+      tuitionAmount: "",
+      studentId: "",
+    });
+    setCatalogSchools([]);
+    setClassLevelGroups([]);
+    setShowStudentModal(true);
+  };
+
+  const openEditStudent = async (s: Student) => {
+    setEditingStudent(s);
+    // Pre-fill what we have
+    setStudentForm({
+      firstName: s.firstName,
+      lastName: s.lastName,
+      institutionTypeId: "",
+      institutionTypeName: "",
+      schoolId: s.schoolId,
+      schoolName: s.school?.name ?? "",
+      gradeLevel: s.gradeLevel,
+      tuitionAmount: String(s.tuitionAmount),
+      studentId: s.studentId ?? "",
+    });
+    setCatalogSchools([]);
+    setClassLevelGroups([]);
+    setShowStudentModal(true);
+  };
+
+  // ── Save student ───────────────────────────────────────────
+
+  const handleSaveStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingStudent(true);
+    try {
+      const payload = {
+        firstName: studentForm.firstName,
+        lastName: studentForm.lastName,
+        schoolId: studentForm.schoolId,
+        gradeLevel: studentForm.gradeLevel,
+        tuitionAmount: parseFloat(studentForm.tuitionAmount) || 0,
+        studentId: studentForm.studentId || undefined,
+      };
+
+      if (editingStudent) {
+        const res = await apiClient.put<{ data: Student }>(
+          `/parents/students/${editingStudent.id}`,
+          payload,
+        );
+        setStudents((prev) =>
+          prev.map((s) => (s.id === editingStudent.id ? res.data.data : s)),
+        );
+        showToast("Student updated successfully.", "success");
+      } else {
+        const res = await apiClient.post<{ data: Student }>(
+          "/parents/students",
+          payload,
+        );
+        setStudents((prev) => [...prev, res.data.data]);
+        showToast("Student added successfully.", "success");
+      }
+      setShowStudentModal(false);
+    } catch {
+      showToast("Failed to save student. Please try again.", "error");
+    } finally {
+      setSavingStudent(false);
+    }
+  };
+
+  // ── Delete student ─────────────────────────────────────────
+
+  const handleDeleteStudent = async () => {
+    if (!deletingStudent) return;
+    setDeletingStudentLoading(true);
+    try {
+      await apiClient.delete(`/parents/students/${deletingStudent.id}`);
+      setStudents((prev) => prev.filter((s) => s.id !== deletingStudent.id));
+      setShowDeleteStudentConfirm(false);
+      setDeletingStudent(null);
+      showToast("Student removed.", "success");
+    } catch {
+      showToast("Failed to delete student.", "error");
+    } finally {
+      setDeletingStudentLoading(false);
+    }
+  };
+
+  // ── Employment status labels ────────────────────────────────
+
+  const EMPLOYMENT_OPTIONS = [
+    { value: "employed_full", label: "Employed (Full-time)" },
+    { value: "employed_part", label: "Employed (Part-time)" },
+    { value: "employed_govt", label: "Employed (Government)" },
+    { value: "self_employed", label: "Self-Employed" },
+    { value: "business_owner", label: "Business Owner" },
+    { value: "freelancer", label: "Freelancer" },
+    { value: "unemployed", label: "Unemployed" },
+  ];
+
+  const employmentLabel = (val: string) =>
+    EMPLOYMENT_OPTIONS.find((o) => o.value === val)?.label ?? val;
+
+  const fmtIncome = (val: string) => {
+    const num = parseFloat(val.replace(/,/g, ""));
+    if (isNaN(num)) return val;
+    return "₦" + num.toLocaleString("en-NG", { minimumFractionDigits: 0 });
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <>
-      {showDeleteModal && (
-        <DeletePhotoModal
-          isDeleting={isDeleting}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setShowDeleteModal(false)}
+      {/* Toast */}
+      {toast && <Toast message={toast.message} type={toast.type} />}
+
+      {/* ── Personal Info Modal ──────────────────────────────────── */}
+      {showPersonalModal && (
+        <Modal
+          title="Edit Personal Information"
+          onClose={() => setShowPersonalModal(false)}
+          footer={
+            <ModalFooter
+              saving={savingPersonal}
+              onCancel={() => setShowPersonalModal(false)}
+              formId="personal-form"
+            />
+          }
+        >
+          <form
+            id="personal-form"
+            onSubmit={handleSavePersonal}
+            className="flex flex-col gap-4"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="First Name">
+                <input
+                  value={personalForm.firstName}
+                  readOnly
+                  className={inputCls + " bg-gray-50 cursor-not-allowed"}
+                />
+              </FormField>
+              <FormField label="Last Name">
+                <input
+                  value={personalForm.lastName}
+                  readOnly
+                  className={inputCls + " bg-gray-50 cursor-not-allowed"}
+                />
+              </FormField>
+            </div>
+            <FormField label="Middle Name">
+              <input
+                value={personalForm.middleName}
+                placeholder="Middle name (optional)"
+                onChange={(e) =>
+                  setPersonalForm((p) => ({ ...p, middleName: e.target.value }))
+                }
+                className={inputCls}
+              />
+            </FormField>
+            <FormField label="Date of Birth">
+              <input
+                type="date"
+                value={personalForm.dob}
+                onChange={(e) =>
+                  setPersonalForm((p) => ({ ...p, dob: e.target.value }))
+                }
+                className={inputCls}
+              />
+            </FormField>
+            <FormField label="Home Address">
+              <input
+                value={personalForm.addressStreet}
+                placeholder="e.g. 12 Adeola Street, Ikeja"
+                onChange={(e) =>
+                  setPersonalForm((p) => ({
+                    ...p,
+                    addressStreet: e.target.value,
+                  }))
+                }
+                className={inputCls}
+              />
+            </FormField>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="City">
+                <input
+                  value={personalForm.addressCity}
+                  placeholder="e.g. Ikeja"
+                  onChange={(e) =>
+                    setPersonalForm((p) => ({
+                      ...p,
+                      addressCity: e.target.value,
+                    }))
+                  }
+                  className={inputCls}
+                />
+              </FormField>
+              <FormField label="LGA">
+                <input
+                  value={personalForm.addressLga}
+                  placeholder="e.g. Ikeja"
+                  onChange={(e) =>
+                    setPersonalForm((p) => ({
+                      ...p,
+                      addressLga: e.target.value,
+                    }))
+                  }
+                  className={inputCls}
+                />
+              </FormField>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="State">
+                <input
+                  value={personalForm.addressState}
+                  placeholder="e.g. Lagos State"
+                  onChange={(e) =>
+                    setPersonalForm((p) => ({
+                      ...p,
+                      addressState: e.target.value,
+                    }))
+                  }
+                  className={inputCls}
+                />
+              </FormField>
+              <FormField label="Country">
+                <input
+                  value={personalForm.addressCountry}
+                  placeholder="e.g. Nigeria"
+                  onChange={(e) =>
+                    setPersonalForm((p) => ({
+                      ...p,
+                      addressCountry: e.target.value,
+                    }))
+                  }
+                  className={inputCls}
+                />
+              </FormField>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Employment Modal ─────────────────────────────────────── */}
+      {showEmploymentModal && (
+        <Modal
+          title="Edit Employment Information"
+          onClose={() => setShowEmploymentModal(false)}
+          footer={
+            <ModalFooter
+              saving={false}
+              onCancel={() => setShowEmploymentModal(false)}
+              formId="employment-form"
+            />
+          }
+        >
+          <form
+            id="employment-form"
+            onSubmit={handleSaveEmployment}
+            className="flex flex-col gap-4"
+          >
+            <SelectField
+              label="Employment Status"
+              required
+              selectProps={{
+                value: employmentForm.employmentStatus,
+                onChange: (e) =>
+                  setEmploymentForm((p) => ({
+                    ...p,
+                    employmentStatus: e.target.value,
+                  })),
+              }}
+            >
+              <option value="">Select status</option>
+              {EMPLOYMENT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </SelectField>
+            <FormField label="Employer / Company">
+              <input
+                value={employmentForm.employer}
+                placeholder="e.g. Zenith Logistics Ltd"
+                onChange={(e) =>
+                  setEmploymentForm((p) => ({ ...p, employer: e.target.value }))
+                }
+                className={inputCls}
+              />
+            </FormField>
+            <FormField label="Monthly Income (₦)">
+              <input
+                value={employmentForm.monthlyIncome}
+                placeholder="e.g. 450,000"
+                inputMode="numeric"
+                onChange={(e) =>
+                  setEmploymentForm((p) => ({
+                    ...p,
+                    monthlyIncome: e.target.value,
+                  }))
+                }
+                className={inputCls}
+              />
+            </FormField>
+            <p className="text-xs text-gray-400 leading-relaxed rounded-xl bg-[#fdf0f6] border border-[#f5c6d8] px-4 py-3 text-[#8B1C53]">
+              Employment details here are for your reference. Your full
+              employment info is collected during the loan application process.
+            </p>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Student Add / Edit Modal ─────────────────────────────── */}
+      {showStudentModal && (
+        <Modal
+          title={editingStudent ? "Edit Student" : "Add Student"}
+          onClose={() => setShowStudentModal(false)}
+          footer={
+            <ModalFooter
+              saving={savingStudent}
+              onCancel={() => setShowStudentModal(false)}
+              formId="student-form"
+              saveLabel={editingStudent ? "Update Student" : "Add Student"}
+            />
+          }
+        >
+          <form
+            id="student-form"
+            onSubmit={handleSaveStudent}
+            className="flex flex-col gap-4"
+          >
+            {/* Name row */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="First Name" required>
+                <input
+                  required
+                  value={studentForm.firstName}
+                  placeholder="e.g. Lola"
+                  onChange={(e) =>
+                    setStudentForm((p) => ({ ...p, firstName: e.target.value }))
+                  }
+                  className={inputCls}
+                />
+              </FormField>
+              <FormField label="Last Name" required>
+                <input
+                  required
+                  value={studentForm.lastName}
+                  placeholder="e.g. Fashola"
+                  onChange={(e) =>
+                    setStudentForm((p) => ({ ...p, lastName: e.target.value }))
+                  }
+                  className={inputCls}
+                />
+              </FormField>
+            </div>
+
+            {/* ── Institution Type ── */}
+            <SelectField
+              label="Institution Type"
+              required
+              selectProps={{
+                value: studentForm.institutionTypeId,
+                disabled: loadingTypes,
+                onChange: (e) => {
+                  const opt = institutionTypes.find(
+                    (t) => t.id === e.target.value,
+                  );
+                  handleInstitutionTypeChange(e.target.value, opt?.name ?? "");
+                },
+              }}
+            >
+              <option value="">
+                {loadingTypes ? "Loading types…" : "— Select type —"}
+              </option>
+              {institutionTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </SelectField>
+
+            {/* ── Choose School ── */}
+            <SelectField
+              label="Choose School"
+              required
+              selectProps={{
+                value: studentForm.schoolId,
+                disabled: !studentForm.institutionTypeId || loadingSchools,
+                onChange: (e) => {
+                  const opt = catalogSchools.find(
+                    (s) => s.id === e.target.value,
+                  );
+                  handleSchoolChange(e.target.value, opt?.name ?? "");
+                },
+              }}
+            >
+              <option value="">
+                {loadingSchools
+                  ? "Loading schools…"
+                  : !studentForm.institutionTypeId
+                    ? "Select a type first"
+                    : "— Choose School —"}
+              </option>
+              {catalogSchools.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </SelectField>
+
+            {/* ── Class / Level ── */}
+            <SelectField
+              label="Class / Level"
+              required
+              selectProps={{
+                value: studentForm.gradeLevel,
+                disabled: !studentForm.schoolId || loadingClasses,
+                onChange: (e) =>
+                  setStudentForm((p) => ({ ...p, gradeLevel: e.target.value })),
+              }}
+            >
+              <option value="">
+                {loadingClasses
+                  ? "Loading classes…"
+                  : !studentForm.schoolId
+                    ? "Select a school first"
+                    : "— Choose Class —"}
+              </option>
+              {flatClasses.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </SelectField>
+
+            {/* Student ID */}
+            <FormField label="Student ID / Admission No.">
+              <input
+                value={studentForm.studentId}
+                placeholder="e.g. STD/2025/001"
+                onChange={(e) =>
+                  setStudentForm((p) => ({ ...p, studentId: e.target.value }))
+                }
+                className={inputCls}
+              />
+            </FormField>
+
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Saved students are reused when you start a new school fee
+              application.
+            </p>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Delete Student Confirm ───────────────────────────────── */}
+      {showDeleteStudentConfirm && deletingStudent && (
+        <ConfirmModal
+          message={`Remove ${deletingStudent.firstName} ${deletingStudent.lastName} from your saved students? This won't affect existing applications.`}
+          loading={deletingStudentLoading}
+          onConfirm={handleDeleteStudent}
+          onCancel={() => {
+            setShowDeleteStudentConfirm(false);
+            setDeletingStudent(null);
+          }}
         />
       )}
 
-      <div className="flex flex-col gap-6 mt-8 w-[90%] mx-auto pb-12 animate-fade-in-up">
-        {/* ── Page header ───────────── */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-xl font-extrabold text-gray-900">Settings</h1>
-            <p className="text-sm text-gray-400 mt-0.5">
-              Manage your personal information and account settings
-            </p>
-          </div>
-
-          {isEditing ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                form="settings-form"
-                type="submit"
-                disabled={isSaving}
-                className="flex items-center gap-1.5 rounded-lg bg-[#8B1C53] px-4 py-2 text-xs font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-60"
-              >
-                <PencilIcon />
-                {isSaving ? "Saving…" : "Save Changes"}
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-[#8B1C53] px-4 py-2 text-xs font-semibold text-white hover:bg-[#7a1848] transition-colors"
-            >
-              <PencilIcon />
-              Edit Profile
-            </button>
-          )}
+      {/* ════════════════════════════════════════════════════════════
+          PAGE BODY
+          ════════════════════════════════════════════════════════════ */}
+      <div className="flex flex-col gap-6 px-4 sm:px-6 py-8 w-full max-w-3xl mx-auto pb-16">
+        {/* Page title */}
+        <div>
+          <h1 className="text-xl font-bold text-[#8B1C53]">My Profile</h1>
+          <p className="text-sm text-gray-400 mt-0.5">
+            Manage your personal information and settings
+          </p>
         </div>
 
-        {saveSuccess && (
-          <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-3 text-sm text-green-700 font-medium">
-            Profile saved successfully.
-          </div>
-        )}
+        {/* ── Profile Header Banner ───────────────────────────────── */}
+        <div className="rounded-2xl overflow-hidden bg-[#8B1C53] shadow-sm">
+          <div className="px-6 py-6 flex flex-wrap items-center gap-4">
+            {/* Avatar / Photo */}
+            <div className="relative shrink-0 group">
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt="Profile photo"
+                  className="h-16 w-16 rounded-full object-cover border-2 border-white/40"
+                  onError={(e) => {
+                    // If the image fails to load, hide it and fall back to icon
+                    (e.currentTarget as HTMLImageElement).style.display =
+                      "none";
+                    const fallback = e.currentTarget
+                      .nextElementSibling as HTMLElement | null;
+                    if (fallback) fallback.style.display = "flex";
+                  }}
+                />
+              ) : null}
 
-        {/* ── Profile card ──────────── */}
-        <div className="rounded-2xl border border-[#8B1C53]/30 bg-white overflow-hidden">
-          {/* Banner */}
-          <div className="bg-[#8B1C53] px-6 py-6">
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Avatar */}
-              <div className="relative shrink-0">
-                {photoUrl ? (
-                  <img
-                    src={photoUrl}
-                    alt="Profile photo"
-                    className="h-16 w-16 rounded-full object-cover border-2 border-white/40"
-                  />
-                ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20 text-white">
-                    <UserIcon className="w-8 h-8" />
-                  </div>
-                )}
-                {photoLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  </div>
-                )}
+              {/* Default avatar — shown always when no photoUrl, or as hidden fallback */}
+              <div
+                className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center text-white border-2 border-white/30"
+                style={{ display: photoUrl ? "none" : "flex" }}
+                aria-hidden={!!photoUrl}
+              >
+                <UserIcon className="w-8 h-8" />
               </div>
 
-              {/* Name + meta */}
-              <div className="text-white flex-1 min-w-0">
-                <p className="text-base font-bold truncate">
-                  {profile.fullName || "—"}
-                </p>
-                <p className="text-xs text-white/70 mt-0.5">Parent Account</p>
-                <p className="text-xs text-white/60 mt-0.5">
-                  Member since {memberSince}
-                </p>
-                {photoError && (
-                  <p className="mt-1 text-xs text-red-300">{photoError}</p>
-                )}
-              </div>
+              {/* Spinner overlay while uploading */}
+              {photoLoading && (
+                <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
+                  <Spinner className="h-5 w-5 border-white" />
+                </div>
+              )}
 
-              {/* Hidden file input */}
+              {/* Hover overlay to change photo */}
+              {!photoLoading && (
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label="Change profile photo"
+                >
+                  <PencilIcon className="w-4 h-4 text-white" />
+                </button>
+              )}
+
               <input
                 ref={photoInputRef}
                 type="file"
@@ -425,239 +1275,207 @@ const ParentSettingsPage: React.FC = () => {
                 onChange={handlePhotoChange}
                 aria-label="Upload profile photo"
               />
+            </div>
 
-              {/* Photo actions */}
-              <div className="flex flex-wrap gap-2 shrink-0">
-                <button
-                  type="button"
-                  disabled={photoLoading}
-                  onClick={() => photoInputRef.current?.click()}
-                  className="flex items-center gap-1.5 rounded-lg border border-white/60 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50"
-                >
-                  <PencilIcon className="w-3 h-3" />
-                  Edit Photo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center gap-1.5 rounded-lg border border-white/60 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10 transition-colors"
-                >
-                  <TrashIcon className="w-3 h-3" />
-                  Delete Photo
-                </button>
+            {/* Name + info */}
+            <div className="text-white flex-1 min-w-0">
+              {loadingProfile ? (
+                <>
+                  <div className="h-5 w-36 bg-white/20 rounded animate-pulse mb-1.5" />
+                  <div className="h-3 w-24 bg-white/10 rounded animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-bold truncate">{fullName}</p>
+                  <p className="text-xs text-white/70 mt-0.5">Parent Account</p>
+                  <p className="text-xs text-white/60 mt-0.5">
+                    Member since {memberSince}
+                  </p>
+                </>
+              )}
+              {photoError && (
+                <p className="text-xs text-red-300 mt-1">{photoError}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Personal Information Card ────────────────────────────── */}
+        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 pt-5 pb-4">
+            <h2 className="text-sm font-bold text-[#8B1C53]">
+              Personal Information
+            </h2>
+            <EditButton onClick={() => setShowPersonalModal(true)} />
+          </div>
+
+          <div className="px-6 pb-6">
+            {loadingProfile ? (
+              <SkeletonRows count={8} />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <FieldRow label="Full Name" value={fullName} />
+                <FieldRow label="Email Address" value={email} />
+                <FieldRow label="Phone Number" value={phone} />
+                <FieldRow label="Home Address" value={profile?.addressStreet} />
+                <FieldRow label="City" value={profile?.addressCity} />
+                <FieldRow label="State" value={profile?.addressState} />
+                <FieldRow
+                  label="BVN/NIN"
+                  value={maskSensitive(profile?.bvn ?? profile?.nin)}
+                />
+                <FieldRow
+                  label="Date of Birth"
+                  value={profile?.dob ?? undefined}
+                />
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Employment Information Card ──────────────────────────── */}
+        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 pt-5 pb-4">
+            <h2 className="text-sm font-bold text-[#8B1C53]">
+              Employment Information
+            </h2>
+            <EditButton onClick={openEmploymentModal} />
+          </div>
+
+          <div className="px-6 pb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <FieldRow
+                label="Employment Status"
+                value={
+                  savedEmployment.employmentStatus
+                    ? employmentLabel(savedEmployment.employmentStatus)
+                    : null
+                }
+              />
+              <FieldRow
+                label="Employer / Company"
+                value={savedEmployment.employer || null}
+              />
+              <FieldRow
+                label="Monthly Income (NGN)"
+                value={
+                  savedEmployment.monthlyIncome
+                    ? fmtIncome(savedEmployment.monthlyIncome)
+                    : null
+                }
+              />
             </div>
           </div>
 
-          {/* Form */}
-          <form
-            id="settings-form"
-            onSubmit={handleSave}
-            className="px-6 py-6 flex flex-col gap-8"
-          >
-            {/* ── Personal Information ── */}
-            <section>
-              <h2 className="text-sm font-bold text-[#8B1C53] mb-4">
-                Personal Information
-              </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Full Name *">
-                  <input
-                    value={profile.fullName}
-                    onChange={set("fullName")}
-                    readOnly={readOnly}
-                    placeholder="First Last"
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Email Address *">
-                  <input
-                    type="email"
-                    value={profile.email}
-                    onChange={set("email")}
-                    readOnly={readOnly}
-                    placeholder="you@example.com"
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Phone Number *">
-                  <input
-                    type="tel"
-                    value={profile.phone}
-                    onChange={set("phone")}
-                    readOnly={readOnly}
-                    placeholder="+234 800 000 0000"
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Home Address">
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                      <PinIcon className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <input
-                      value={profile.homeAddress}
-                      onChange={set("homeAddress")}
-                      readOnly={readOnly}
-                      placeholder="12 Example Street"
-                      className={inputCls + " pl-9"}
-                    />
-                  </div>
-                </Field>
-                <Field label="City">
-                  <input
-                    value={profile.city}
-                    onChange={set("city")}
-                    readOnly={readOnly}
-                    placeholder="e.g Ikeja"
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="State">
-                  <input
-                    value={profile.state}
-                    onChange={set("state")}
-                    readOnly={readOnly}
-                    placeholder="e.g Lagos State"
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-              <div className="mt-4">
-                <Field label="BVN / NIN">
-                  <input
-                    value={profile.bvnNin}
-                    onChange={set("bvnNin")}
-                    readOnly={readOnly}
-                    placeholder="Enter your BVN or NIN"
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-            </section>
-
-            <hr className="border-gray-100" />
-
-            {/* ── Employment Information ── */}
-            <section>
-              <h2 className="text-sm font-bold text-[#8B1C53] mb-4">
-                Employment Information
-              </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Employment Status">
-                  <select
-                    value={profile.employmentStatus}
-                    onChange={set("employmentStatus")}
-                    disabled={readOnly}
-                    className={inputCls + " appearance-none"}
-                  >
-                    <option value="">Select type</option>
-                    <option value="employed_private">Employed (Private)</option>
-                    <option value="employed_govt">Employed (Government)</option>
-                    <option value="self_employed">Self-Employed</option>
-                    <option value="business_owner">Business Owner</option>
-                    <option value="freelancer">Freelancer</option>
-                    <option value="unemployed">Unemployed</option>
-                  </select>
-                </Field>
-                <Field label="Employer / Company">
-                  <input
-                    value={profile.employer}
-                    onChange={set("employer")}
-                    readOnly={readOnly}
-                    placeholder="Company name"
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-              <div className="mt-4">
-                <Field label="Monthly Income (₦)">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={profile.monthlyIncome}
-                    onChange={set("monthlyIncome")}
-                    readOnly={readOnly}
-                    placeholder="e.g 250,000"
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-            </section>
-
-            <hr className="border-gray-100" />
-
-            {/* ── Student Information ── */}
-            <section>
-              <h2 className="text-sm font-bold text-[#8B1C53] mb-4">
-                Student Information
-              </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Student Full Name">
-                  <input
-                    value={profile.studentFullName}
-                    onChange={set("studentFullName")}
-                    readOnly={readOnly}
-                    placeholder="Student name"
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="School Name">
-                  <input
-                    value={profile.schoolName}
-                    onChange={set("schoolName")}
-                    readOnly={readOnly}
-                    placeholder="School name"
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="School Location">
-                  <input
-                    value={profile.schoolLocation}
-                    onChange={set("schoolLocation")}
-                    readOnly={readOnly}
-                    placeholder="e.g Lagos"
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Session / Term">
-                  <input
-                    value={profile.sessionTerm}
-                    onChange={set("sessionTerm")}
-                    readOnly={readOnly}
-                    placeholder="e.g 2025/2026 First Term"
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-            </section>
-          </form>
+          {!savedEmployment.employmentStatus && (
+            <div className="mx-6 mb-5 rounded-xl bg-[#fdf0f6] border border-[#f5c6d8] px-4 py-3">
+              <p className="text-xs text-[#8B1C53] leading-relaxed">
+                Click <strong>Edit</strong> to add your employment details. Full
+                employment info is also collected during the loan application
+                process.
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* ── Security & Privacy ──────── */}
-        <div className="rounded-2xl border border-[#8B1C53]/30 bg-white px-6 py-6">
-          <h2 className="text-sm font-bold text-[#8B1C53] mb-4">
-            Security &amp; Privacy
-          </h2>
-          <div className="flex flex-col divide-y divide-gray-100">
-            <SecurityRow
-              label="Password"
-              detail="Last changed 30 days ago"
-              action="Change Password"
-              onAction={() => {}}
-            />
-            <SecurityRow
-              label="Two-Factor Authentication"
-              detail="Add an extra layer of security to your account"
-              action="Enable"
-              onAction={() => {}}
-            />
-            <SecurityRow
-              label="Email Notifications"
-              detail="Receive updates about your applications and repayments"
-              action="Manage"
-              onAction={() => {}}
-            />
+        {/* ── My Students Card ─────────────────────────────────────── */}
+        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 pt-5 pb-4">
+            <div>
+              <h2 className="text-sm font-bold text-[#8B1C53]">My Students</h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Saved students are reused when you start a new school fee
+                application.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={openAddStudent}
+              className="flex items-center gap-1.5 rounded-lg bg-[#8B1C53] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#7a1848] transition-colors shrink-0"
+            >
+              <PlusIcon className="w-3 h-3" />
+              Add Student
+            </button>
+          </div>
+
+          <div className="px-6 pb-5 flex flex-col gap-3">
+            {loadingStudents ? (
+              Array.from({ length: 2 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 rounded-xl border border-gray-100 p-4"
+                >
+                  <div className="h-10 w-10 rounded-full bg-gray-100 animate-pulse shrink-0" />
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <div className="h-4 w-32 bg-gray-100 rounded animate-pulse" />
+                    <div className="h-3 w-48 bg-gray-100 rounded animate-pulse" />
+                  </div>
+                </div>
+              ))
+            ) : students.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-200 py-8 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-50">
+                  <GradCapIcon className="w-6 h-6 text-gray-300" />
+                </div>
+                <p className="text-sm font-medium text-gray-500">
+                  No students added yet
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Click "Add Student" to get started
+                </p>
+              </div>
+            ) : (
+              students.map((student) => {
+                const schoolLabel = [
+                  student.school?.name,
+                  student.school?.city ?? student.school?.state,
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+
+                return (
+                  <div
+                    key={student.id}
+                    className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3.5 hover:border-[#e8a0bf] hover:bg-[#fdf8fb] transition-colors"
+                  >
+                    <div className="h-10 w-10 rounded-full bg-[#f5e8f0] flex items-center justify-center shrink-0">
+                      <GradCapIcon className="w-5 h-5 text-[#8B1C53]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#8B1C53] truncate">
+                        {student.firstName} {student.lastName}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5 truncate">
+                        {[schoolLabel, student.gradeLevel]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => openEditStudent(student)}
+                        aria-label="Edit student"
+                        className="rounded-lg p-2 text-gray-400 hover:bg-[#f5e8f0] hover:text-[#8B1C53] transition-colors"
+                      >
+                        <PencilIcon className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeletingStudent(student);
+                          setShowDeleteStudentConfirm(true);
+                        }}
+                        aria-label="Delete student"
+                        className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                      >
+                        <TrashIcon className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>

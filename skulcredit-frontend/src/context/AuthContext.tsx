@@ -15,10 +15,6 @@ import authService, {
 import { tokenStorage, userStorage } from "../services/api";
 import { ROLE_DASHBOARD } from "../config/routes";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
-
 export interface AuthUser {
   id: string;
   email: string;
@@ -35,26 +31,14 @@ export interface AuthUser {
   updatedAt?: string;
 }
 
-/**
- * sessionState tracks the lifecycle of the auth session:
- *
- *  "initializing"   – bootstrap is still running; no routing decisions yet.
- *  "authenticated"  – user is confirmed logged in (stays here until logout()).
- *  "unauthenticated"– bootstrap finished with no valid session, OR the user
- *                     explicitly called logout().
- *
- * Critically, mid-session background failures (network errors, 5xx, temp
- * backend outage) do NOT move the state to "unauthenticated".  Only a
- * genuine 401/403 from the server or an explicit logout() do that.
- */
 export type SessionState = "initializing" | "authenticated" | "unauthenticated";
 
 interface AuthContextValue {
   user: AuthUser | null;
   sessionState: SessionState;
-  /** @deprecated – use sessionState instead; kept for backward compat */
+  /** @deprecated –  */
   isLoading: boolean;
-  /** @deprecated – use sessionState instead; kept for backward compat */
+  /** @deprecated –  */
   isInitializing: boolean;
   isAuthenticated: boolean;
   login: (
@@ -77,10 +61,6 @@ export const useAuth = (): AuthContextValue => {
   if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
   return ctx;
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 function enrichUser(raw: ServiceAuthUser): AuthUser {
   const firstName = raw.profile?.firstName ?? raw.firstName;
@@ -118,20 +98,11 @@ function wipeSession(): void {
   userStorage.clear();
 }
 
-/**
- * Returns true only when the server explicitly rejected the session (401/403).
- * Network failures, timeouts, and 5xx are NOT auth rejections.
- */
 function isDefinitiveAuthFailure(err: unknown): boolean {
   const status = (err as AxiosError)?.response?.status;
   return status === 401 || status === 403;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared route-guard utilities (exported for ProtectedRoute / PublicRoute)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Maps a role to its home dashboard path. */
 export function roleDashboard(role: AuthUser["role"]): string {
   return ROLE_DASHBOARD[role] ?? "/auth";
 }
@@ -142,10 +113,6 @@ export const AuthSpinner: React.FC = () => (
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AuthProvider
-// ─────────────────────────────────────────────────────────────────────────────
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
@@ -153,23 +120,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const [sessionState, setSessionState] =
     useState<SessionState>("initializing");
 
-  // ── Bootstrap: restore session on every mount / page refresh ──────────────
   useEffect(() => {
     const bootstrap = async () => {
-      // Step 1 – hydrate from localStorage immediately so the user object is
-      // non-null before the network call completes.  Route guards see
-      // sessionState = "initializing" and show a spinner, so the user never
-      // reaches a decision point until we're done.
       const cachedUser = userStorage.get<AuthUser>();
       if (cachedUser) setUser(cachedUser);
 
       try {
-        // Step 2 – silent token refresh via httpOnly cookie.
         const { accessToken } = await authService.refreshTokens();
         tokenStorage.setAccess(accessToken);
 
-        // Step 3 – build a fresh user from the new JWT payload, merged with
-        // any profile fields we already have in cache.
         const payload = parseJwt(accessToken);
         if (payload) {
           const freshUser: AuthUser = {
@@ -201,16 +160,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         setSessionState("authenticated");
       } catch (err) {
         if (isDefinitiveAuthFailure(err)) {
-          // The server confirmed the session is dead (401/403) — clean up.
           wipeSession();
           setUser(null);
           setSessionState("unauthenticated");
         } else {
-          // Network error, timeout, 5xx, backend temporarily down, etc.
-          // Do NOT log the user out.  If we have a cached user, keep them
-          // authenticated — the in-flight access token will be refreshed the
-          // next time a real API call returns 401 (the apiClient interceptor
-          // handles that automatically).
+
           if (cachedUser) {
             setSessionState("authenticated");
           } else {
@@ -223,11 +177,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     bootstrap();
   }, []);
 
-  // ── Mid-session expiry event dispatched by the apiClient interceptor ───────
-  // This fires when the refresh-token cookie itself has expired and the
-  // interceptor cannot recover any in-flight requests.
-  // Even here we only act if the user was actually authenticated, and we
-  // give them a graceful confirmation rather than a silent kick.
   useEffect(() => {
     const handle = () => {
       wipeSession();
@@ -237,8 +186,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     window.addEventListener("auth:session-expired", handle);
     return () => window.removeEventListener("auth:session-expired", handle);
   }, []);
-
-  // ── Auth actions ───────────────────────────────────────────────────────────
 
   const login = useCallback(
     async (
@@ -287,7 +234,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     try {
       await authService.logout();
     } catch {
-      // swallow — we're logging out regardless
     } finally {
       wipeSession();
       setUser(null);
@@ -295,13 +241,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, []);
 
-  // ── Memoised context value ─────────────────────────────────────────────────
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       sessionState,
-      // backward-compat shims
       isLoading: sessionState === "initializing",
       isInitializing: sessionState === "initializing",
       isAuthenticated: sessionState === "authenticated",
@@ -315,10 +259,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Legacy higher-order route guards (kept for backward compatibility)
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const RequireAuth: React.FC<{
   children: ReactNode;

@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { parentService } from "../../services/parentService";
 
-// ── Types
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type ApplicationStatus =
   | "draft"
@@ -24,60 +25,82 @@ interface Application {
   lastUpdated: string;
 }
 
-// ── Mock Data 
+// â”€â”€ Backend status â†’ frontend status mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const MOCK_APPLICATIONS: Application[] = [
-  {
-    id: "1",
-    applicationId: "PSA-APP-000123",
-    studentName: "Amara Bello",
-    studentPhoto: "https://randomuser.me/api/portraits/women/44.jpg",
-    schoolName: "Peershore Academy",
-    grade: "Primary 5",
-    status: "under_review",
-    totalAmount: 450000,
-    submittedOn: "May 10, 2026",
-    lastUpdated: "May 12, 2026",
-  },
-  {
-    id: "2",
-    applicationId: "PSA-APP-000124",
-    studentName: "Amara Bello",
-    studentPhoto: "https://randomuser.me/api/portraits/women/44.jpg",
-    schoolName: "Peershore Academy",
-    grade: "Primary 5",
-    status: "approved",
-    totalAmount: 450000,
-    submittedOn: "May 10, 2026",
-    lastUpdated: "May 12, 2026",
-  },
-  {
-    id: "3",
-    applicationId: "PSA-APP-000125",
-    studentName: "Amara Bello",
-    studentPhoto: "https://randomuser.me/api/portraits/women/44.jpg",
-    schoolName: "Peershore Academy",
-    grade: "Primary 5",
-    status: "under_review",
-    totalAmount: 450000,
-    submittedOn: "May 10, 2026",
-    lastUpdated: "May 12, 2026",
-  },
-  {
-    id: "4",
-    applicationId: "PSA-APP-000126",
-    studentName: "Amara Bello",
-    studentPhoto: "https://randomuser.me/api/portraits/women/44.jpg",
-    schoolName: "Peershore Academy",
-    grade: "Primary 5",
-    status: "rejected",
-    totalAmount: 450000,
-    submittedOn: "May 10, 2026",
-    lastUpdated: "May 12, 2026",
-  },
-];
+function mapStatus(raw: string): ApplicationStatus {
+  switch (raw) {
+    case "pending":
+      return "submitted";
+    case "under_review":
+    case "info_requested":
+    case "school_verification":
+      return "under_review";
+    case "approved":
+      return "approved";
+    case "disbursed":
+      return "disbursed";
+    case "rejected":
+    case "cancelled":
+      return "rejected";
+    case "repaid":
+      return "disbursed";
+    default:
+      return "submitted";
+  }
+}
 
-// ── Status config
+// â”€â”€ Normalize API response â†’ Application â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+interface RawApplication {
+  id: string;
+  referenceNumber?: string;
+  amountRequested?: number;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  student?: {
+    firstName?: string;
+    lastName?: string;
+    gradeLevel?: string;
+    profilePhotoUrl?: string;
+  };
+  school?: {
+    schoolName?: string;
+  };
+}
+
+function normalize(raw: RawApplication): Application {
+  const firstName = raw.student?.firstName ?? "";
+  const lastName = raw.student?.lastName ?? "";
+  const studentName = `${firstName} ${lastName}`.trim() || "Unknown Student";
+
+  return {
+    id: raw.id,
+    applicationId: raw.referenceNumber ?? raw.id.slice(0, 12).toUpperCase(),
+    studentName,
+    studentPhoto: `https://ui-avatars.com/api/?name=${encodeURIComponent(studentName)}&background=881337&color=fff&size=44`,
+    schoolName: raw.school?.schoolName ?? "â€”",
+    grade: raw.student?.gradeLevel ?? "â€”",
+    status: mapStatus(raw.status ?? "pending"),
+    totalAmount: Number(raw.amountRequested ?? 0),
+    submittedOn: raw.createdAt
+      ? new Date(raw.createdAt).toLocaleDateString("en-NG", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "â€”",
+    lastUpdated: raw.updatedAt
+      ? new Date(raw.updatedAt).toLocaleDateString("en-NG", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "â€”",
+  };
+}
+
+// â”€â”€ Status config
 const STATUS_CONFIG: Record<
   ApplicationStatus,
   {
@@ -141,7 +164,7 @@ const TAB_ORDER: ApplicationStatus[] = [
   "rejected",
 ];
 
-// ── Status Badge 
+// â”€â”€ Status Badge
 
 const StatusBadge: React.FC<{ status: ApplicationStatus }> = ({ status }) => {
   const cfg = STATUS_CONFIG[status];
@@ -259,7 +282,7 @@ const StatusBadge: React.FC<{ status: ApplicationStatus }> = ({ status }) => {
   );
 };
 
-// ── Applications Table 
+// â”€â”€ Applications Table
 
 const ApplicationsTable: React.FC<{
   apps: Application[];
@@ -292,7 +315,7 @@ const ApplicationsTable: React.FC<{
             onClick={() => onRowClick(app)}
             className="group cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            {/* ── Student ── */}
+            {/* â”€â”€ Student â”€â”€ */}
             <td className="px-5 py-4 whitespace-nowrap">
               <div className="flex items-center gap-3">
                 <img
@@ -351,7 +374,7 @@ const ApplicationsTable: React.FC<{
               </div>
             </td>
 
-            {/* ── Application ID ── */}
+            {/* â”€â”€ Application ID â”€â”€ */}
             <td className="px-5 py-4 whitespace-nowrap">
               <p className="text-xs text-gray-400 mb-0.5">Application ID</p>
               <p className="font-bold text-gray-900">{app.applicationId}</p>
@@ -361,7 +384,7 @@ const ApplicationsTable: React.FC<{
               </p>
             </td>
 
-            {/* ── Status ── */}
+            {/* â”€â”€ Status â”€â”€ */}
             <td className="px-5 py-4 whitespace-nowrap">
               <p className="text-xs text-gray-400 mb-1.5">Status</p>
               <StatusBadge status={app.status} />
@@ -371,18 +394,18 @@ const ApplicationsTable: React.FC<{
               </p>
             </td>
 
-            {/* ── Total Amount ── */}
+            {/* â”€â”€ Total Amount â”€â”€ */}
             <td className="px-5 py-4 whitespace-nowrap text-right">
               <p className="text-xs text-gray-400 mb-1">Total Amount</p>
               <p className="font-bold text-gray-900">
-                ₦
+                â‚¦
                 {app.totalAmount.toLocaleString("en-NG", {
                   minimumFractionDigits: 2,
                 })}
               </p>
             </td>
 
-            {/* ── Chevron ── */}
+            {/* â”€â”€ Chevron â”€â”€ */}
             <td className="pr-4 py-4 whitespace-nowrap">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -405,7 +428,7 @@ const ApplicationsTable: React.FC<{
   </div>
 );
 
-// ── Date Range Dropdown 
+// â”€â”€ Date Range Dropdown
 
 interface DateRange {
   from: string;
@@ -583,19 +606,33 @@ const DateRangeDropdown: React.FC<{
   );
 };
 
-// ── Main Page ───
+// â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-interface MyApplicationsPageProps {
-  applications?: Application[];
-  onNewApplication?: () => void;
-}
-
-const MyApplicationsPage: React.FC<MyApplicationsPageProps> = ({
-  applications = MOCK_APPLICATIONS,
-  onNewApplication,
-}) => {
+const MyApplicationsPage: React.FC = () => {
   const navigate = useNavigate();
 
+  // â”€â”€ Data fetching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    parentService
+      .getApplications()
+      .then((data) => {
+        const raw = Array.isArray(data) ? (data as RawApplication[]) : [];
+        setApplications(raw.map(normalize));
+      })
+      .catch(() =>
+        setFetchError("Failed to load applications. Please refresh."),
+      )
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleNewApplication = () => navigate("/parent/details");
+
+  // â”€â”€ Filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [activeFilter, setActiveFilter] = useState<"all" | ApplicationStatus>(
     "all",
   );
@@ -603,15 +640,7 @@ const MyApplicationsPage: React.FC<MyApplicationsPageProps> = ({
   const [dateRange, setDateRange] = useState<DateRange>({ from: "", to: "" });
   const [dateDropOpen, setDateDropOpen] = useState(false);
 
-  const handleNewApplication = () => {
-    if (onNewApplication) {
-      onNewApplication();
-    } else {
-      navigate("/parent/eligibility");
-    }
-  };
-
-  // ── Status counts 
+  // â”€â”€ Status counts
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: applications.length };
     for (const s of TAB_ORDER) {
@@ -620,7 +649,7 @@ const MyApplicationsPage: React.FC<MyApplicationsPageProps> = ({
     return counts;
   }, [applications]);
 
-  // ── Filtered list ─
+  // â”€â”€ Filtered list â”€
   const filtered = useMemo(() => {
     let list = [...applications];
 
@@ -639,7 +668,6 @@ const MyApplicationsPage: React.FC<MyApplicationsPageProps> = ({
     }
 
     if (dateRange.from || dateRange.to) {
-    
       list = list.filter((_a, i) => {
         void _a;
         return i >= 0;
@@ -651,7 +679,7 @@ const MyApplicationsPage: React.FC<MyApplicationsPageProps> = ({
 
   const hasDateFilter = !!(dateRange.from || dateRange.to);
   const dateLabel = hasDateFilter
-    ? [dateRange.from, dateRange.to].filter(Boolean).join(" → ")
+    ? [dateRange.from, dateRange.to].filter(Boolean).join(" â†’ ")
     : "Sort by Date";
 
   const handleRowClick = (app: Application) => {
@@ -670,293 +698,222 @@ const MyApplicationsPage: React.FC<MyApplicationsPageProps> = ({
 
   return (
     <div className="flex flex-col gap-5 pt-8 pb-12 animate-fade-in-up w-[90%] mx-auto">
-      {/* ── Page heading ─────────────────────────────────────── */}
+      {/* â”€â”€ Page heading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div>
-        <h2 className="text-xl font-extrabold text-gray-900">
-          My Applications
-        </h2>
+        <h2 className="text-xl font-extrabold text-gray-900">My Applications</h2>
         <p className="mt-0.5 text-sm text-gray-400">
           Track and manage all your tuition applications
         </p>
       </div>
 
-      {/* ── Filter toolbar (dark brand card) ─────────────────── */}
-      <div className="rounded-2xl bg-brand px-5 pt-4 pb-5 space-y-3">
-        {/* Status filter pills */}
-        <div className="flex flex-wrap gap-2">
-          {(["all", ...TAB_ORDER] as const).map((s) => {
-            const active = activeFilter === s;
-            const count = statusCounts[s] ?? 0;
-            return (
-              <button
-                key={s}
-                onClick={() => setActiveFilter(s)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                  active
-                    ? "bg-white text-brand border-white shadow-sm"
-                    : "bg-transparent text-white/80 border-white/30 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                {TAB_LABELS[s]}
-                <span
-                  className={`inline-flex items-center justify-center rounded-full text-[10px] font-bold min-w-[18px] h-[18px] px-1 ${
-                    active ? "bg-brand text-white" : "bg-white/20 text-white"
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+      {/* â”€â”€ Loading skeleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {loading && (
+        <div className="rounded-2xl border border-gray-100 bg-white p-6 space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-4 animate-pulse">
+              <div className="w-11 h-11 rounded-full bg-gray-100 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-gray-100 rounded w-1/3" />
+                <div className="h-3 bg-gray-100 rounded w-1/2" />
+              </div>
+              <div className="h-6 w-24 bg-gray-100 rounded-full" />
+            </div>
+          ))}
         </div>
+      )}
 
-        {/* Search + Sort row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Search */}
-          <div className="relative">
-            <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-white/50">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </span>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by student name, school, or application ID..."
-              className="w-full rounded-full border border-white/30 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white placeholder:text-white/40 outline-none focus:border-white focus:ring-2 focus:ring-white/20 transition-colors"
-            />
-          </div>
+      {/* â”€â”€ Fetch error â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {!loading && fetchError && (
+        <div className="rounded-2xl border border-red-100 bg-red-50 px-6 py-5 flex items-center gap-4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-red-500 shrink-0">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <p className="text-sm text-red-700 font-medium">{fetchError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="ml-auto text-xs font-bold text-red-600 hover:text-red-800 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
-          {/* Date / sort button */}
-          <div className="relative">
-            <button
-              onClick={() => setDateDropOpen((o) => !o)}
-              className={`flex w-full items-center justify-between rounded-full border px-4 py-2.5 text-sm font-medium transition-colors ${
-                hasDateFilter
-                  ? "border-white bg-white text-brand"
-                  : "border-white/30 bg-white/10 text-white hover:bg-white/20"
-              }`}
-            >
-              <span className="flex items-center gap-2 truncate">
-                {/* Filter funnel icon */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                  className="shrink-0"
-                >
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                </svg>
-                <span className="truncate">{dateLabel}</span>
-              </span>
-              {hasDateFilter ? (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Clear date filter"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDateRange({ from: "", to: "" });
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.stopPropagation();
-                      setDateRange({ from: "", to: "" });
-                    }
-                  }}
-                  className="shrink-0 ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-brand/20 hover:bg-brand/40 cursor-pointer transition-colors"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+      {/* â”€â”€ Main content (only when not loading) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {!loading && !fetchError && (
+        <>
+          {/* Filter toolbar */}
+          <div className="rounded-2xl bg-brand px-5 pt-4 pb-5 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {(["all", ...TAB_ORDER] as const).map((s) => {
+                const active = activeFilter === s;
+                const count = statusCounts[s] ?? 0;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setActiveFilter(s)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                      active
+                        ? "bg-white text-brand border-white shadow-sm"
+                        : "bg-transparent text-white/80 border-white/30 hover:bg-white/10 hover:text-white"
+                    }`}
                   >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
+                    {TAB_LABELS[s]}
+                    <span
+                      className={`inline-flex items-center justify-center rounded-full text-[10px] font-bold min-w-[18px] h-[18px] px-1 ${
+                        active ? "bg-brand text-white" : "bg-white/20 text-white"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-white/50">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
                 </span>
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                  className="shrink-0 ml-2 text-white/60"
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by student name, school, or application ID..."
+                  className="w-full rounded-full border border-white/30 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white placeholder:text-white/40 outline-none focus:border-white focus:ring-2 focus:ring-white/20 transition-colors"
+                />
+              </div>
+
+              <div className="relative">
+                <button
+                  onClick={() => setDateDropOpen((o) => !o)}
+                  className={`flex w-full items-center justify-between rounded-full border px-4 py-2.5 text-sm font-medium transition-colors ${
+                    hasDateFilter
+                      ? "border-white bg-white text-brand"
+                      : "border-white/30 bg-white/10 text-white hover:bg-white/20"
+                  }`}
                 >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              )}
-            </button>
-            {dateDropOpen && (
-              <DateRangeDropdown
-                value={dateRange}
-                onApply={setDateRange}
-                onClose={() => setDateDropOpen(false)}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Applications list card ────────────────────────────── */}
-      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-        {/* Card header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-bold text-gray-800 shrink-0">
-            Your Applications{" "}
-            <span className="text-gray-400 font-semibold">
-              ({filtered.length})
-            </span>
-          </h3>
-          <div className="flex items-center gap-3 min-w-0">
-            {hasDateFilter && (
-              <span className="text-xs font-medium text-brand truncate">
-                Filtered: {dateRange.from || "any"} → {dateRange.to || "any"}
-              </span>
-            )}
-            {/* Scroll hint — visible only on small screens where the table overflows */}
-            <span className="flex items-center gap-1 text-[11px] text-gray-400 sm:hidden shrink-0">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-3 h-3"
-                aria-hidden="true"
-              >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-              Scroll to see more
-            </span>
-          </div>
-        </div>
-
-        {/* List body */}
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-300 mb-4">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-8 h-8"
-              >
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-              </svg>
+                  <span className="flex items-center gap-2 truncate">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+                      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                    </svg>
+                    <span className="truncate">{dateLabel}</span>
+                  </span>
+                  {hasDateFilter ? (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Clear date filter"
+                      onClick={(e) => { e.stopPropagation(); setDateRange({ from: "", to: "" }); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setDateRange({ from: "", to: "" }); } }}
+                      className="shrink-0 ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-brand/20 hover:bg-brand/40 cursor-pointer transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 ml-2 text-white/60">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  )}
+                </button>
+                {dateDropOpen && (
+                  <DateRangeDropdown
+                    value={dateRange}
+                    onApply={setDateRange}
+                    onClose={() => setDateDropOpen(false)}
+                  />
+                )}
+              </div>
             </div>
-            <h4 className="text-base font-bold text-gray-700 mb-1">
-              {search || activeFilter !== "all"
-                ? "No matching applications"
-                : "No Applications Yet"}
-            </h4>
-            <p className="text-sm text-gray-400 max-w-xs mb-6">
-              {search || activeFilter !== "all"
-                ? "Try adjusting your filters or search term."
-                : "Start your first application to get tuition support for your child."}
-            </p>
-            {!search && activeFilter === "all" && (
-              <button
-                onClick={handleNewApplication}
-                className="inline-flex items-center gap-2 bg-brand text-white text-sm font-bold px-6 py-2.5 rounded-full hover:bg-brand-hover transition-colors shadow-sm"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="w-4 h-4"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Create Application
-              </button>
+          </div>
+
+          {/* Applications table card */}
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold text-gray-800 shrink-0">
+                Your Applications{" "}
+                <span className="text-gray-400 font-semibold">({filtered.length})</span>
+              </h3>
+              <div className="flex items-center gap-3 min-w-0">
+                {hasDateFilter && (
+                  <span className="text-xs font-medium text-brand truncate">
+                    Filtered: {dateRange.from || "any"} â†’ {dateRange.to || "any"}
+                  </span>
+                )}
+                <span className="flex items-center gap-1 text-[11px] text-gray-400 sm:hidden shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3" aria-hidden="true">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                  Scroll to see more
+                </span>
+              </div>
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-300 mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                </div>
+                <h4 className="text-base font-bold text-gray-700 mb-1">
+                  {search || activeFilter !== "all" ? "No matching applications" : "No Applications Yet"}
+                </h4>
+                <p className="text-sm text-gray-400 max-w-xs mb-6">
+                  {search || activeFilter !== "all"
+                    ? "Try adjusting your filters or search term."
+                    : "Start your first application to get tuition support for your child."}
+                </p>
+                {!search && activeFilter === "all" && (
+                  <button
+                    onClick={handleNewApplication}
+                    className="inline-flex items-center gap-2 bg-brand text-white text-sm font-bold px-6 py-2.5 rounded-full hover:bg-brand-hover transition-colors shadow-sm"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Create Application
+                  </button>
+                )}
+              </div>
+            ) : (
+              <ApplicationsTable apps={filtered} onRowClick={handleRowClick} />
             )}
           </div>
-        ) : (
-          <ApplicationsTable apps={filtered} onRowClick={handleRowClick} />
-        )}
-      </div>
 
-      {/* ── "Need to apply for another child" banner ──────────── */}
-      <div className="rounded-2xl border border-pink-200 bg-[#FFF5F8] px-6 py-5 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-extrabold text-brand">
-            Need to apply for another child
-          </p>
-          <p className="mt-0.5 text-xs text-gray-500">
-            You can start a new application for another child under your account
-          </p>
-        </div>
-        <button
-          onClick={handleNewApplication}
-          className="shrink-0 inline-flex items-center gap-2 rounded-full border-2 border-brand bg-white px-5 py-2.5 text-sm font-bold text-brand hover:bg-brand hover:text-white transition-all shadow-sm whitespace-nowrap"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="w-4 h-4"
-            aria-hidden="true"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          New Application
-        </button>
-      </div>
+          {/* "Need to apply for another child" banner */}
+          <div className="rounded-2xl border border-pink-200 bg-[#FFF5F8] px-6 py-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-extrabold text-brand">Need to apply for another child</p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                You can start a new application for another child under your account
+              </p>
+            </div>
+            <button
+              onClick={handleNewApplication}
+              className="shrink-0 inline-flex items-center gap-2 rounded-full border-2 border-brand bg-white px-5 py-2.5 text-sm font-bold text-brand hover:bg-brand hover:text-white transition-all shadow-sm whitespace-nowrap"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              New Application
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };
 
 export default MyApplicationsPage;
+

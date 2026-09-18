@@ -14,12 +14,13 @@ const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
   left,
   notificationCount = 0,
   rightExtra,
-  heightCls = "h-16",
+  heightCls = "h-20",
   className = "",
   onMobileMenuOpen,
 }) => (
   <header
-    className={`${heightCls} bg-white border-b border-slate-200 flex items-center gap-3 px-4 md:px-6 z-10 shrink-0 ${className}`}>
+    className={`${heightCls} bg-white border-b border-slate-200 flex items-center gap-3 px-6 md:px-10 py-4 z-10 shrink-0 ${className}`}
+  >
     {onMobileMenuOpen && (
       <button
         aria-label="Open navigation"
@@ -30,9 +31,7 @@ const DashboardTopBar: React.FC<DashboardTopBarProps> = ({
       </button>
     )}
     {left && <div className="flex-1 min-w-0">{left}</div>}
-    <div className="flex items-center gap-3 ml-auto shrink-0">
-      {rightExtra}
-    </div>
+    <div className="flex items-center gap-3 ml-auto shrink-0">{rightExtra}</div>
   </header>
 );
 

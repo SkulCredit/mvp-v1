@@ -372,6 +372,40 @@ class ParentController {
   }
 
   /**
+   * POST /parents/score-check
+   *
+   * Runs the Lendsqr loan-score / karma check using the parent's BVN.
+   * Called at step 2 of the eligibility wizard before full KYC submission.
+   * Returns { pass, decision, creditScore, advisoryAmount }.
+   * If pass=false the user's account is deactivated server-side.
+   */
+  async checkLoanScore(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { bvn, requestedAmount, location } = req.body as {
+        bvn: string;
+        requestedAmount?: number;
+        location?: string;
+      };
+      if (!bvn || !/^\d{11}$/.test(bvn)) {
+        throw new ApiError(400, "Valid 11-digit BVN is required");
+      }
+      const result = await parentService.checkLoanScore(
+        req.user!.userId,
+        bvn,
+        requestedAmount ?? 100,
+        location ?? "Lagos",
+      );
+      successResponse(res, 200, "Score check complete", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * POST /parents/submit-application-json
    *
    * Streamlined JSON wizard submission from StudentDetailsPage.

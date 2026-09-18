@@ -441,6 +441,9 @@ interface Step2Data {
   ninStatus: "idle" | "verifying" | "verified" | "error";
   ninData: NinVerificationData | null;
   selectedDocType: string;
+  /** Visible when doc type is Bank Statement or Employment Letter */
+  employerName: string;
+  companyName: string;
   pendingFile: File | null;
   uploadedDocs: UploadedDoc[];
 }
@@ -477,6 +480,10 @@ interface WizardState {
   applicationRef: string | null;
   isSubmitting: boolean;
   showSuccess: boolean;
+  /** true while the Lendsqr score check is running */
+  isScoreChecking: boolean;
+  /** set true when the score check returns pass=false — shows the block modal */
+  scoreBlocked: boolean;
 }
 
 // ── Shared components ─────────────────────────────────────────────────────────
@@ -660,6 +667,8 @@ const EligibilityTestPage: React.FC = () => {
       ninStatus: "idle",
       ninData: null,
       selectedDocType: "",
+      employerName: "",
+      companyName: "",
       pendingFile: null,
       uploadedDocs: [],
     },
@@ -680,6 +689,8 @@ const EligibilityTestPage: React.FC = () => {
     applicationRef: null,
     isSubmitting: false,
     showSuccess: false,
+    isScoreChecking: false,
+    scoreBlocked: false,
   });
 
   const patch = <K extends keyof WizardState>(key: K, value: WizardState[K]) =>
@@ -887,6 +898,53 @@ const EligibilityTestPage: React.FC = () => {
 
   const submitStep2 = async (): Promise<boolean> => {
     if (!validateStep2()) return false;
+
+    // ── Lendsqr loan-score / karma check ──────────────────────────────────
+    // Run before allowing the parent to proceed to school/student steps.
+    const bvnToCheck =
+      state.step2.bvnOrNin === "bvn"
+        ? state.step2.bvn.trim()
+        : ((state.step2.ninData as { bvn?: string } | null)?.bvn ?? "");
+
+    // If we have a BVN (either entered directly or returned from NIN lookup),
+    // run the score check.  If there is no BVN available (NIN-only flow where
+    // the Lendsqr NIN response didn't return a BVN) we skip and continue.
+    if (bvnToCheck && /^\d{11}$/.test(bvnToCheck)) {
+      patch("isScoreChecking", true);
+      try {
+        const res = await apiClient.post<{
+          data: {
+            pass: boolean;
+            decision: string;
+            creditScore: string;
+            advisoryAmount: number;
+          };
+        }>("/parents/score-check", {
+          bvn: bvnToCheck,
+          requestedAmount: 100,
+          location: state.step1.addressState || "Lagos",
+        });
+
+        const { pass } = res.data.data;
+
+        if (!pass) {
+          // Show the block modal — user cannot proceed
+          setState((prev) => ({
+            ...prev,
+            isScoreChecking: false,
+            scoreBlocked: true,
+          }));
+          return false;
+        }
+      } catch {
+        // Score endpoint error — non-fatal, allow the parent to continue
+        // (backend logs the failure; we don't block legitimate users due
+        // to a transient 3rd-party outage)
+      } finally {
+        patch("isScoreChecking", false);
+      }
+    }
+
     return true;
   };
 
@@ -977,6 +1035,43 @@ const EligibilityTestPage: React.FC = () => {
 
       await parentService.verifyKYC(kycPayload);
 
+      // ── 5. Save each student from step 4 ─────────────────────────────────
+      // Students are saved with parentId (set server-side from the auth token)
+      // and the schoolId from step 3.  tuitionAmount defaults to 0 here —
+      // the parent will set the actual amount when applying via /parent/details.
+      const tuitionAmountNum = parseFloat(state.step3.tuitionAmount) || 0;
+      const studentSaveErrors: string[] = [];
+
+      for (const st of state.step4.students) {
+        if (!st.fullName.trim()) continue; // skip blank rows
+        const nameParts = st.fullName.trim().split(/\s+/);
+        const firstName = nameParts[0] ?? "";
+        const lastName = nameParts.slice(1).join(" ") || firstName;
+
+        try {
+          await parentService.addStudent({
+            schoolId: state.step3.schoolId,
+            firstName,
+            lastName,
+            studentId: st.admissionNumber || undefined,
+            gradeLevel: state.step3.gradeLevel,
+            tuitionAmount: tuitionAmountNum,
+          });
+        } catch (err) {
+          // Log individual failures but don't abort — other students can still save
+          studentSaveErrors.push(
+            `${st.fullName}: ${(err as { message?: string }).message ?? "Save failed"}`,
+          );
+        }
+      }
+
+      if (studentSaveErrors.length > 0) {
+        // Non-fatal — KYC succeeded, just warn about the student saves
+        showToast(
+          `KYC submitted. Some students could not be saved: ${studentSaveErrors.join("; ")}`,
+        );
+      }
+
       patch("showSuccess", true);
     } catch (err) {
       showToast(
@@ -1031,6 +1126,79 @@ const EligibilityTestPage: React.FC = () => {
       ...state.step4,
       students: state.step4.students.filter((_, idx) => idx !== i),
     });
+
+  // ── Score-blocked modal ───────────────────────────────────────────────────
+  // Shown when the Lendsqr karma/score check returns pass=false.
+  // The parent's account has been deactivated server-side; we show a clear
+  // message and redirect them to the dashboard after they dismiss.
+
+  if (state.scoreBlocked) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+          {/* Red header band */}
+          <div className="bg-[#8B1C53] px-6 py-6 text-white text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white/20">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-7 h-7 text-white"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-bold leading-snug">
+              Credit Score Too Low
+            </h2>
+          </div>
+
+          {/* Body */}
+          <div className="px-6 py-6 text-center">
+            <p className="text-sm text-gray-700 leading-relaxed">
+              Unfortunately, your credit score does not meet the minimum
+              requirement to use SkulCredit at this time.
+            </p>
+            <p className="mt-3 text-sm text-gray-500 leading-relaxed">
+              You may re-apply in the next school term or session once your
+              credit standing has improved. If you believe this is an error,
+              please contact support.
+            </p>
+
+            <div className="mt-6 rounded-xl bg-[#fdf0f6] border border-[#f5c6d8] px-4 py-3 text-left">
+              <p className="text-xs font-semibold text-[#8B1C53] mb-1">
+                What happens next?
+              </p>
+              <ul className="text-xs text-[#8B1C53]/80 space-y-1 list-disc list-inside leading-relaxed">
+                <li>
+                  Your account has been flagged and temporarily restricted.
+                </li>
+                <li>You cannot submit new loan applications at this time.</li>
+                <li>Contact support if you have questions about your score.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 pb-6">
+            <button
+              type="button"
+              onClick={() => navigate("/parent/dashboard")}
+              className="w-full rounded-full bg-[#8B1C53] py-3 text-sm font-bold text-white hover:bg-[#7a1848] transition-colors"
+            >
+              Return to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Success screen ────────────────────────────────────────────────────────
 
@@ -1850,12 +2018,69 @@ const EligibilityTestPage: React.FC = () => {
                 <SelectWithChevron
                   value={state.step2.selectedDocType}
                   onChange={(v) =>
-                    patch("step2", { ...state.step2, selectedDocType: v })
+                    patch("step2", {
+                      ...state.step2,
+                      selectedDocType: v,
+                      // Clear employer fields when switching to Utility Bill
+                      employerName:
+                        v === "Utility Bill (Proof of Address"
+                          ? ""
+                          : state.step2.employerName,
+                      companyName:
+                        v === "Utility Bill (Proof of Address"
+                          ? ""
+                          : state.step2.companyName,
+                    })
                   }
                   placeholder="Select document type"
                   options={DOCUMENT_TYPES}
                 />
               </div>
+
+              {/* Employer fields — visible for Bank Statement or Employment Letter */}
+              {(state.step2.selectedDocType ===
+                "Bank Statement (Last 3 Months)" ||
+                state.step2.selectedDocType ===
+                  "Employment Letter or Business registration") && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in-up">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-gray-700">
+                      Name of Employer
+                      <span className="text-red-500 ml-0.5">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={state.step2.employerName}
+                      onChange={(e) =>
+                        patch("step2", {
+                          ...state.step2,
+                          employerName: e.target.value,
+                        })
+                      }
+                      placeholder="e.g. John Adebayo"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition-colors focus:border-[#8B1C53] focus:ring-2 focus:ring-[#8B1C53]/20"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-gray-700">
+                      Company / Organisation
+                      <span className="text-red-500 ml-0.5">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={state.step2.companyName}
+                      onChange={(e) =>
+                        patch("step2", {
+                          ...state.step2,
+                          companyName: e.target.value,
+                        })
+                      }
+                      placeholder="e.g. Zenith Logistics Ltd"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition-colors focus:border-[#8B1C53] focus:ring-2 focus:ring-[#8B1C53]/20"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Drop zone */}
               <div
@@ -2454,7 +2679,7 @@ const EligibilityTestPage: React.FC = () => {
             <button
               type="button"
               onClick={handleBack}
-              disabled={state.isSubmitting}
+              disabled={state.isSubmitting || state.isScoreChecking}
               className="flex items-center gap-1.5 rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               <BackIcon /> Back
@@ -2465,16 +2690,18 @@ const EligibilityTestPage: React.FC = () => {
           <button
             type="button"
             onClick={handleNext}
-            disabled={state.isSubmitting}
+            disabled={state.isSubmitting || state.isScoreChecking}
             className="rounded-full bg-[#8B1C53] px-8 py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-60 min-w-[100px]"
           >
-            {state.isSubmitting
-              ? state.step1.photoUploading
-                ? "Uploading photo…"
-                : "Please wait…"
-              : state.step === 3
-                ? "Submit Application"
-                : "Next"}
+            {state.isScoreChecking
+              ? "Checking score…"
+              : state.isSubmitting
+                ? state.step1.photoUploading
+                  ? "Uploading photo…"
+                  : "Please wait…"
+                : state.step === 3
+                  ? "Submit Application"
+                  : "Next"}
           </button>
         </div>
       </div>

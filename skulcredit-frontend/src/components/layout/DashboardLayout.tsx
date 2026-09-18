@@ -18,7 +18,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     {sidebar}
     <div className="flex-1 flex flex-col h-screen overflow-hidden z-10">
       {header}
-      <main className="flex-1 overflow-y-auto scrollbar-brand px-6 md:px-8 pb-12">
+      <main className="flex-1 overflow-y-auto scrollbar-brand px-8 md:px-12 pb-12">
         {children}
       </main>
     </div>
