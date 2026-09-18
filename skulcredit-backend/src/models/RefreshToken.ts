@@ -1,5 +1,5 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '../config/db';
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../config/db";
 
 export interface RefreshTokenAttributes {
   id: string;
@@ -14,12 +14,13 @@ export interface RefreshTokenAttributes {
 
 type RefreshTokenCreationAttributes = Optional<
   RefreshTokenAttributes,
-  'id' | 'revokedAt' | 'replacedByToken'
+  "id" | "revokedAt" | "replacedByToken"
 >;
 
 export class RefreshTokenInstance
   extends Model<RefreshTokenAttributes, RefreshTokenCreationAttributes>
-  implements RefreshTokenAttributes {
+  implements RefreshTokenAttributes
+{
   declare id: string;
   declare token: string;
   declare userId: string;
@@ -46,27 +47,27 @@ RefreshTokenInstance.init(
       primaryKey: true,
     },
     token: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.TEXT,
       allowNull: false,
       unique: true,
     },
     userId: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: 'users', key: 'id' },
-      onDelete: 'CASCADE',
+      references: { model: "users", key: "id" },
+      onDelete: "CASCADE",
     },
-    expiresAt:       { type: DataTypes.DATE, allowNull: false },
-    revokedAt:       { type: DataTypes.DATE, allowNull: true },
-    replacedByToken: { type: DataTypes.STRING(500), allowNull: true },
+    expiresAt: { type: DataTypes.DATE, allowNull: false },
+    revokedAt: { type: DataTypes.DATE, allowNull: true },
+    replacedByToken: { type: DataTypes.TEXT, allowNull: true },
   },
   {
     sequelize,
-    modelName: 'RefreshToken',
-    tableName: 'refresh_tokens',
+    modelName: "RefreshToken",
+    tableName: "refresh_tokens",
     timestamps: true,
     underscored: true,
-  }
+  },
 );
 
 export default RefreshTokenInstance;

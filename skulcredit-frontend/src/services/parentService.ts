@@ -1,4 +1,6 @@
-import apiClient from './apiClient';
+import apiClient from "./apiClient";
+
+// ── Param interfaces ──────────────────────────────────────────────────────────
 
 export interface AddStudentParams {
   schoolId: string;
@@ -29,34 +31,82 @@ export interface RequestSchoolParams {
   documentUrl?: string;
 }
 
+export interface VerifyKycParams {
+  bvn?: string;
+  nin?: string;
+  dob?: string;
+  state?: string;
+  lga?: string;
+  city?: string;
+  address?: string;
+  photoUrl?: string;
+  accountNumber?: string;
+  bankCode?: string;
+  documents?: Array<{ url: string; type_id: number; sub_type_id?: number }>;
+}
+
+export interface NinVerificationData {
+  nin: string;
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  dob: string;
+  formatted_dob: string;
+  mobile: string;
+  mobile2: string;
+  registration_date: string;
+  email: string;
+  gender: string;
+  marital_status: string;
+  state_of_residence: string;
+  base64Image: string;
+  image_url: string;
+}
+
+// ── Service ───────────────────────────────────────────────────────────────────
+
 export const parentService = {
   getProfile: async (): Promise<unknown> => {
-    const response = await apiClient.get('/parents/profile');
+    const response = await apiClient.get("/parents/profile");
     return response.data.data;
   },
 
   updateProfile: async (data: Record<string, unknown>): Promise<unknown> => {
-    const response = await apiClient.put('/parents/profile', data);
+    const response = await apiClient.put("/parents/profile", data);
     return response.data.data;
   },
 
-  changePassword: async (currentPassword: string, newPassword: string): Promise<unknown> => {
-    const response = await apiClient.put('/parents/change-password', {
+  changePassword: async (
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<unknown> => {
+    const response = await apiClient.put("/parents/change-password", {
       currentPassword,
       newPassword,
     });
     return response.data.data;
   },
 
-  verifyKYC: async ({ bvn, nin }: { bvn: string; nin?: string }): Promise<unknown> => {
-    const payload: Record<string, string> = { bvn };
-    if (nin) payload.nin = nin;
-    const response = await apiClient.post('/parents/kyc', payload);
+  /** Submit BVN-based KYC with full profile payload to Lendsqr v2/customers */
+  verifyKYC: async (params: VerifyKycParams): Promise<unknown> => {
+    const response = await apiClient.post("/parents/kyc", params);
     return response.data.data;
   },
 
-  checkEligibility: async (amount: number): Promise<{ maxAmount: number; [key: string]: unknown }> => {
-    const response = await apiClient.post('/loans/eligibility', { amount: Number(amount) });
+  /** Verify NIN only — returns NIN identity data for display */
+  verifyNin: async (nin: string): Promise<NinVerificationData> => {
+    const response = await apiClient.post<{
+      data: { data: NinVerificationData };
+    }>("/parents/verify-nin", { nin });
+    return response.data.data as unknown as NinVerificationData;
+  },
+
+  checkEligibility: async (
+    amount: number,
+  ): Promise<{ maxAmount: number; [key: string]: unknown }> => {
+    const response = await apiClient.post("/loans/eligibility", {
+      amount: Number(amount),
+    });
     return response.data.data as { maxAmount: number };
   },
 
@@ -69,7 +119,7 @@ export const parentService = {
     amount: number;
     tenor: number;
   }): Promise<unknown> => {
-    const response = await apiClient.post('/loans/apply', {
+    const response = await apiClient.post("/loans/apply", {
       studentId,
       amount: Number(amount),
       tenor: Number(tenor),
@@ -78,7 +128,7 @@ export const parentService = {
   },
 
   getApplications: async (): Promise<unknown> => {
-    const response = await apiClient.get('/parents/applications');
+    const response = await apiClient.get("/parents/applications");
     return response.data.data;
   },
 
@@ -88,7 +138,7 @@ export const parentService = {
   },
 
   getStudents: async (): Promise<unknown> => {
-    const response = await apiClient.get('/parents/students');
+    const response = await apiClient.get("/parents/students");
     return response.data.data;
   },
 
@@ -105,7 +155,7 @@ export const parentService = {
     gradeLevel,
     tuitionAmount,
   }: AddStudentParams): Promise<{ id: string; [key: string]: unknown }> => {
-    const response = await apiClient.post('/parents/students', {
+    const response = await apiClient.post("/parents/students", {
       schoolId,
       firstName,
       lastName,
@@ -116,7 +166,10 @@ export const parentService = {
     return response.data.data as { id: string };
   },
 
-  updateStudent: async (id: string, data: Record<string, unknown>): Promise<unknown> => {
+  updateStudent: async (
+    id: string,
+    data: Record<string, unknown>,
+  ): Promise<unknown> => {
     const response = await apiClient.put(`/parents/students/${id}`, data);
     return response.data.data;
   },
@@ -134,17 +187,19 @@ export const parentService = {
     limit = 20,
   }: SchoolDirectoryParams = {}): Promise<unknown> => {
     const params = new URLSearchParams();
-    if (search) params.set('search', search);
-    if (city) params.set('city', city);
-    if (state) params.set('state', state);
-    params.set('page', String(page));
-    params.set('limit', String(limit));
-    const response = await apiClient.get(`/parents/schools?${params.toString()}`);
+    if (search) params.set("search", search);
+    if (city) params.set("city", city);
+    if (state) params.set("state", state);
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+    const response = await apiClient.get(
+      `/parents/schools?${params.toString()}`,
+    );
     return response.data.data;
   },
 
   getSchoolRequests: async (): Promise<unknown> => {
-    const response = await apiClient.get('/parents/school-requests');
+    const response = await apiClient.get("/parents/school-requests");
     return response.data.data;
   },
 
@@ -159,7 +214,7 @@ export const parentService = {
     additionalNotes,
     documentUrl,
   }: RequestSchoolParams): Promise<unknown> => {
-    const response = await apiClient.post('/parents/school-requests', {
+    const response = await apiClient.post("/parents/school-requests", {
       schoolName,
       ...(schoolAddress ? { schoolAddress } : {}),
       ...(schoolCity ? { schoolCity } : {}),
@@ -174,7 +229,113 @@ export const parentService = {
   },
 
   getDashboard: async (): Promise<unknown> => {
-    const response = await apiClient.get('/parents/dashboard');
+    const response = await apiClient.get("/parents/dashboard");
+    return response.data.data;
+  },
+
+  /**
+   * Submit the 4-step new-application wizard as a JSON request.
+   * Backend: POST /parents/submit-application-json
+   * (The multipart endpoint still exists for the KYC wizard; this one is
+   *  for the streamlined StudentDetailsPage flow where documents are already
+   *  on file from a prior KYC submission.)
+   */
+  submitWizardApplication: async ({
+    childId,
+    schoolId,
+    institutionTypeId,
+    institutionTypeName,
+    gradeLevel,
+    tuitionAmount,
+    repaymentPlanId,
+    tenor,
+  }: {
+    childId: string;
+    schoolId: string;
+    institutionTypeId: string;
+    institutionTypeName: string;
+    gradeLevel: string;
+    tuitionAmount: number;
+    repaymentPlanId: "full" | "3month" | "6month";
+    tenor: number;
+  }): Promise<{
+    referenceNumber?: string;
+    referenceNumbers?: string[];
+    lendsqrLoanId?: number;
+    [key: string]: unknown;
+  }> => {
+    const response = await apiClient.post("/parents/apply", {
+      childId,
+      schoolId,
+      institutionTypeId,
+      institutionTypeName,
+      gradeLevel,
+      tuitionAmount: Number(tuitionAmount),
+      repaymentPlanId,
+      tenor: Number(tenor),
+    });
+    return response.data.data as {
+      referenceNumber?: string;
+      referenceNumbers?: string[];
+      lendsqrLoanId?: number;
+    };
+  },
+};
+
+// ── Catalog types ─────────────────────────────────────────────────────────────
+
+export interface CatalogInstitutionType {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface CatalogSchool {
+  id: string;
+  name: string;
+  isRegistered: boolean;
+  tier: string | null;
+  serviceChargeDisplay: string | null;
+}
+
+export interface CatalogClassLevel {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface CatalogClassLevelGroup {
+  subLevelGroup: string | null;
+  classes: CatalogClassLevel[];
+}
+
+// ── Catalog service ───────────────────────────────────────────────────────────
+
+export const catalogService = {
+  /** Step 1 of 3: fetch all institution types (Nursery, Primary, Secondary …) */
+  getInstitutionTypes: async (): Promise<CatalogInstitutionType[]> => {
+    const response = await apiClient.get<{
+      data: CatalogInstitutionType[];
+    }>("/catalog/institution-types");
+    return response.data.data;
+  },
+
+  /** Step 2 of 3: fetch schools that offer the selected institution type */
+  getSchools: async (institutionTypeId: string): Promise<CatalogSchool[]> => {
+    const response = await apiClient.get<{ data: CatalogSchool[] }>(
+      `/catalog/schools?institutionTypeId=${institutionTypeId}`,
+    );
+    return response.data.data;
+  },
+
+  /** Step 3 of 3: fetch class levels for the selected school + institution type */
+  getClassLevels: async (
+    schoolId: string,
+    institutionTypeId: string,
+  ): Promise<CatalogClassLevelGroup[]> => {
+    const response = await apiClient.get<{ data: CatalogClassLevelGroup[] }>(
+      `/catalog/class-levels?schoolId=${schoolId}&institutionTypeId=${institutionTypeId}`,
+    );
     return response.data.data;
   },
 };

@@ -263,3 +263,165 @@
     transform: translateX(4px);
   }
 }
+
+/* ── react-country-state-city — match form design ──────────────────────────── */
+.stdropdown-container {
+  border: 1px solid #e5e7eb !important; /* gray-200 */
+  border-radius: 0.5rem !important; /* rounded-lg */
+  font-family: inherit !important;
+  font-size: 0.875rem !important; /* text-sm */
+  background: #fff !important;
+  width: 100% !important;
+  transition: border-color 0.15s ease !important;
+}
+
+.stdropdown-container:focus-within {
+  border-color: #8b1c53 !important;
+  box-shadow: 0 0 0 3px rgba(139, 28, 83, 0.12) !important;
+  outline: none !important;
+}
+
+.stdropdown-container.error-border {
+  border-color: #f87171 !important;
+  background: #fef2f2 !important;
+}
+
+.stdropdown-input {
+  padding: 0.625rem 0.75rem !important; /* py-2.5 px-3 */
+  color: #1f2937 !important; /* gray-800 */
+  cursor: pointer !important;
+}
+
+.stdropdown-input input {
+  font-size: 0.875rem !important;
+  color: #1f2937 !important;
+  background: transparent !important;
+}
+
+.stdropdown-input input::placeholder {
+  color: #9ca3af !important; /* placeholder-gray-400 */
+}
+
+.stdropdown-tool-tip {
+  /* the chevron arrow — keep it tidy */
+  color: #9ca3af !important;
+}
+
+.stdropdown-menu {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+  z-index: 9999 !important;
+  max-height: 220px !important;
+  font-size: 0.875rem !important;
+}
+
+.stdropdown-item {
+  padding: 0.5rem 0.75rem !important;
+  color: #374151 !important;
+  cursor: pointer !important;
+}
+
+.stdropdown-item:hover {
+  background-color: #fdf2f8 !important; /* light brand tint */
+  color: #8b1c53 !important;
+}
+
+.stdropdown-item.selected {
+  background-color: #8b1c53 !important;
+  color: #fff !important;
+}
+
+.stsearch-box {
+  padding: 0.5rem !important;
+}
+
+.stsearch-box input {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.375rem !important;
+  padding: 0.375rem 0.5rem !important;
+  font-size: 0.875rem !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.stsearch-box input:focus {
+  outline: none !important;
+  border-color: #8b1c53 !important;
+}
+
+/* disabled state */
+.stdropdown-container[style*="opacity"] {
+  background: #f9fafb !important;
+  cursor: not-allowed !important;
+}
+
+/* ── react-international-phone — match form design ──────────────────────────── */
+.react-international-phone-input-container {
+  display: flex !important;
+  width: 100% !important;
+}
+
+.react-international-phone-country-selector-button {
+  border: 1px solid #e5e7eb !important;
+  border-right: none !important;
+  border-radius: 0.5rem 0 0 0.5rem !important;
+  background: #f9fafb !important;
+  padding: 0 0.5rem !important;
+  height: 42px !important;
+  cursor: pointer !important;
+  transition: border-color 0.15s ease !important;
+}
+
+.react-international-phone-country-selector-button:hover {
+  background: #f3f4f6 !important;
+}
+
+.react-international-phone-input {
+  flex: 1 !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0 0.5rem 0.5rem 0 !important;
+  padding: 0 0.75rem !important;
+  height: 42px !important;
+  font-size: 0.875rem !important;
+  color: #1f2937 !important;
+  background: #fff !important;
+  outline: none !important;
+  transition: border-color 0.15s ease !important;
+}
+
+.react-international-phone-input::placeholder {
+  color: #9ca3af !important;
+}
+
+.react-international-phone-input:focus,
+.react-international-phone-input-container:focus-within
+  .react-international-phone-country-selector-button,
+.react-international-phone-input-container:focus-within
+  .react-international-phone-input {
+  border-color: #8b1c53 !important;
+}
+
+.react-international-phone-input-container:focus-within {
+  box-shadow: 0 0 0 3px rgba(139, 28, 83, 0.12) !important;
+  border-radius: 0.5rem !important;
+}
+
+.react-international-phone-country-selector-dropdown {
+  z-index: 9999 !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+  font-size: 0.875rem !important;
+  max-height: 240px !important;
+  overflow-y: auto !important;
+}
+
+.react-international-phone-country-selector-dropdown__list-item:hover {
+  background: #fdf2f8 !important;
+}
+
+.react-international-phone-country-selector-dropdown__list-item--selected {
+  background: #fdf2f8 !important;
+  color: #8b1c53 !important;
+}

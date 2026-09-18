@@ -1,87 +1,175 @@
-import User from './User';
-import Parent from './Parent';
-import School from './School';
-import Student from './Student';
-import Term from './Term';
-import LoanApplication from './LoanApplication';
-import LoanOffer from './LoanOffer';
-import RepaymentSchedule from './RepaymentSchedule';
-import Repayment from './Repayment';
-import Disbursement from './Disbursement';
-import RefreshToken from './RefreshToken';
-import SchoolRequest from './SchoolRequest';
-import ApplicationEvent from './ApplicationEvent';
-import Notification from './Notification';
-import DeviceToken from './DeviceToken';
+import User from "./User";
+import Parent from "./Parent";
+import Document from "./Document";
+import School from "./School";
+import Student from "./Student";
+import Term from "./Term";
+import LoanApplication from "./LoanApplication";
+import LoanOffer from "./LoanOffer";
+import RepaymentSchedule from "./RepaymentSchedule";
+import Repayment from "./Repayment";
+import Disbursement from "./Disbursement";
+import RefreshToken from "./RefreshToken";
+import SchoolRequest from "./SchoolRequest";
+import ApplicationEvent from "./ApplicationEvent";
+import Notification from "./Notification";
+import DeviceToken from "./DeviceToken";
+import LoanLedger from "./LoanLedger";
+import CatalogInstitutionType from "./CatalogInstitutionType";
+import CatalogSchool from "./CatalogSchool";
+import CatalogSchoolClassLevel from "./CatalogSchoolClassLevel";
 
-User.hasOne(Parent,        { foreignKey: 'userId', as: 'parentProfile' });
-User.hasOne(School,        { foreignKey: 'userId', as: 'schoolProfile' });
-User.hasMany(RefreshToken, { foreignKey: 'userId', as: 'refreshTokens' });
-User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
+User.hasOne(Parent, { foreignKey: "userId", as: "parentProfile" });
+User.hasOne(School, { foreignKey: "userId", as: "schoolProfile" });
+User.hasMany(RefreshToken, { foreignKey: "userId", as: "refreshTokens" });
+User.hasMany(Notification, { foreignKey: "userId", as: "notifications" });
 
-Parent.belongsTo(User,             { foreignKey: 'userId',   as: 'user' });
-Parent.hasMany(Student,            { foreignKey: 'parentId', as: 'students' });
-Parent.hasMany(LoanApplication,    { foreignKey: 'parentId', as: 'loanApplications' });
-Parent.hasMany(SchoolRequest,      { foreignKey: 'parentId', as: 'schoolRequests' });
-Parent.hasMany(Repayment,          { foreignKey: 'parentId', as: 'repayments' });
-Parent.hasMany(Disbursement,       { foreignKey: 'parentId', as: 'disbursements' });
-Parent.hasMany(RepaymentSchedule,  { foreignKey: 'parentId', as: 'repaymentSchedules' });
+Parent.belongsTo(User, { foreignKey: "userId", as: "user" });
+Parent.hasMany(Document, { foreignKey: "parentId", as: "documents" });
+Parent.hasMany(Student, { foreignKey: "parentId", as: "students" });
+Parent.hasMany(LoanApplication, {
+  foreignKey: "parentId",
+  as: "loanApplications",
+});
+Parent.hasMany(SchoolRequest, { foreignKey: "parentId", as: "schoolRequests" });
+Parent.hasMany(Repayment, { foreignKey: "parentId", as: "repayments" });
+Parent.hasMany(Disbursement, { foreignKey: "parentId", as: "disbursements" });
+Parent.hasMany(RepaymentSchedule, {
+  foreignKey: "parentId",
+  as: "repaymentSchedules",
+});
 
-School.belongsTo(User,          { foreignKey: 'userId',   as: 'user' });
-School.hasMany(Student,         { foreignKey: 'schoolId', as: 'students' });
-School.hasMany(LoanApplication, { foreignKey: 'schoolId', as: 'loanApplications' });
-School.hasMany(Disbursement,    { foreignKey: 'schoolId', as: 'disbursements' });
-School.hasMany(Term,            { foreignKey: 'schoolId', as: 'terms' });
+School.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-Term.belongsTo(School,        { foreignKey: 'schoolId', as: 'school' });
-Term.hasMany(LoanApplication, { foreignKey: 'termId',   as: 'loanApplications' });
+Document.belongsTo(Parent, { foreignKey: "parentId", as: "parent" });
+School.hasMany(Student, { foreignKey: "schoolId", as: "students" });
+School.hasMany(LoanApplication, {
+  foreignKey: "schoolId",
+  as: "loanApplications",
+});
+School.hasMany(Disbursement, { foreignKey: "schoolId", as: "disbursements" });
+School.hasMany(Term, { foreignKey: "schoolId", as: "terms" });
 
-Student.belongsTo(Parent,        { foreignKey: 'parentId',  as: 'parent' });
-Student.belongsTo(School,        { foreignKey: 'schoolId',  as: 'school' });
-Student.hasMany(LoanApplication, { foreignKey: 'studentId', as: 'loanApplications' });
+Term.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+Term.hasMany(LoanApplication, { foreignKey: "termId", as: "loanApplications" });
 
-LoanApplication.belongsTo(Parent,  { foreignKey: 'parentId',  as: 'parent' });
-LoanApplication.belongsTo(Student, { foreignKey: 'studentId', as: 'student' });
-LoanApplication.belongsTo(School,  { foreignKey: 'schoolId',  as: 'school' });
-LoanApplication.belongsTo(Term,    { foreignKey: 'termId',    as: 'term' });
-LoanApplication.hasMany(ApplicationEvent,  { foreignKey: 'loanApplicationId', as: 'events' });
-LoanApplication.hasOne(LoanOffer,          { foreignKey: 'loanApplicationId', as: 'offer' });
-LoanApplication.hasMany(RepaymentSchedule, { foreignKey: 'loanApplicationId', as: 'schedule' });
-LoanApplication.hasMany(Repayment,         { foreignKey: 'loanApplicationId', as: 'repayments' });
-LoanApplication.hasOne(Disbursement,       { foreignKey: 'loanApplicationId', as: 'disbursement' });
+Student.belongsTo(Parent, { foreignKey: "parentId", as: "parent" });
+Student.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+Student.hasMany(LoanApplication, {
+  foreignKey: "studentId",
+  as: "loanApplications",
+});
 
-LoanOffer.belongsTo(LoanApplication, { foreignKey: 'loanApplicationId', as: 'application' });
+LoanApplication.belongsTo(Parent, { foreignKey: "parentId", as: "parent" });
+LoanApplication.belongsTo(Student, { foreignKey: "studentId", as: "student" });
+LoanApplication.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+LoanApplication.belongsTo(Term, { foreignKey: "termId", as: "term" });
+LoanApplication.hasMany(ApplicationEvent, {
+  foreignKey: "loanApplicationId",
+  as: "events",
+});
+LoanApplication.hasOne(LoanLedger, {
+  foreignKey: "loanApplicationId",
+  as: "ledger",
+});
+LoanLedger.belongsTo(LoanApplication, {
+  foreignKey: "loanApplicationId",
+  as: "loanApplication",
+});
 
-RepaymentSchedule.belongsTo(LoanApplication, { foreignKey: 'loanApplicationId', as: 'loanApplication' });
-RepaymentSchedule.belongsTo(Parent,          { foreignKey: 'parentId',          as: 'parent' });
-RepaymentSchedule.hasMany(Repayment,         { foreignKey: 'repaymentScheduleId', as: 'payments' });
+LoanApplication.hasOne(LoanOffer, {
+  foreignKey: "loanApplicationId",
+  as: "offer",
+});
+LoanApplication.hasMany(RepaymentSchedule, {
+  foreignKey: "loanApplicationId",
+  as: "schedule",
+});
+LoanApplication.hasMany(Repayment, {
+  foreignKey: "loanApplicationId",
+  as: "repayments",
+});
+LoanApplication.hasOne(Disbursement, {
+  foreignKey: "loanApplicationId",
+  as: "disbursement",
+});
 
-Repayment.belongsTo(LoanApplication,   { foreignKey: 'loanApplicationId',  as: 'loanApplication' });
-Repayment.belongsTo(Parent,            { foreignKey: 'parentId',            as: 'parent' });
-Repayment.belongsTo(RepaymentSchedule, { foreignKey: 'repaymentScheduleId', as: 'installment' });
+LoanOffer.belongsTo(LoanApplication, {
+  foreignKey: "loanApplicationId",
+  as: "application",
+});
 
-Disbursement.belongsTo(LoanApplication, { foreignKey: 'loanApplicationId', as: 'loanApplication' });
-Disbursement.belongsTo(School,          { foreignKey: 'schoolId',           as: 'school' });
-Disbursement.belongsTo(Parent,          { foreignKey: 'parentId',           as: 'parent' });
+RepaymentSchedule.belongsTo(LoanApplication, {
+  foreignKey: "loanApplicationId",
+  as: "loanApplication",
+});
+RepaymentSchedule.belongsTo(Parent, { foreignKey: "parentId", as: "parent" });
+RepaymentSchedule.hasMany(Repayment, {
+  foreignKey: "repaymentScheduleId",
+  as: "payments",
+});
 
-RefreshToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+Repayment.belongsTo(LoanApplication, {
+  foreignKey: "loanApplicationId",
+  as: "loanApplication",
+});
+Repayment.belongsTo(Parent, { foreignKey: "parentId", as: "parent" });
+Repayment.belongsTo(RepaymentSchedule, {
+  foreignKey: "repaymentScheduleId",
+  as: "installment",
+});
 
-SchoolRequest.belongsTo(Parent, { foreignKey: 'parentId', as: 'parent' });
+Disbursement.belongsTo(LoanApplication, {
+  foreignKey: "loanApplicationId",
+  as: "loanApplication",
+});
+Disbursement.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+Disbursement.belongsTo(Parent, { foreignKey: "parentId", as: "parent" });
 
-ApplicationEvent.belongsTo(LoanApplication, { foreignKey: 'loanApplicationId', as: 'loanApplication' });
+RefreshToken.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+SchoolRequest.belongsTo(Parent, { foreignKey: "parentId", as: "parent" });
 
-DeviceToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-User.hasMany(DeviceToken,   { foreignKey: 'userId', as: 'deviceTokens' });
+ApplicationEvent.belongsTo(LoanApplication, {
+  foreignKey: "loanApplicationId",
+  as: "loanApplication",
+});
+
+Notification.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+DeviceToken.belongsTo(User, { foreignKey: "userId", as: "user" });
+User.hasMany(DeviceToken, { foreignKey: "userId", as: "deviceTokens" });
+
+// ── School Catalog associations ───────────────────────────────────────────────
+// A CatalogSchool offers many class levels; each level belongs to one school
+// and one institution type.
+CatalogSchool.hasMany(CatalogSchoolClassLevel, {
+  foreignKey: "schoolId",
+  as: "classLevels",
+});
+CatalogSchoolClassLevel.belongsTo(CatalogSchool, {
+  foreignKey: "schoolId",
+  as: "school",
+});
+
+CatalogInstitutionType.hasMany(CatalogSchoolClassLevel, {
+  foreignKey: "institutionTypeId",
+  as: "classLevels",
+});
+CatalogSchoolClassLevel.belongsTo(CatalogInstitutionType, {
+  foreignKey: "institutionTypeId",
+  as: "institutionType",
+});
 
 export {
   User,
   Parent,
+  Document,
   School,
   Student,
   Term,
   LoanApplication,
+  LoanLedger,
   LoanOffer,
   RepaymentSchedule,
   Repayment,
@@ -91,4 +179,7 @@ export {
   ApplicationEvent,
   Notification,
   DeviceToken,
+  CatalogInstitutionType,
+  CatalogSchool,
+  CatalogSchoolClassLevel,
 };

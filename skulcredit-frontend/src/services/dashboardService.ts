@@ -33,6 +33,7 @@ export interface DashboardStats {
 
 export interface ParentDashboardResponse {
   profile: Record<string, unknown>;
+  kycStatus: "pending" | "submitted" | "approved" | "rejected";
   stats: DashboardStats;
   schoolRequests: SchoolRequestRecord[];
   hasSchoolRequest: boolean;

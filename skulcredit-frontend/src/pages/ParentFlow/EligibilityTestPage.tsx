@@ -2,9 +2,103 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import apiClient from "../../services/apiClient";
-import { parentService } from "../../services/parentService";
+import {
+  parentService,
+  catalogService,
+  NinVerificationData,
+  CatalogInstitutionType,
+  CatalogSchool,
+  CatalogClassLevelGroup,
+} from "../../services/parentService";
+import {
+  CountrySelect,
+  StateSelect,
+  CitySelect,
+} from "react-country-state-city";
+import "react-country-state-city/dist/react-country-state-city.css";
+import {
+  getCountryCallingCode,
+  getCountries,
+} from "react-phone-number-input/input";
+import type { Country } from "react-phone-number-input";
+import en from "react-phone-number-input/locale/en.json";
 
-// ── Toast ─────────────────────────────────────────────────────────────────────
+const ALL_COUNTRIES = getCountries();
+
+interface PhoneFieldProps {
+  value: string;
+  country: Country;
+  onChange: (number: string) => void;
+  onCountryChange: (c: Country) => void;
+  placeholder?: string;
+  error?: boolean;
+}
+
+const PhoneField: React.FC<PhoneFieldProps> = ({
+  value,
+  country,
+  onChange,
+  onCountryChange,
+  placeholder = "Enter phone number",
+  error,
+}) => {
+  const dialCode = `+${getCountryCallingCode(country)}`;
+  return (
+    <div
+      className={[
+        "flex w-full rounded-lg border bg-white transition-colors",
+        "focus-within:ring-2 focus-within:ring-[#8B1C53]/20 focus-within:border-[#8B1C53]",
+        error
+          ? "border-red-400 bg-red-50"
+          : "border-gray-200 hover:border-gray-300",
+      ].join(" ")}
+    >
+      <div className="relative flex items-center shrink-0 border-r border-gray-200">
+        <div className="flex items-center gap-1 px-3 h-full pointer-events-none select-none">
+          <span className="text-sm font-semibold text-[#8B1C53]">
+            {dialCode}
+          </span>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-3.5 h-3.5 text-gray-400"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+        <select
+          aria-label="Country code"
+          value={country}
+          onChange={(e) => onCountryChange(e.target.value as Country)}
+          className="absolute inset-0 opacity-0 cursor-pointer w-full"
+        >
+          {ALL_COUNTRIES.map((c) => (
+            <option key={c} value={c}>
+              {(en as Record<string, string>)[c]} (+{getCountryCallingCode(c)})
+            </option>
+          ))}
+        </select>
+      </div>
+      <input
+        type="tel"
+        inputMode="tel"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className={[
+          "flex-1 rounded-r-xl px-3 py-2.5 text-sm bg-transparent outline-none",
+          "placeholder-gray-400",
+          error ? "text-red-700" : "text-gray-800",
+        ].join(" ")}
+      />
+    </div>
+  );
+};
 
 interface ToastState {
   message: string;
@@ -80,8 +174,6 @@ const Toast: React.FC<{
   </div>
 );
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
-
 const CheckIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     viewBox="0 0 24 24"
@@ -147,7 +239,7 @@ const PlusCircleIcon: React.FC = () => (
   </svg>
 );
 
-const UploadCloudIcon: React.FC = () => (
+const UploadCloudIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -155,7 +247,7 @@ const UploadCloudIcon: React.FC = () => (
     strokeWidth="1.5"
     strokeLinecap="round"
     strokeLinejoin="round"
-    className="w-10 h-10 text-gray-400"
+    className={className ?? "w-10 h-10 text-gray-400"}
     aria-hidden="true"
   >
     <polyline points="16 16 12 12 8 16" />
@@ -212,6 +304,22 @@ const RefreshIcon: React.FC = () => (
   </svg>
 );
 
+const UserPhotoIcon: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="w-10 h-10 text-gray-300"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+  </svg>
+);
+
 const SubmitCheckIcon: React.FC = () => (
   <div className="flex items-center justify-center w-20 h-20 rounded-full bg-green-100">
     <svg
@@ -236,8 +344,6 @@ const SubmitCheckIcon: React.FC = () => (
   </div>
 );
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
 const STEPS = [
   { label: "Parent/Guardian\nInformation", short: "Parent Info" },
   { label: "BVN/NIN &\nCredit Verification", short: "KYC" },
@@ -246,13 +352,6 @@ const STEPS = [
 ] as const;
 
 type Step = 0 | 1 | 2 | 3;
-
-const COUNTRY_CODES = [
-  { code: "+234", flag: "🇳🇬", label: "NG" },
-  { code: "+1", flag: "🇺🇸", label: "US" },
-  { code: "+44", flag: "🇬🇧", label: "GB" },
-  { code: "+233", flag: "🇬🇭", label: "GH" },
-];
 
 const RELATIONSHIPS = ["Parent", "Guardian", "Sponsor"];
 const EMPLOYER_TYPES = [
@@ -277,13 +376,6 @@ const INCOME_RANGES = [
   "₦500,001 – ₦1,000,000",
   "Above ₦1,000,000",
 ];
-const INSTITUTION_TYPES = [
-  "Nursery",
-  "Primary",
-  "Secondary",
-  "Tertiary",
-  "Vocational",
-];
 const REPAYMENT_PLANS = [
   "3-month Installment",
   "6-month Installment",
@@ -296,27 +388,10 @@ const SESSIONS = [
   "2025/2026-First Semester",
   "2025/2026-Second Semester",
 ];
-const GRADE_LEVELS: Record<string, string[]> = {
-  Nursery: ["Creche", "Nursery 1", "Nursery 2", "Nursery 3"],
-  Primary: [
-    "Primary 1",
-    "Primary 2",
-    "Primary 3",
-    "Primary 4",
-    "Primary 5",
-    "Primary 6",
-  ],
-  Secondary: ["JSS 1", "JSS 2", "JSS 3", "SS 1", "SS 2", "SS 3"],
-  Tertiary: ["100L", "200L", "300L", "400L", "500L", "6th Year"],
-  Vocational: ["Year 1", "Year 2", "Year 3"],
-};
 const DOCUMENT_TYPES = [
   "Bank Statement (Last 3 Months)",
-  "Employment Letter",
-  "Business Registration",
-  "Utility Bill",
-  "Government-Issued ID",
-  "Tax Clearance Certificate",
+  "Employment Letter or Business registration",
+  "Utility Bill (Proof of Address",
 ];
 
 const tenorFromPlan = (plan: string): number => {
@@ -326,18 +401,27 @@ const tenorFromPlan = (plan: string): number => {
   return 6;
 };
 
-// ── Data types ────────────────────────────────────────────────────────────────
-
 interface Step1Data {
   fullName: string;
   email: string;
-  phoneCountryCode: string;
   phone: string;
+  phoneCountry: Country;
   relationship: string;
   employerType: string;
   yearsInRole: string;
   monthlyIncome: string;
-  homeAddress: string;
+  countryId: number;
+  stateId: number;
+  addressCountryName: string;
+  addressState: string;
+  addressCity: string;
+  addressLga: string;
+  addressStreet: string;
+  dob: string;
+  photoUrl: string;
+  photoPreview: string;
+  photoFile: File | null;
+  photoUploading: boolean;
 }
 
 interface UploadedDoc {
@@ -354,17 +438,19 @@ interface Step2Data {
   bvn: string;
   nin: string;
   bvnStatus: "idle" | "error" | "verified";
-  ninStatus: "idle" | "error" | "verified";
+  ninStatus: "idle" | "verifying" | "verified" | "error";
+  ninData: NinVerificationData | null;
   selectedDocType: string;
   pendingFile: File | null;
   uploadedDocs: UploadedDoc[];
 }
 
 interface Step3Data {
-  institutionType: string;
-  schoolId: string;
-  schoolName: string;
-  gradeLevel: string;
+  institutionTypeId: string; // UUID from catalog API
+  institutionType: string; // display name
+  schoolId: string; // UUID from catalog API
+  schoolName: string; // display name
+  gradeLevel: string; // class name string (display value)
   repaymentPlan: string;
   academicSession: string;
   tuitionAmount: string;
@@ -388,20 +474,12 @@ interface WizardState {
   step2: Step2Data;
   step3: Step3Data;
   step4: Step4Data;
-  submittedStudentId: string | null;
   applicationRef: string | null;
   isSubmitting: boolean;
   showSuccess: boolean;
 }
 
-interface School {
-  id: string;
-  schoolName: string;
-  addressCity: string;
-  addressState: string;
-}
-
-// ── Shared small components ───────────────────────────────────────────────────
+// ── Shared components ─────────────────────────────────────────────────────────
 
 const Field: React.FC<{
   label: string;
@@ -428,20 +506,12 @@ const Field: React.FC<{
 const inputCls = (error?: string) =>
   `w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border bg-white
    placeholder-gray-400 focus:ring-2 focus:ring-[#8B1C53]/20 focus:border-[#8B1C53]
-   ${
-     error
-       ? "border-red-400 bg-red-50 text-red-700"
-       : "border-gray-200 text-gray-800 hover:border-gray-300"
-   }`;
+   ${error ? "border-red-400 bg-red-50 text-red-700" : "border-gray-200 text-gray-800 hover:border-gray-300"}`;
 
 const selectCls = (error?: string) =>
   `w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors border bg-white appearance-none
    focus:ring-2 focus:ring-[#8B1C53]/20 focus:border-[#8B1C53] cursor-pointer
-   ${
-     error
-       ? "border-red-400 bg-red-50 text-red-700"
-       : "border-gray-200 text-gray-800 hover:border-gray-300"
-   }`;
+   ${error ? "border-red-400 bg-red-50 text-red-700" : "border-gray-200 text-gray-800 hover:border-gray-300"}`;
 
 const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="flex justify-between py-2 border-b border-gray-100 last:border-0">
@@ -451,8 +521,6 @@ const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     </span>
   </div>
 );
-
-// ── StepIndicator ─────────────────────────────────────────────────────────────
 
 const StepIndicator: React.FC<{ current: Step }> = ({ current }) => (
   <div className="flex items-start justify-center gap-0 mb-8">
@@ -498,8 +566,6 @@ const StepIndicator: React.FC<{ current: Step }> = ({ current }) => (
   </div>
 );
 
-// ── SelectWithChevron ─────────────────────────────────────────────────────────
-
 const SelectWithChevron: React.FC<{
   value: string;
   onChange: (v: string) => void;
@@ -539,17 +605,27 @@ const SelectWithChevron: React.FC<{
   </div>
 );
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 const EligibilityTestPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast, showToast, dismissToast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [schools, setSchools] = useState<School[]>([]);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
+  const photoFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [schools, setSchools] = useState<CatalogSchool[]>([]);
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // ── Catalog state ─────────────────────────────────────────────────────────
+  const [institutionTypes, setInstitutionTypes] = useState<
+    CatalogInstitutionType[]
+  >([]);
+  const [loadingTypes, setLoadingTypes] = useState(false);
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [classLevelGroups, setClassLevelGroups] = useState<
+    CatalogClassLevelGroup[]
+  >([]);
 
   const [state, setState] = useState<WizardState>({
     step: 0,
@@ -557,13 +633,24 @@ const EligibilityTestPage: React.FC = () => {
       fullName:
         user?.name ?? `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
       email: user?.email ?? "",
-      phoneCountryCode: "+234",
       phone: user?.phoneNumber ?? "",
+      phoneCountry: "NG" as Country,
       relationship: "",
       employerType: "",
       yearsInRole: "",
       monthlyIncome: "",
-      homeAddress: "",
+      countryId: 0,
+      stateId: 0,
+      addressCountryName: "",
+      addressState: "",
+      addressLga: "",
+      addressCity: "",
+      addressStreet: "",
+      dob: "",
+      photoUrl: "",
+      photoPreview: "",
+      photoFile: null,
+      photoUploading: false,
     },
     step2: {
       bvnOrNin: "bvn",
@@ -571,11 +658,13 @@ const EligibilityTestPage: React.FC = () => {
       nin: "",
       bvnStatus: "idle",
       ninStatus: "idle",
+      ninData: null,
       selectedDocType: "",
       pendingFile: null,
       uploadedDocs: [],
     },
     step3: {
+      institutionTypeId: "",
       institutionType: "",
       schoolId: "",
       schoolName: "",
@@ -588,7 +677,6 @@ const EligibilityTestPage: React.FC = () => {
       students: [{ fullName: "", dob: "", gender: "", admissionNumber: "" }],
       termsConfirmed: false,
     },
-    submittedStudentId: null,
     applicationRef: null,
     isSubmitting: false,
     showSuccess: false,
@@ -604,28 +692,124 @@ const EligibilityTestPage: React.FC = () => {
       return n;
     });
 
-  const loadSchools = useCallback(async () => {
-    setLoadingSchools(true);
-    try {
-      const res = await apiClient.get<{ data: { schools?: School[] } }>(
-        `/parents/schools?limit=100`,
-      );
-      const arr = Array.isArray(res.data.data)
-        ? (res.data.data as School[])
-        : (res.data.data?.schools ?? []);
-      setSchools(arr);
-    } catch {
-      setSchools([]);
-    } finally {
-      setLoadingSchools(false);
-    }
-  }, []);
-
+  // ── Catalog: fetch institution types when entering step 3 ────────────────
   useEffect(() => {
-    if (state.step === 2) loadSchools();
-  }, [state.step, loadSchools]);
+    if (state.step !== 2) return;
+    setLoadingTypes(true);
+    catalogService
+      .getInstitutionTypes()
+      .then(setInstitutionTypes)
+      .catch(() =>
+        showToast("Failed to load institution types. Please try again."),
+      )
+      .finally(() => setLoadingTypes(false));
+  }, [state.step]);
 
-  // ── Validation ───────────────────────────────────────────────────────────
+  // ── Catalog: fetch schools when an institution type is chosen ────────────
+  useEffect(() => {
+    if (!state.step3.institutionTypeId) {
+      setSchools([]);
+      return;
+    }
+    setLoadingSchools(true);
+    setSchools([]);
+    catalogService
+      .getSchools(state.step3.institutionTypeId)
+      .then(setSchools)
+      .catch(() => showToast("Failed to load schools. Please try again."))
+      .finally(() => setLoadingSchools(false));
+  }, [state.step3.institutionTypeId]);
+
+  // ── Catalog: fetch class levels when a school is chosen ──────────────────
+  useEffect(() => {
+    if (!state.step3.schoolId || !state.step3.institutionTypeId) {
+      setClassLevelGroups([]);
+      return;
+    }
+    setLoadingClasses(true);
+    setClassLevelGroups([]);
+    catalogService
+      .getClassLevels(state.step3.schoolId, state.step3.institutionTypeId)
+      .then(setClassLevelGroups)
+      .catch(() => showToast("Failed to load class levels. Please try again."))
+      .finally(() => setLoadingClasses(false));
+  }, [state.step3.schoolId, state.step3.institutionTypeId]);
+
+  const handlePhotoSelect = (file: File) => {
+    if (state.step1.photoPreview) URL.revokeObjectURL(state.step1.photoPreview);
+    const preview = URL.createObjectURL(file);
+    setState((prev) => ({
+      ...prev,
+      step1: {
+        ...prev.step1,
+        photoFile: file,
+        photoPreview: preview,
+        photoUrl: "",
+      },
+    }));
+    clearErr("photo");
+  };
+
+  const removePhoto = () => {
+    if (state.step1.photoPreview) URL.revokeObjectURL(state.step1.photoPreview);
+    setState((prev) => ({
+      ...prev,
+      step1: {
+        ...prev.step1,
+        photoFile: null,
+        photoPreview: "",
+        photoUrl: "",
+        photoUploading: false,
+      },
+    }));
+  };
+
+  const handleFileSelect = (file: File) => {
+    if (!state.step2.selectedDocType) return;
+    const newDoc: UploadedDoc = {
+      id: `doc-${Date.now()}`,
+      name: file.name,
+      size:
+        file.size > 1024 * 1024
+          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+          : `${Math.round(file.size / 1024)} KB`,
+      docType: state.step2.selectedDocType,
+      file,
+      status: "pending",
+    };
+    patch("step2", {
+      ...state.step2,
+      uploadedDocs: [...state.step2.uploadedDocs, newDoc],
+      pendingFile: null,
+    });
+    clearErr("uploadedDocs");
+    if (docFileInputRef.current) docFileInputRef.current.value = "";
+  };
+
+  const removeDoc = (id: string) =>
+    patch("step2", {
+      ...state.step2,
+      uploadedDocs: state.step2.uploadedDocs.filter((d) => d.id !== id),
+    });
+
+  const handleVerifyNin = async () => {
+    if (!/^\d{11}$/.test(state.step2.nin)) {
+      setErrors((p) => ({ ...p, nin: "NIN must be exactly 11 digits." }));
+      return;
+    }
+    patch("step2", { ...state.step2, ninStatus: "verifying", ninData: null });
+    try {
+      const data = await parentService.verifyNin(state.step2.nin);
+      patch("step2", { ...state.step2, ninStatus: "verified", ninData: data });
+      clearErr("nin");
+    } catch (err) {
+      patch("step2", { ...state.step2, ninStatus: "error", ninData: null });
+      showToast(
+        (err as { message?: string }).message ??
+          "NIN verification failed. Please check the number.",
+      );
+    }
+  };
 
   const validateStep1 = (): boolean => {
     const e: Record<string, string> = {};
@@ -636,7 +820,14 @@ const EligibilityTestPage: React.FC = () => {
     if (!s.employerType) e.employerType = "Please select your employment type.";
     if (!s.yearsInRole) e.yearsInRole = "Please select years in current role.";
     if (!s.monthlyIncome) e.monthlyIncome = "Please select your income range.";
-    if (!s.homeAddress.trim()) e.homeAddress = "Home address is required.";
+    if (!s.dob) e.dob = "Date of birth is required.";
+    if (!s.countryId) e.addressState = "Please select your country.";
+    else if (!s.addressState)
+      e.addressState = "Please select your state / region.";
+    if (!s.addressCity) e.addressCity = "Please select your city / town.";
+    if (!s.addressStreet.trim())
+      e.addressStreet = "Street address is required.";
+    if (!s.photoUrl && !s.photoFile) e.photo = "Please upload your photo.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -652,6 +843,8 @@ const EligibilityTestPage: React.FC = () => {
       if (!s.nin.trim()) e.nin = "NIN is required.";
       else if (!/^\d{11}$/.test(s.nin.trim()))
         e.nin = "NIN must be exactly 11 digits.";
+      else if (s.ninStatus !== "verified")
+        e.nin = "Please verify your NIN before continuing.";
     }
     if (s.uploadedDocs.length === 0)
       e.uploadedDocs = "Please upload at least one document.";
@@ -662,7 +855,8 @@ const EligibilityTestPage: React.FC = () => {
   const validateStep3 = (): boolean => {
     const e: Record<string, string> = {};
     const s = state.step3;
-    if (!s.institutionType) e.institutionType = "Institution type is required.";
+    if (!s.institutionTypeId)
+      e.institutionType = "Institution type is required.";
     if (!s.schoolId) e.schoolId = "Please select a school.";
     if (!s.gradeLevel) e.gradeLevel = "Class/level is required.";
     if (!s.repaymentPlan) e.repaymentPlan = "Please choose a repayment plan.";
@@ -686,65 +880,103 @@ const EligibilityTestPage: React.FC = () => {
     return Object.keys(e).length === 0;
   };
 
-  // ── Submit handlers ───────────────────────────────────────────────────────
-
   const submitStep1 = async (): Promise<boolean> => {
     if (!validateStep1()) return false;
-    try {
-      const [street, ...rest] = state.step1.homeAddress.split(",");
-      await apiClient.put("/parents/profile", {
-        addressStreet: street?.trim() || state.step1.homeAddress,
-        addressCity: rest[0]?.trim() || undefined,
-        addressState: rest[1]?.trim() || undefined,
-      });
-      return true;
-    } catch (err) {
-      showToast(
-        (err as { message?: string }).message ?? "Profile update failed.",
-      );
-      return false;
-    }
+    return true;
   };
 
   const submitStep2 = async (): Promise<boolean> => {
     if (!validateStep2()) return false;
-    patch("isSubmitting", true);
-    try {
-      return true;
-    } catch (err) {
-      showToast(
-        (err as { message?: string }).message ??
-          "Identity verification failed.",
-      );
-      return false;
-    } finally {
-      patch("isSubmitting", false);
-    }
+    return true;
   };
 
   const submitStep3 = async (): Promise<boolean> => {
     if (!validateStep3()) return false;
-    patch("isSubmitting", true);
-    try {
-      return true;
-    } catch (err) {
-      showToast(
-        (err as { message?: string }).message ?? "Failed to save student info.",
-      );
-      return false;
-    } finally {
-      patch("isSubmitting", false);
-    }
+    return true;
   };
 
   const submitStep4 = async (): Promise<void> => {
     if (!validateStep4()) return;
-    if (!state.submittedStudentId) {
-      showToast("Student record missing. Please go back to Step 3.");
-      return;
-    }
     patch("isSubmitting", true);
+
     try {
+      let photoUrl = state.step1.photoUrl;
+      if (state.step1.photoFile && !photoUrl) {
+        setState((prev) => ({
+          ...prev,
+          step1: { ...prev.step1, photoUploading: true },
+        }));
+        const formData = new FormData();
+        formData.append("file", state.step1.photoFile);
+        const photoRes = await apiClient.post<{ data: { url: string } }>(
+          "/upload/document",
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } },
+        );
+        photoUrl = photoRes.data.data.url;
+        setState((prev) => ({
+          ...prev,
+          step1: { ...prev.step1, photoUrl, photoUploading: false },
+        }));
+      }
+
+      // ── 2. Upload any staged documents and collect their URLs ─────────────
+      const uploadedDocUrls: Array<{ url: string; type_id: number }> = [];
+      for (const doc of state.step2.uploadedDocs) {
+        if ((doc as unknown as { url?: string }).url) {
+          // already uploaded in a previous attempt
+          uploadedDocUrls.push({
+            url: (doc as unknown as { url: string }).url,
+            type_id: 1,
+          });
+        } else {
+          const df = new FormData();
+          df.append("file", doc.file);
+          const docRes = await apiClient.post<{ data: { url: string } }>(
+            "/upload/document",
+            df,
+            { headers: { "Content-Type": "multipart/form-data" } },
+          );
+          uploadedDocUrls.push({ url: docRes.data.data.url, type_id: 1 });
+        }
+      }
+
+      // ── 3. Save parent profile ────────────────────────────────────────────
+      await apiClient.put("/parents/profile", {
+        dob: state.step1.dob,
+        addressStreet: state.step1.addressStreet,
+        addressCity: state.step1.addressCity,
+        addressState: state.step1.addressState,
+        addressLga: state.step1.addressLga,
+        profilePhotoUrl: photoUrl || undefined,
+      });
+
+      // ── 4. Submit KYC (BVN or NIN) ────────────────────────────────────────
+      const kycPayload =
+        state.step2.bvnOrNin === "bvn"
+          ? {
+              bvn: state.step2.bvn,
+              dob: state.step1.dob,
+              state: state.step1.addressState,
+              lga: state.step1.addressLga,
+              city: state.step1.addressCity,
+              address: state.step1.addressStreet,
+              photoUrl: photoUrl || undefined,
+              documents: uploadedDocUrls,
+            }
+          : {
+              nin: state.step2.nin,
+              dob: state.step1.dob,
+              state: state.step1.addressState,
+              lga: state.step1.addressLga,
+              city: state.step1.addressCity,
+              address: state.step1.addressStreet,
+              photoUrl: photoUrl || undefined,
+              documents: uploadedDocUrls,
+            };
+
+      await parentService.verifyKYC(kycPayload);
+
       patch("showSuccess", true);
     } catch (err) {
       showToast(
@@ -799,37 +1031,6 @@ const EligibilityTestPage: React.FC = () => {
       ...state.step4,
       students: state.step4.students.filter((_, idx) => idx !== i),
     });
-
-  // Step 2 – document upload helpers
-  const handleFileSelect = (file: File) => {
-    if (!state.step2.selectedDocType) return;
-    const newDoc: UploadedDoc = {
-      id: `doc-${Date.now()}`,
-      name: file.name,
-      size:
-        file.size > 1024 * 1024
-          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-          : `${Math.round(file.size / 1024)} KB`,
-      docType: state.step2.selectedDocType,
-      file,
-      status: "pending",
-    };
-    patch("step2", {
-      ...state.step2,
-      uploadedDocs: [...state.step2.uploadedDocs, newDoc],
-      pendingFile: null,
-    });
-    clearErr("uploadedDocs");
-    // Reset file input so same file can be re-selected if needed
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const removeDoc = (id: string) => {
-    patch("step2", {
-      ...state.step2,
-      uploadedDocs: state.step2.uploadedDocs.filter((d) => d.id !== id),
-    });
-  };
 
   // ── Success screen ────────────────────────────────────────────────────────
 
@@ -910,12 +1111,12 @@ const EligibilityTestPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Personal details card */}
+            {/* ── Personal details ── */}
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
-              {/* Full Name */}
+              {/* Full Name (read-only) */}
               <Field
                 label="Full Name"
-                hint="This is auto-filled from signup and cannot be edited"
+                hint="Auto-filled from signup and cannot be edited"
               >
                 <input
                   value={state.step1.fullName}
@@ -924,7 +1125,7 @@ const EligibilityTestPage: React.FC = () => {
                 />
               </Field>
 
-              {/* Email */}
+              {/* Email (read-only) */}
               <Field
                 label="Email Address"
                 hint="We'll use this email to send you updates about your application."
@@ -936,58 +1137,51 @@ const EligibilityTestPage: React.FC = () => {
                 />
               </Field>
 
-              {/* Phone Number with country code selector */}
+              {/* Phone */}
               <Field
                 label="Phone Number"
                 required
                 error={errors.phone}
                 hint="Enter your country code"
               >
-                <div
-                  className={`flex rounded-lg border overflow-hidden transition-colors ${errors.phone ? "border-red-400" : "border-gray-200 focus-within:border-[#8B1C53]"}`}
-                >
-                  <div className="relative shrink-0">
-                    <select
-                      value={state.step1.phoneCountryCode}
-                      onChange={(e) =>
-                        patch("step1", {
-                          ...state.step1,
-                          phoneCountryCode: e.target.value,
-                        })
-                      }
-                      className="h-full appearance-none bg-gray-50 border-r border-gray-200 pl-3 pr-7 py-2.5 text-sm font-medium text-gray-700 focus:outline-none cursor-pointer"
-                      aria-label="Country code"
-                    >
-                      {COUNTRY_CODES.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.code}
-                        </option>
-                      ))}
-                    </select>
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400"
-                      aria-hidden="true"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </div>
-                  <input
-                    value={state.step1.phone}
-                    placeholder="Enter your phone number"
-                    inputMode="tel"
-                    onChange={(e) => {
-                      patch("step1", { ...state.step1, phone: e.target.value });
-                      clearErr("phone");
-                    }}
-                    className="flex-1 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 bg-white focus:outline-none"
-                  />
-                </div>
+                <PhoneField
+                  value={state.step1.phone}
+                  country={state.step1.phoneCountry}
+                  placeholder="Enter your phone number"
+                  error={!!errors.phone}
+                  onChange={(v) => {
+                    patch("step1", { ...state.step1, phone: v });
+                    clearErr("phone");
+                  }}
+                  onCountryChange={(c) => {
+                    patch("step1", { ...state.step1, phoneCountry: c });
+                  }}
+                />
+              </Field>
+
+              {/* Date of Birth */}
+              <Field
+                label="Date of Birth"
+                required
+                error={errors.dob}
+                hint="Parent/guardian's date of birth"
+              >
+                <input
+                  type="date"
+                  value={state.step1.dob}
+                  max={
+                    new Date(
+                      new Date().setFullYear(new Date().getFullYear() - 18),
+                    )
+                      .toISOString()
+                      .split("T")[0]
+                  }
+                  onChange={(e) => {
+                    patch("step1", { ...state.step1, dob: e.target.value });
+                    clearErr("dob");
+                  }}
+                  className={inputCls(errors.dob)}
+                />
               </Field>
 
               {/* Relationship to Student */}
@@ -995,7 +1189,7 @@ const EligibilityTestPage: React.FC = () => {
                 label="Relationship to Student"
                 required
                 error={errors.relationship}
-                hint="Choose if you're the parent, guardian, student"
+                hint="Choose if you're the parent, guardian, or sponsor"
               >
                 <SelectWithChevron
                   value={state.step1.relationship}
@@ -1010,7 +1204,131 @@ const EligibilityTestPage: React.FC = () => {
               </Field>
             </div>
 
-            {/* Employment details card */}
+            {/* ── Photo upload ── */}
+            <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">
+                  Profile Photo <span className="text-red-500">*</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Upload a clear photo of your face. JPG or PNG, up to 5 MB.
+                </p>
+              </div>
+
+              {state.step1.photoPreview ? (
+                /* Preview — file selected locally, will upload on final submit */
+                <div className="flex items-center gap-4">
+                  <div className="relative h-20 w-20 rounded-full overflow-hidden border-2 border-[#8B1C53]/30 shrink-0">
+                    <img
+                      src={state.step1.photoPreview}
+                      alt="Profile preview"
+                      className="h-full w-full object-cover"
+                    />
+                    {state.step1.photoUploading && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <svg
+                          className="w-6 h-6 text-white animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8v8z"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {state.step1.photoUploading ? (
+                      <p className="text-xs text-gray-500">Uploading…</p>
+                    ) : state.step1.photoUrl ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600">
+                        <CheckIcon className="w-3.5 h-3.5" /> Uploaded
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600">
+                        <CheckIcon className="w-3.5 h-3.5" /> Photo selected
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={removePhoto}
+                      disabled={state.step1.photoUploading}
+                      className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 disabled:opacity-40"
+                    >
+                      <TrashIcon /> Remove photo
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Drop zone */
+                <div
+                  className={`rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 py-8 cursor-pointer transition-colors border-gray-300 hover:border-[#8B1C53]/50 bg-white ${errors.photo ? "border-red-400 bg-red-50" : ""}`}
+                  onClick={() => photoFileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const f = e.dataTransfer.files?.[0];
+                    if (f) handlePhotoSelect(f);
+                  }}
+                  role="button"
+                  aria-label="Upload profile photo"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      photoFileInputRef.current?.click();
+                    }
+                  }}
+                >
+                  <UserPhotoIcon />
+                  <p className="text-sm font-medium text-gray-600">
+                    Click or drag to upload your photo
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    JPG or PNG – up to 5 MB
+                  </p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      photoFileInputRef.current?.click();
+                    }}
+                    className="mt-1 rounded-full bg-[#8B1C53] px-5 py-1.5 text-xs font-semibold text-white hover:bg-[#7a1848] transition-colors"
+                  >
+                    Browse
+                  </button>
+                </div>
+              )}
+              {errors.photo && (
+                <p role="alert" className="text-xs text-red-500">
+                  {errors.photo}
+                </p>
+              )}
+              <input
+                ref={photoFileInputRef}
+                type="file"
+                accept=".jpg,.jpeg,.png"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handlePhotoSelect(f);
+                }}
+              />
+            </div>
+
+            {/* ── Employment details ── */}
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
               {/* Employer / Business Type */}
               <Field
@@ -1036,7 +1354,6 @@ const EligibilityTestPage: React.FC = () => {
                 label="Years in Current Role"
                 required
                 error={errors.yearsInRole}
-                hint="Enter your full residential address for verification purposes."
               >
                 <SelectWithChevron
                   value={state.step1.yearsInRole}
@@ -1067,25 +1384,164 @@ const EligibilityTestPage: React.FC = () => {
                   error={errors.monthlyIncome}
                 />
               </Field>
+            </div>
 
-              {/* Home Address */}
+            {/* ── Address (cascading) ── */}
+            <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">
+                  Residential Address
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Enter your full residential address for verification purposes.
+                </p>
+              </div>
+
+              {/* Country */}
+              <Field label="Country" required error={errors.addressState}>
+                <div
+                  className={`[&_.stdropdown-container]:w-full [&_.stdropdown-container]:!rounded-lg [&_.stdropdown-container]:!border [&_.stdropdown-container]:!border-gray-200 [&_.stdropdown-container]:!bg-white [&_.stdropdown-container:hover]:!border-gray-300 [&_.stdropdown-container:focus-within]:!border-[#8B1C53] [&_.stdropdown-container:focus-within]:!ring-2 [&_.stdropdown-container:focus-within]:!ring-[#8B1C53]/20 [&_.stdropdown-input]:!w-full [&_.stdropdown-input]:px-3 [&_.stdropdown-input]:py-2.5 [&_.stdropdown-input_input]:!w-full [&_.stdropdown-input_input]:!border-none [&_.stdropdown-input_input]:!rounded-none [&_.stdropdown-input_input]:!shadow-none [&_.stdropdown-input_input]:!outline-none [&_.stdropdown-input_input]:!ring-0 [&_.stdropdown-input_input]:!bg-transparent [&_.stdropdown-input_input]:!p-0 [&_.stdropdown-input_input]:text-sm ${errors.addressState ? "[&_.stdropdown-container]:!border-red-400" : ""}`}
+                >
+                  <CountrySelect
+                    containerClassName="w-full"
+                    inputClassName="w-full"
+                    onChange={(val) => {
+                      const country = val as {
+                        id: number;
+                        name: string;
+                      } | null;
+                      setState((prev) => ({
+                        ...prev,
+                        step1: {
+                          ...prev.step1,
+                          countryId: country?.id ?? 0,
+                          addressCountryName: country?.name ?? "",
+                          stateId: 0,
+                          addressState: "",
+                          addressCity: "",
+                        },
+                      }));
+                      clearErr("addressState");
+                    }}
+                    placeHolder="Select Country"
+                  />
+                </div>
+              </Field>
+
+              {/* State / Region */}
               <Field
-                label="Home Address"
+                label="State / Region"
                 required
-                error={errors.homeAddress}
-                hint="Enter your full residential address for verification purposes."
+                error={errors.addressState}
+              >
+                <div
+                  className={`[&_.stdropdown-container]:w-full [&_.stdropdown-container]:!rounded-lg [&_.stdropdown-container]:!border [&_.stdropdown-container]:!border-gray-200 [&_.stdropdown-container]:!bg-white [&_.stdropdown-container:hover]:!border-gray-300 [&_.stdropdown-container:focus-within]:!border-[#8B1C53] [&_.stdropdown-container:focus-within]:!ring-2 [&_.stdropdown-container:focus-within]:!ring-[#8B1C53]/20 [&_.stdropdown-input]:!w-full [&_.stdropdown-input]:px-3 [&_.stdropdown-input]:py-2.5 [&_.stdropdown-input_input]:!w-full [&_.stdropdown-input_input]:!border-none [&_.stdropdown-input_input]:!rounded-none [&_.stdropdown-input_input]:!shadow-none [&_.stdropdown-input_input]:!outline-none [&_.stdropdown-input_input]:!ring-0 [&_.stdropdown-input_input]:!bg-transparent [&_.stdropdown-input_input]:!p-0 [&_.stdropdown-input_input]:text-sm ${errors.addressState ? "[&_.stdropdown-container]:!border-red-400" : ""}`}
+                >
+                  <StateSelect
+                    key={`state-${state.step1.countryId}`}
+                    countryid={state.step1.countryId}
+                    containerClassName="w-full"
+                    inputClassName="w-full"
+                    onChange={(val) => {
+                      const s = val as { id: number; name: string } | null;
+                      setState((prev) => ({
+                        ...prev,
+                        step1: {
+                          ...prev.step1,
+                          stateId: s?.id ?? 0,
+                          addressState: s?.name ?? "",
+                          addressCity: "",
+                        },
+                      }));
+                      clearErr("addressState");
+                    }}
+                    placeHolder={
+                      state.step1.countryId
+                        ? "--Select--"
+                        : "Select a country first"
+                    }
+                    disabled={!state.step1.countryId}
+                  />
+                </div>
+                {errors.addressState && (
+                  <p role="alert" className="text-xs text-red-500">
+                    {errors.addressState}
+                  </p>
+                )}
+              </Field>
+
+              {/* City */}
+              <Field label="City / Town" required error={errors.addressCity}>
+                <div
+                  className={`[&_.stdropdown-container]:w-full [&_.stdropdown-container]:!rounded-lg [&_.stdropdown-container]:!border [&_.stdropdown-container]:!border-gray-200 [&_.stdropdown-container]:!bg-white [&_.stdropdown-container:hover]:!border-gray-300 [&_.stdropdown-container:focus-within]:!border-[#8B1C53] [&_.stdropdown-container:focus-within]:!ring-2 [&_.stdropdown-container:focus-within]:!ring-[#8B1C53]/20 [&_.stdropdown-input]:!w-full [&_.stdropdown-input]:px-3 [&_.stdropdown-input]:py-2.5 [&_.stdropdown-input_input]:!w-full [&_.stdropdown-input_input]:!border-none [&_.stdropdown-input_input]:!rounded-none [&_.stdropdown-input_input]:!shadow-none [&_.stdropdown-input_input]:!outline-none [&_.stdropdown-input_input]:!ring-0 [&_.stdropdown-input_input]:!bg-transparent [&_.stdropdown-input_input]:!p-0 [&_.stdropdown-input_input]:text-sm ${errors.addressCity ? "[&_.stdropdown-container]:!border-red-400" : ""}`}
+                >
+                  <CitySelect
+                    key={`city-${state.step1.countryId}-${state.step1.stateId}`}
+                    countryid={state.step1.countryId}
+                    stateid={state.step1.stateId}
+                    containerClassName="w-full"
+                    inputClassName="w-full"
+                    onChange={(val) => {
+                      const c = val as { name: string } | null;
+                      setState((prev) => ({
+                        ...prev,
+                        step1: { ...prev.step1, addressCity: c?.name ?? "" },
+                      }));
+                      clearErr("addressCity");
+                    }}
+                    placeHolder={
+                      state.step1.stateId
+                        ? "--Select--"
+                        : "Select a state first"
+                    }
+                    disabled={!state.step1.stateId}
+                  />
+                </div>
+                {errors.addressCity && (
+                  <p role="alert" className="text-xs text-red-500">
+                    {errors.addressCity}
+                  </p>
+                )}
+              </Field>
+
+              {/* LGA — free text, relevant mainly for Nigeria */}
+              <Field
+                label="Local Government Area (LGA)"
+                error={errors.addressLga}
+                hint="If applicable — e.g. Agege, Surulere, Ikeja"
               >
                 <input
-                  value={state.step1.homeAddress}
-                  placeholder="Enter your address"
+                  value={state.step1.addressLga}
+                  placeholder="Enter your LGA"
                   onChange={(e) => {
                     patch("step1", {
                       ...state.step1,
-                      homeAddress: e.target.value,
+                      addressLga: e.target.value,
                     });
-                    clearErr("homeAddress");
+                    clearErr("addressLga");
                   }}
-                  className={inputCls(errors.homeAddress)}
+                  className={inputCls(errors.addressLga)}
+                />
+              </Field>
+
+              {/* Street address */}
+              <Field
+                label="Street Address"
+                required
+                error={errors.addressStreet}
+                hint="House number, street name, and any additional details"
+              >
+                <input
+                  value={state.step1.addressStreet}
+                  placeholder="E.g. 12 Bode Thomas Street, Surulere"
+                  onChange={(e) => {
+                    patch("step1", {
+                      ...state.step1,
+                      addressStreet: e.target.value,
+                    });
+                    clearErr("addressStreet");
+                  }}
+                  className={inputCls(errors.addressStreet)}
                 />
               </Field>
             </div>
@@ -1104,9 +1560,9 @@ const EligibilityTestPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Identity Verification card */}
+            {/* Identity card */}
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
-              {/* Card header */}
+              {/* Header */}
               <div className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200">
                   <svg
@@ -1130,7 +1586,7 @@ const EligibilityTestPage: React.FC = () => {
                 Verify your identity using your BVN or NIN for faster processing
               </p>
 
-              {/* BVN / NIN tab toggle */}
+              {/* Tab toggle */}
               <div className="flex rounded-lg border border-gray-200 overflow-hidden">
                 {(["bvn", "nin"] as const).map((tab) => (
                   <button
@@ -1151,7 +1607,7 @@ const EligibilityTestPage: React.FC = () => {
                 ))}
               </div>
 
-              {/* BVN input */}
+              {/* ── BVN tab — no Verify button ── */}
               {state.step2.bvnOrNin === "bvn" && (
                 <Field
                   label="Bank Verification Number (BVN)"
@@ -1208,50 +1664,36 @@ const EligibilityTestPage: React.FC = () => {
                         </button>
                       </div>
                     ) : (
-                      <>
-                        <input
-                          value={state.step2.bvn}
-                          maxLength={11}
-                          inputMode="numeric"
-                          placeholder="Enter your 11-digit BVN"
-                          onChange={(e) => {
-                            patch("step2", {
-                              ...state.step2,
-                              bvn: e.target.value.replace(/\D/g, ""),
-                              bvnStatus: "idle",
-                            });
-                            clearErr("bvn");
-                          }}
-                          className="flex-1 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!/^\d{11}$/.test(state.step2.bvn)) {
-                              setErrors((p) => ({
-                                ...p,
-                                bvn: "BVN must be exactly 11 digits.",
-                              }));
-                            }
-                            // In production: call verify API here, set bvnStatus accordingly
-                          }}
-                          className="shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 hover:text-[#8B1C53] border-l border-gray-200 bg-gray-50 transition-colors"
-                        >
-                          Verify
-                        </button>
-                      </>
+                      <input
+                        value={state.step2.bvn}
+                        maxLength={11}
+                        inputMode="numeric"
+                        placeholder="Enter your 11-digit BVN"
+                        onChange={(e) => {
+                          patch("step2", {
+                            ...state.step2,
+                            bvn: e.target.value.replace(/\D/g, ""),
+                            bvnStatus: "idle",
+                          });
+                          clearErr("bvn");
+                        }}
+                        className="flex-1 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none"
+                      />
                     )}
                   </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Your BVN will be verified when you submit this step.
+                  </p>
                   {state.step2.bvnStatus === "error" && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Visit your nearest BVN enrollment center or check your NIN
-                      slip
+                    <p className="text-xs text-gray-400">
+                      Visit your nearest BVN enrollment center or use your NIN
+                      instead.
                     </p>
                   )}
                 </Field>
               )}
 
-              {/* NIN input */}
+              {/* ── NIN tab — Verify button wired to backend ── */}
               {state.step2.bvnOrNin === "nin" && (
                 <Field
                   label="National Identification Number (NIN)"
@@ -1266,25 +1708,121 @@ const EligibilityTestPage: React.FC = () => {
                       maxLength={11}
                       inputMode="numeric"
                       placeholder="Enter your 11-digit NIN"
+                      disabled={
+                        state.step2.ninStatus === "verifying" ||
+                        state.step2.ninStatus === "verified"
+                      }
                       onChange={(e) => {
                         patch("step2", {
                           ...state.step2,
                           nin: e.target.value.replace(/\D/g, ""),
+                          ninStatus: "idle",
+                          ninData: null,
                         });
                         clearErr("nin");
                       }}
-                      className="flex-1 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none"
+                      className="flex-1 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none disabled:opacity-60"
                     />
-                    <button
-                      type="button"
-                      className="shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 hover:text-[#8B1C53] border-l border-gray-200 bg-gray-50 transition-colors"
-                    >
-                      Verify
-                    </button>
+                    {state.step2.ninStatus === "verified" ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          patch("step2", {
+                            ...state.step2,
+                            nin: "",
+                            ninStatus: "idle",
+                            ninData: null,
+                          })
+                        }
+                        className="shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 hover:text-[#8B1C53] border-l border-gray-200 bg-gray-50 transition-colors flex items-center gap-1"
+                        aria-label="Clear NIN and re-enter"
+                      >
+                        <RefreshIcon /> Change
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleVerifyNin}
+                        disabled={state.step2.ninStatus === "verifying"}
+                        className="shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 hover:text-[#8B1C53] border-l border-gray-200 bg-gray-50 transition-colors disabled:opacity-50"
+                      >
+                        {state.step2.ninStatus === "verifying"
+                          ? "Verifying…"
+                          : "Verify"}
+                      </button>
+                    )}
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
                     11-digit NIN from your NIMC slip or National ID card
                   </p>
+
+                  {/* NIN verified result card */}
+                  {state.step2.ninStatus === "verified" &&
+                    state.step2.ninData && (
+                      <div className="mt-3 rounded-xl border border-green-200 bg-green-50 p-4 flex flex-col gap-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          {state.step2.ninData.image_url && (
+                            <img
+                              src={state.step2.ninData.image_url}
+                              alt="NIN photo"
+                              className="h-12 w-12 rounded-full object-cover border border-green-300 shrink-0"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display =
+                                  "none";
+                              }}
+                            />
+                          )}
+                          <div>
+                            <p className="text-sm font-semibold text-green-700 flex items-center gap-1">
+                              <CheckIcon className="w-4 h-4" /> NIN Verified
+                            </p>
+                            <p className="text-xs text-green-600">
+                              {[
+                                state.step2.ninData.first_name,
+                                state.step2.ninData.middle_name,
+                                state.step2.ninData.last_name,
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-green-700">
+                          {state.step2.ninData.dob && (
+                            <span>
+                              <span className="text-green-500">DOB:</span>{" "}
+                              {state.step2.ninData.formatted_dob ||
+                                state.step2.ninData.dob}
+                            </span>
+                          )}
+                          {state.step2.ninData.gender && (
+                            <span>
+                              <span className="text-green-500">Gender:</span>{" "}
+                              {state.step2.ninData.gender}
+                            </span>
+                          )}
+                          {state.step2.ninData.mobile && (
+                            <span>
+                              <span className="text-green-500">Phone:</span>{" "}
+                              {state.step2.ninData.mobile}
+                            </span>
+                          )}
+                          {state.step2.ninData.state_of_residence && (
+                            <span>
+                              <span className="text-green-500">State:</span>{" "}
+                              {state.step2.ninData.state_of_residence}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* NIN error state */}
+                  {state.step2.ninStatus === "error" && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Verification failed. Please check your NIN and try again.
+                    </p>
+                  )}
                 </Field>
               )}
             </div>
@@ -1321,22 +1859,20 @@ const EligibilityTestPage: React.FC = () => {
 
               {/* Drop zone */}
               <div
-                className={`rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 py-10 cursor-pointer ${
+                className={`rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 py-10 ${
                   state.step2.selectedDocType
-                    ? "border-gray-300 hover:border-[#8B1C53]/50 bg-white"
+                    ? "border-gray-300 hover:border-[#8B1C53]/50 bg-white cursor-pointer"
                     : "border-gray-200 bg-gray-50 cursor-not-allowed"
                 }`}
                 onClick={() =>
-                  state.step2.selectedDocType && fileInputRef.current?.click()
+                  state.step2.selectedDocType &&
+                  docFileInputRef.current?.click()
                 }
-                onDragOver={(e) => {
-                  e.preventDefault();
-                }}
+                onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
-                  const file = e.dataTransfer.files?.[0];
-                  if (file && state.step2.selectedDocType)
-                    handleFileSelect(file);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f && state.step2.selectedDocType) handleFileSelect(f);
                 }}
                 role="button"
                 aria-label="Upload document"
@@ -1345,7 +1881,7 @@ const EligibilityTestPage: React.FC = () => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     state.step2.selectedDocType &&
-                      fileInputRef.current?.click();
+                      docFileInputRef.current?.click();
                   }
                 }}
               >
@@ -1354,7 +1890,7 @@ const EligibilityTestPage: React.FC = () => {
                   className={`text-sm font-medium ${state.step2.selectedDocType ? "text-gray-600" : "text-gray-400"}`}
                 >
                   {state.step2.selectedDocType
-                    ? "Select a document type to enable upload"
+                    ? "Click or drag a file here"
                     : "Select a document type to enable upload"}
                 </p>
                 <p className="text-xs text-gray-400">
@@ -1365,20 +1901,20 @@ const EligibilityTestPage: React.FC = () => {
                   disabled={!state.step2.selectedDocType}
                   onClick={(e) => {
                     e.stopPropagation();
-                    fileInputRef.current?.click();
+                    docFileInputRef.current?.click();
                   }}
                   className="mt-2 rounded-full bg-[#8B1C53] px-6 py-2 text-sm font-semibold text-white hover:bg-[#7a1848] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  Browser
+                  Browse
                 </button>
                 <input
-                  ref={fileInputRef}
+                  ref={docFileInputRef}
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
                   className="hidden"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileSelect(file);
+                    const f = e.target.files?.[0];
+                    if (f) handleFileSelect(f);
                   }}
                 />
               </div>
@@ -1397,19 +1933,16 @@ const EligibilityTestPage: React.FC = () => {
                   Uploaded documents
                 </p>
                 <div className="rounded-xl border border-gray-200 overflow-hidden">
-                  {/* Table header */}
                   <div className="grid grid-cols-[1fr_100px_80px] bg-[#FBF4FD] px-4 py-2.5 text-xs font-semibold text-[#8B1C53]">
                     <span>Document</span>
                     <span className="text-center">Status</span>
                     <span className="text-right">Actions</span>
                   </div>
-                  {/* Table rows */}
                   {state.step2.uploadedDocs.map((doc) => (
                     <div
                       key={doc.id}
                       className="grid grid-cols-[1fr_100px_80px] items-center px-4 py-3 border-t border-gray-100"
                     >
-                      {/* Document name + size */}
                       <div className="flex items-center gap-2 min-w-0">
                         <PaperclipIcon />
                         <div className="min-w-0">
@@ -1419,12 +1952,10 @@ const EligibilityTestPage: React.FC = () => {
                           <p className="text-xs text-gray-400">{doc.size}</p>
                         </div>
                       </div>
-                      {/* Status badge */}
                       <div className="flex justify-center">
                         {doc.status === "verified" ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-semibold text-green-600">
-                            <CheckIcon className="w-3 h-3" />
-                            Verified
+                            <CheckIcon className="w-3 h-3" /> Verified
                           </span>
                         ) : doc.status === "failed" ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-500">
@@ -1436,7 +1967,6 @@ const EligibilityTestPage: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      {/* Actions */}
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
@@ -1471,71 +2001,48 @@ const EligibilityTestPage: React.FC = () => {
               </h2>
               <p className="mt-1 text-sm text-gray-500">
                 Select your child's school and choose a tuition plan that fits
-                your needs. Your application will be linked directly to the
-                school for payment.
+                your needs.
               </p>
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
-              {/* Institution Type */}
+              {/* ── 1. Institution Type ── */}
               <Field
                 label="Institution Type"
                 required
                 error={errors.institutionType}
-                hint="Choose whether your child attends a primary, secondary, or tertiary institution."
-              >
-                <SelectWithChevron
-                  value={state.step3.institutionType}
-                  onChange={(v) => {
-                    patch("step3", {
-                      ...state.step3,
-                      institutionType: v,
-                      gradeLevel: "",
-                      schoolId: "",
-                      schoolName: "",
-                    });
-                    clearErr("institutionType");
-                  }}
-                  placeholder="-Select institution level-"
-                  options={INSTITUTION_TYPES}
-                  error={errors.institutionType}
-                />
-              </Field>
-
-              {/* Choose Student School */}
-              <Field
-                label="Choose Student School"
-                required
-                error={errors.schoolId}
-                hint="Only schools partnered with Skulcredit will appear here."
+                hint="Choose whether your child attends a nursery, primary, secondary, or tertiary institution."
               >
                 <div className="relative">
                   <select
-                    value={state.step3.schoolId}
+                    value={state.step3.institutionTypeId}
+                    disabled={loadingTypes}
                     onChange={(e) => {
-                      const selected = schools.find(
-                        (s) => s.id === e.target.value,
+                      const selected = institutionTypes.find(
+                        (t) => t.id === e.target.value,
                       );
                       patch("step3", {
                         ...state.step3,
-                        schoolId: e.target.value,
-                        schoolName: selected?.schoolName ?? "",
+                        institutionTypeId: e.target.value,
+                        institutionType: selected?.name ?? "",
+                        // reset dependent fields
+                        schoolId: "",
+                        schoolName: "",
+                        gradeLevel: "",
                       });
-                      clearErr("schoolId");
+                      clearErr("institutionType");
                     }}
-                    disabled={loadingSchools}
                     className={
-                      selectCls(errors.schoolId) +
-                      (loadingSchools ? " opacity-60 cursor-wait" : "")
+                      selectCls(errors.institutionType) +
+                      (loadingTypes ? " opacity-60 cursor-wait" : "")
                     }
                   >
                     <option value="">
-                      {loadingSchools ? "Loading schools…" : "-Choose School-"}
+                      {loadingTypes ? "Loading…" : "-Select institution level-"}
                     </option>
-                    {schools.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.schoolName}
-                        {s.addressCity ? ` – ${s.addressCity}` : ""}
+                    {institutionTypes.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
                       </option>
                     ))}
                   </select>
@@ -1554,31 +2061,145 @@ const EligibilityTestPage: React.FC = () => {
                 </div>
               </Field>
 
-              {/* Class / Level */}
+              {/* ── 2. Choose Student School ── */}
+              <Field
+                label="Choose Student School"
+                required
+                error={errors.schoolId}
+                hint={
+                  !state.step3.institutionTypeId
+                    ? "Select an institution type first"
+                    : "Schools available for the selected institution type"
+                }
+              >
+                <div className="relative">
+                  <select
+                    value={state.step3.schoolId}
+                    disabled={!state.step3.institutionTypeId || loadingSchools}
+                    onChange={(e) => {
+                      const selected = schools.find(
+                        (s) => s.id === e.target.value,
+                      );
+                      patch("step3", {
+                        ...state.step3,
+                        schoolId: e.target.value,
+                        schoolName: selected?.name ?? "",
+                        // reset class level
+                        gradeLevel: "",
+                      });
+                      clearErr("schoolId");
+                    }}
+                    className={
+                      selectCls(errors.schoolId) +
+                      (!state.step3.institutionTypeId || loadingSchools
+                        ? " opacity-60 cursor-not-allowed"
+                        : "")
+                    }
+                  >
+                    <option value="">
+                      {loadingSchools
+                        ? "Loading schools…"
+                        : !state.step3.institutionTypeId
+                          ? "Select institution type first"
+                          : schools.length === 0
+                            ? "No schools available"
+                            : "-Choose School-"}
+                    </option>
+                    {schools.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                    aria-hidden="true"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+              </Field>
+
+              {/* ── 3. Class / Level ── */}
               <Field
                 label="Class/Level"
                 required
                 error={errors.gradeLevel}
-                hint="Choose student class or level"
+                hint={
+                  !state.step3.schoolId
+                    ? "Select a school first"
+                    : "Choose the student's current class or level"
+                }
               >
-                <SelectWithChevron
-                  value={state.step3.gradeLevel}
-                  onChange={(v) => {
-                    patch("step3", { ...state.step3, gradeLevel: v });
-                    clearErr("gradeLevel");
-                  }}
-                  placeholder="-Choose Student Class/Level-"
-                  options={
-                    state.step3.institutionType
-                      ? (GRADE_LEVELS[state.step3.institutionType] ?? [])
-                      : []
-                  }
-                  error={errors.gradeLevel}
-                  disabled={!state.step3.institutionType}
-                />
+                <div className="relative">
+                  <select
+                    value={state.step3.gradeLevel}
+                    disabled={!state.step3.schoolId || loadingClasses}
+                    onChange={(e) => {
+                      patch("step3", {
+                        ...state.step3,
+                        gradeLevel: e.target.value,
+                      });
+                      clearErr("gradeLevel");
+                    }}
+                    className={
+                      selectCls(errors.gradeLevel) +
+                      (!state.step3.schoolId || loadingClasses
+                        ? " opacity-60 cursor-not-allowed"
+                        : "")
+                    }
+                  >
+                    <option value="">
+                      {loadingClasses
+                        ? "Loading classes…"
+                        : !state.step3.schoolId
+                          ? "Select a school first"
+                          : "-Choose Student Class/Level-"}
+                    </option>
+                    {classLevelGroups.map((group) =>
+                      group.subLevelGroup ? (
+                        // Grouped — e.g. Junior Secondary / Senior Secondary
+                        <optgroup
+                          key={group.subLevelGroup}
+                          label={group.subLevelGroup}
+                        >
+                          {group.classes.map((cls) => (
+                            <option key={cls.id} value={cls.name}>
+                              {cls.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ) : (
+                        // Flat — Nursery / Primary classes
+                        group.classes.map((cls) => (
+                          <option key={cls.id} value={cls.name}>
+                            {cls.name}
+                          </option>
+                        ))
+                      ),
+                    )}
+                  </select>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                    aria-hidden="true"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
               </Field>
 
-              {/* Choose Repayment Plan */}
               <Field
                 label="Choose Repayment Plan"
                 required
@@ -1597,7 +2218,6 @@ const EligibilityTestPage: React.FC = () => {
                 />
               </Field>
 
-              {/* Academic Session / Term */}
               <Field
                 label="Academy Session/Term"
                 required
@@ -1617,7 +2237,6 @@ const EligibilityTestPage: React.FC = () => {
               </Field>
             </div>
 
-            {/* Selection Summary */}
             {(state.step3.schoolId || state.step3.gradeLevel) && (
               <div className="rounded-xl border border-gray-200 bg-white p-5">
                 <p className="text-sm font-semibold text-[#8B1C53] mb-3">
@@ -1642,7 +2261,7 @@ const EligibilityTestPage: React.FC = () => {
                   {state.step3.tuitionAmount && (
                     <Row
                       label="Tuition Fee"
-                      value={`#${Number(state.step3.tuitionAmount).toLocaleString()}`}
+                      value={`₦${Number(state.step3.tuitionAmount).toLocaleString()}`}
                     />
                   )}
                   {state.step3.repaymentPlan && (
@@ -1654,7 +2273,7 @@ const EligibilityTestPage: React.FC = () => {
           </div>
         )}
 
-        {/* ── STEP 4 — Student Information + Review ── */}
+        {/* ── STEP 4 — Student Information ── */}
         {state.step === 3 && (
           <div className="flex flex-col gap-6 animate-fade-in-up">
             <div>
@@ -1830,7 +2449,6 @@ const EligibilityTestPage: React.FC = () => {
           </div>
         )}
 
-        {/* ── Navigation ── */}
         <div className="flex items-center justify-between mt-8 pt-4 border-t border-gray-100">
           {state.step > 0 ? (
             <button
@@ -1851,7 +2469,9 @@ const EligibilityTestPage: React.FC = () => {
             className="rounded-full bg-[#8B1C53] px-8 py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-60 min-w-[100px]"
           >
             {state.isSubmitting
-              ? "Please wait…"
+              ? state.step1.photoUploading
+                ? "Uploading photo…"
+                : "Please wait…"
               : state.step === 3
                 ? "Submit Application"
                 : "Next"}
@@ -1861,5 +2481,7 @@ const EligibilityTestPage: React.FC = () => {
     </div>
   );
 };
+
+void tenorFromPlan;
 
 export default EligibilityTestPage;

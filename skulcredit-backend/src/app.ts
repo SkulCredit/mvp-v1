@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import path from "path";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import swaggerUi from "swagger-ui-express";
@@ -79,6 +80,16 @@ app.get("/api/v1/docs.json", (req, res) => {
 });
 
 app.use("/api/v1", routes);
+
+// ── Serve uploaded files ────────────────────────────────────────────────────
+// Files are stored at <UPLOADS_DIR>/ on disk and accessible at /uploads/*
+app.use(
+  "/uploads",
+  express.static(path.resolve(process.cwd(), env.uploads.dir), {
+    dotfiles: "deny",
+    index: false,
+  }),
+);
 
 app.use(errorHandler);
 
