@@ -462,11 +462,7 @@ const ParentDashboardPage: React.FC = () => {
       )}
 
       {/* ══════════════════ APPLICATIONS TAB ═══════════════════ */}
-      {activeTab === "applications" && (
-        <MyApplicationsPage
-          onNewApplication={() => navigate("/parent/eligibility")}
-        />
-      )}
+      {activeTab === "applications" && <MyApplicationsPage />}
 
       {/* ══════════════════ REPAYMENT TAB ══════════════════════ */}
       {activeTab === "repayment" && (

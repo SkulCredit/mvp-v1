@@ -977,6 +977,43 @@ const EligibilityTestPage: React.FC = () => {
 
       await parentService.verifyKYC(kycPayload);
 
+      // ── 5. Save each student from step 4 ─────────────────────────────────
+      // Students are saved with parentId (set server-side from the auth token)
+      // and the schoolId from step 3.  tuitionAmount defaults to 0 here —
+      // the parent will set the actual amount when applying via /parent/details.
+      const tuitionAmountNum = parseFloat(state.step3.tuitionAmount) || 0;
+      const studentSaveErrors: string[] = [];
+
+      for (const st of state.step4.students) {
+        if (!st.fullName.trim()) continue; // skip blank rows
+        const nameParts = st.fullName.trim().split(/\s+/);
+        const firstName = nameParts[0] ?? "";
+        const lastName = nameParts.slice(1).join(" ") || firstName;
+
+        try {
+          await parentService.addStudent({
+            schoolId: state.step3.schoolId,
+            firstName,
+            lastName,
+            studentId: st.admissionNumber || undefined,
+            gradeLevel: state.step3.gradeLevel,
+            tuitionAmount: tuitionAmountNum,
+          });
+        } catch (err) {
+          // Log individual failures but don't abort — other students can still save
+          studentSaveErrors.push(
+            `${st.fullName}: ${(err as { message?: string }).message ?? "Save failed"}`,
+          );
+        }
+      }
+
+      if (studentSaveErrors.length > 0) {
+        // Non-fatal — KYC succeeded, just warn about the student saves
+        showToast(
+          `KYC submitted. Some students could not be saved: ${studentSaveErrors.join("; ")}`,
+        );
+      }
+
       patch("showSuccess", true);
     } catch (err) {
       showToast(

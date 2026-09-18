@@ -308,7 +308,7 @@ const ParentDashboardHomePage: React.FC = () => {
       )}
 
       {/* ── Tuition support CTA ─────── */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl bg-white border border-gray-100 shadow-sm px-5 py-4">
         <div>
           <p className="text-sm font-bold text-gray-800">
             Need Tuition Support?
@@ -318,7 +318,7 @@ const ParentDashboardHomePage: React.FC = () => {
           </p>
         </div>
         <Button
-          className="flex items-center gap-1.5 shrink-0"
+          className="flex items-center justify-center gap-1.5 w-full sm:w-auto shrink-0"
           onClick={() => navigate("/parent/details")}
         >
           <PlusIcon />
