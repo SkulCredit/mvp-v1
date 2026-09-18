@@ -230,4 +230,38 @@ router.post(
   parentController.submitWizardApplicationJson.bind(parentController),
 );
 
+/**
+ * @swagger
+ * /parents/score-check:
+ *   post:
+ *     summary: Check loan score / karma before KYC (step 2 of eligibility wizard)
+ *     tags: [Parent]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [bvn]
+ *             properties:
+ *               bvn:
+ *                 type: string
+ *                 example: "22222222222"
+ *               requestedAmount:
+ *                 type: number
+ *                 default: 100
+ *               location:
+ *                 type: string
+ *                 default: "Lagos"
+ *     responses:
+ *       200:
+ *         description: Score check result
+ */
+router.post(
+  "/score-check",
+  parentController.checkLoanScore.bind(parentController),
+);
+
 export default router;
