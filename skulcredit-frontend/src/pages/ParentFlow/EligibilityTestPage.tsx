@@ -4,7 +4,11 @@ import { useAuth } from "../../context/AuthContext";
 import apiClient from "../../services/apiClient";
 import {
   parentService,
+  catalogService,
   NinVerificationData,
+  CatalogInstitutionType,
+  CatalogSchool,
+  CatalogClassLevelGroup,
 } from "../../services/parentService";
 import {
   CountrySelect,
@@ -372,13 +376,6 @@ const INCOME_RANGES = [
   "₦500,001 – ₦1,000,000",
   "Above ₦1,000,000",
 ];
-const INSTITUTION_TYPES = [
-  "Nursery",
-  "Primary",
-  "Secondary",
-  "Tertiary",
-  "Vocational",
-];
 const REPAYMENT_PLANS = [
   "3-month Installment",
   "6-month Installment",
@@ -391,20 +388,6 @@ const SESSIONS = [
   "2025/2026-First Semester",
   "2025/2026-Second Semester",
 ];
-const GRADE_LEVELS: Record<string, string[]> = {
-  Nursery: ["Creche", "Nursery 1", "Nursery 2", "Nursery 3"],
-  Primary: [
-    "Primary 1",
-    "Primary 2",
-    "Primary 3",
-    "Primary 4",
-    "Primary 5",
-    "Primary 6",
-  ],
-  Secondary: ["JSS 1", "JSS 2", "JSS 3", "SS 1", "SS 2", "SS 3"],
-  Tertiary: ["100L", "200L", "300L", "400L", "500L", "6th Year"],
-  Vocational: ["Year 1", "Year 2", "Year 3"],
-};
 const DOCUMENT_TYPES = [
   "Bank Statement (Last 3 Months)",
   "Employment Letter or Business registration",
@@ -421,8 +404,8 @@ const tenorFromPlan = (plan: string): number => {
 interface Step1Data {
   fullName: string;
   email: string;
-  phone: string; 
-  phoneCountry: Country; 
+  phone: string;
+  phoneCountry: Country;
   relationship: string;
   employerType: string;
   yearsInRole: string;
@@ -431,8 +414,8 @@ interface Step1Data {
   stateId: number;
   addressCountryName: string;
   addressState: string;
-  addressCity: string; 
-  addressLga: string; 
+  addressCity: string;
+  addressLga: string;
   addressStreet: string;
   dob: string;
   photoUrl: string;
@@ -463,10 +446,11 @@ interface Step2Data {
 }
 
 interface Step3Data {
-  institutionType: string;
-  schoolId: string;
-  schoolName: string;
-  gradeLevel: string;
+  institutionTypeId: string; // UUID from catalog API
+  institutionType: string; // display name
+  schoolId: string; // UUID from catalog API
+  schoolName: string; // display name
+  gradeLevel: string; // class name string (display value)
   repaymentPlan: string;
   academicSession: string;
   tuitionAmount: string;
@@ -493,13 +477,6 @@ interface WizardState {
   applicationRef: string | null;
   isSubmitting: boolean;
   showSuccess: boolean;
-}
-
-interface School {
-  id: string;
-  schoolName: string;
-  addressCity: string;
-  addressState: string;
 }
 
 // ── Shared components ─────────────────────────────────────────────────────────
@@ -636,9 +613,19 @@ const EligibilityTestPage: React.FC = () => {
   const docFileInputRef = useRef<HTMLInputElement>(null);
   const photoFileInputRef = useRef<HTMLInputElement>(null);
 
-  const [schools, setSchools] = useState<School[]>([]);
+  const [schools, setSchools] = useState<CatalogSchool[]>([]);
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // ── Catalog state ─────────────────────────────────────────────────────────
+  const [institutionTypes, setInstitutionTypes] = useState<
+    CatalogInstitutionType[]
+  >([]);
+  const [loadingTypes, setLoadingTypes] = useState(false);
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [classLevelGroups, setClassLevelGroups] = useState<
+    CatalogClassLevelGroup[]
+  >([]);
 
   const [state, setState] = useState<WizardState>({
     step: 0,
@@ -677,6 +664,7 @@ const EligibilityTestPage: React.FC = () => {
       uploadedDocs: [],
     },
     step3: {
+      institutionTypeId: "",
       institutionType: "",
       schoolId: "",
       schoolName: "",
@@ -704,50 +692,48 @@ const EligibilityTestPage: React.FC = () => {
       return n;
     });
 
-  const mockSchools: School[] = [
-    {
-      id: "school-001",
-      schoolName: "University of Ibadan",
-      addressCity: "Ibadan",
-      addressState: "Oyo",
-    },
-    {
-      id: "school-002",
-      schoolName: "Lead City University",
-      addressCity: "Ibadan",
-      addressState: "Oyo",
-    },
-    {
-      id: "school-003",
-      schoolName: "Lagos State University",
-      addressCity: "Lagos",
-      addressState: "Lagos",
-    },
-    {
-      id: "school-004",
-      schoolName: "University of Lagos",
-      addressCity: "Lagos",
-      addressState: "Lagos",
-    },
-    {
-      id: "school-005",
-      schoolName: "Covenant University",
-      addressCity: "Ota",
-      addressState: "Ogun",
-    },
-  ];
-
-  const loadSchools = useCallback(() => {
-    setLoadingSchools(true);
-    setTimeout(() => {
-      setSchools(mockSchools);
-      setLoadingSchools(false);
-    }, 500);
-  }, []);
-
+  // ── Catalog: fetch institution types when entering step 3 ────────────────
   useEffect(() => {
-    if (state.step === 2) loadSchools();
-  }, [state.step, loadSchools]);
+    if (state.step !== 2) return;
+    setLoadingTypes(true);
+    catalogService
+      .getInstitutionTypes()
+      .then(setInstitutionTypes)
+      .catch(() =>
+        showToast("Failed to load institution types. Please try again."),
+      )
+      .finally(() => setLoadingTypes(false));
+  }, [state.step]);
+
+  // ── Catalog: fetch schools when an institution type is chosen ────────────
+  useEffect(() => {
+    if (!state.step3.institutionTypeId) {
+      setSchools([]);
+      return;
+    }
+    setLoadingSchools(true);
+    setSchools([]);
+    catalogService
+      .getSchools(state.step3.institutionTypeId)
+      .then(setSchools)
+      .catch(() => showToast("Failed to load schools. Please try again."))
+      .finally(() => setLoadingSchools(false));
+  }, [state.step3.institutionTypeId]);
+
+  // ── Catalog: fetch class levels when a school is chosen ──────────────────
+  useEffect(() => {
+    if (!state.step3.schoolId || !state.step3.institutionTypeId) {
+      setClassLevelGroups([]);
+      return;
+    }
+    setLoadingClasses(true);
+    setClassLevelGroups([]);
+    catalogService
+      .getClassLevels(state.step3.schoolId, state.step3.institutionTypeId)
+      .then(setClassLevelGroups)
+      .catch(() => showToast("Failed to load class levels. Please try again."))
+      .finally(() => setLoadingClasses(false));
+  }, [state.step3.schoolId, state.step3.institutionTypeId]);
 
   const handlePhotoSelect = (file: File) => {
     if (state.step1.photoPreview) URL.revokeObjectURL(state.step1.photoPreview);
@@ -758,7 +744,7 @@ const EligibilityTestPage: React.FC = () => {
         ...prev.step1,
         photoFile: file,
         photoPreview: preview,
-        photoUrl: "", 
+        photoUrl: "",
       },
     }));
     clearErr("photo");
@@ -869,7 +855,8 @@ const EligibilityTestPage: React.FC = () => {
   const validateStep3 = (): boolean => {
     const e: Record<string, string> = {};
     const s = state.step3;
-    if (!s.institutionType) e.institutionType = "Institution type is required.";
+    if (!s.institutionTypeId)
+      e.institutionType = "Institution type is required.";
     if (!s.schoolId) e.schoolId = "Please select a school.";
     if (!s.gradeLevel) e.gradeLevel = "Class/level is required.";
     if (!s.repaymentPlan) e.repaymentPlan = "Please choose a repayment plan.";
@@ -2019,63 +2006,43 @@ const EligibilityTestPage: React.FC = () => {
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
+              {/* ── 1. Institution Type ── */}
               <Field
                 label="Institution Type"
                 required
                 error={errors.institutionType}
-                hint="Choose whether your child attends a primary, secondary, or tertiary institution."
-              >
-                <SelectWithChevron
-                  value={state.step3.institutionType}
-                  onChange={(v) => {
-                    patch("step3", {
-                      ...state.step3,
-                      institutionType: v,
-                      gradeLevel: "",
-                      schoolId: "",
-                      schoolName: "",
-                    });
-                    clearErr("institutionType");
-                  }}
-                  placeholder="-Select institution level-"
-                  options={INSTITUTION_TYPES}
-                  error={errors.institutionType}
-                />
-              </Field>
-
-              <Field
-                label="Choose Student School"
-                required
-                error={errors.schoolId}
-                hint="Only schools partnered with Skulcredit will appear here."
+                hint="Choose whether your child attends a nursery, primary, secondary, or tertiary institution."
               >
                 <div className="relative">
                   <select
-                    value={state.step3.schoolId}
+                    value={state.step3.institutionTypeId}
+                    disabled={loadingTypes}
                     onChange={(e) => {
-                      const selected = schools.find(
-                        (s) => s.id === e.target.value,
+                      const selected = institutionTypes.find(
+                        (t) => t.id === e.target.value,
                       );
                       patch("step3", {
                         ...state.step3,
-                        schoolId: e.target.value,
-                        schoolName: selected?.schoolName ?? "",
+                        institutionTypeId: e.target.value,
+                        institutionType: selected?.name ?? "",
+                        // reset dependent fields
+                        schoolId: "",
+                        schoolName: "",
+                        gradeLevel: "",
                       });
-                      clearErr("schoolId");
+                      clearErr("institutionType");
                     }}
-                    disabled={loadingSchools}
                     className={
-                      selectCls(errors.schoolId) +
-                      (loadingSchools ? " opacity-60 cursor-wait" : "")
+                      selectCls(errors.institutionType) +
+                      (loadingTypes ? " opacity-60 cursor-wait" : "")
                     }
                   >
                     <option value="">
-                      {loadingSchools ? "Loading schools…" : "-Choose School-"}
+                      {loadingTypes ? "Loading…" : "-Select institution level-"}
                     </option>
-                    {schools.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.schoolName}
-                        {s.addressCity ? ` – ${s.addressCity}` : ""}
+                    {institutionTypes.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
                       </option>
                     ))}
                   </select>
@@ -2094,27 +2061,143 @@ const EligibilityTestPage: React.FC = () => {
                 </div>
               </Field>
 
+              {/* ── 2. Choose Student School ── */}
+              <Field
+                label="Choose Student School"
+                required
+                error={errors.schoolId}
+                hint={
+                  !state.step3.institutionTypeId
+                    ? "Select an institution type first"
+                    : "Schools available for the selected institution type"
+                }
+              >
+                <div className="relative">
+                  <select
+                    value={state.step3.schoolId}
+                    disabled={!state.step3.institutionTypeId || loadingSchools}
+                    onChange={(e) => {
+                      const selected = schools.find(
+                        (s) => s.id === e.target.value,
+                      );
+                      patch("step3", {
+                        ...state.step3,
+                        schoolId: e.target.value,
+                        schoolName: selected?.name ?? "",
+                        // reset class level
+                        gradeLevel: "",
+                      });
+                      clearErr("schoolId");
+                    }}
+                    className={
+                      selectCls(errors.schoolId) +
+                      (!state.step3.institutionTypeId || loadingSchools
+                        ? " opacity-60 cursor-not-allowed"
+                        : "")
+                    }
+                  >
+                    <option value="">
+                      {loadingSchools
+                        ? "Loading schools…"
+                        : !state.step3.institutionTypeId
+                          ? "Select institution type first"
+                          : schools.length === 0
+                            ? "No schools available"
+                            : "-Choose School-"}
+                    </option>
+                    {schools.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                    aria-hidden="true"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+              </Field>
+
+              {/* ── 3. Class / Level ── */}
               <Field
                 label="Class/Level"
                 required
                 error={errors.gradeLevel}
-                hint="Choose student class or level"
+                hint={
+                  !state.step3.schoolId
+                    ? "Select a school first"
+                    : "Choose the student's current class or level"
+                }
               >
-                <SelectWithChevron
-                  value={state.step3.gradeLevel}
-                  onChange={(v) => {
-                    patch("step3", { ...state.step3, gradeLevel: v });
-                    clearErr("gradeLevel");
-                  }}
-                  placeholder="-Choose Student Class/Level-"
-                  options={
-                    state.step3.institutionType
-                      ? (GRADE_LEVELS[state.step3.institutionType] ?? [])
-                      : []
-                  }
-                  error={errors.gradeLevel}
-                  disabled={!state.step3.institutionType}
-                />
+                <div className="relative">
+                  <select
+                    value={state.step3.gradeLevel}
+                    disabled={!state.step3.schoolId || loadingClasses}
+                    onChange={(e) => {
+                      patch("step3", {
+                        ...state.step3,
+                        gradeLevel: e.target.value,
+                      });
+                      clearErr("gradeLevel");
+                    }}
+                    className={
+                      selectCls(errors.gradeLevel) +
+                      (!state.step3.schoolId || loadingClasses
+                        ? " opacity-60 cursor-not-allowed"
+                        : "")
+                    }
+                  >
+                    <option value="">
+                      {loadingClasses
+                        ? "Loading classes…"
+                        : !state.step3.schoolId
+                          ? "Select a school first"
+                          : "-Choose Student Class/Level-"}
+                    </option>
+                    {classLevelGroups.map((group) =>
+                      group.subLevelGroup ? (
+                        // Grouped — e.g. Junior Secondary / Senior Secondary
+                        <optgroup
+                          key={group.subLevelGroup}
+                          label={group.subLevelGroup}
+                        >
+                          {group.classes.map((cls) => (
+                            <option key={cls.id} value={cls.name}>
+                              {cls.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ) : (
+                        // Flat — Nursery / Primary classes
+                        group.classes.map((cls) => (
+                          <option key={cls.id} value={cls.name}>
+                            {cls.name}
+                          </option>
+                        ))
+                      ),
+                    )}
+                  </select>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                    aria-hidden="true"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
               </Field>
 
               <Field

@@ -232,4 +232,110 @@ export const parentService = {
     const response = await apiClient.get("/parents/dashboard");
     return response.data.data;
   },
+
+  /**
+   * Submit the 4-step new-application wizard as a JSON request.
+   * Backend: POST /parents/submit-application-json
+   * (The multipart endpoint still exists for the KYC wizard; this one is
+   *  for the streamlined StudentDetailsPage flow where documents are already
+   *  on file from a prior KYC submission.)
+   */
+  submitWizardApplication: async ({
+    childId,
+    schoolId,
+    institutionTypeId,
+    institutionTypeName,
+    gradeLevel,
+    tuitionAmount,
+    repaymentPlanId,
+    tenor,
+  }: {
+    childId: string;
+    schoolId: string;
+    institutionTypeId: string;
+    institutionTypeName: string;
+    gradeLevel: string;
+    tuitionAmount: number;
+    repaymentPlanId: "full" | "3month" | "6month";
+    tenor: number;
+  }): Promise<{
+    referenceNumber?: string;
+    referenceNumbers?: string[];
+    lendsqrLoanId?: number;
+    [key: string]: unknown;
+  }> => {
+    const response = await apiClient.post("/parents/apply", {
+      childId,
+      schoolId,
+      institutionTypeId,
+      institutionTypeName,
+      gradeLevel,
+      tuitionAmount: Number(tuitionAmount),
+      repaymentPlanId,
+      tenor: Number(tenor),
+    });
+    return response.data.data as {
+      referenceNumber?: string;
+      referenceNumbers?: string[];
+      lendsqrLoanId?: number;
+    };
+  },
+};
+
+// ── Catalog types ─────────────────────────────────────────────────────────────
+
+export interface CatalogInstitutionType {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface CatalogSchool {
+  id: string;
+  name: string;
+  isRegistered: boolean;
+  tier: string | null;
+  serviceChargeDisplay: string | null;
+}
+
+export interface CatalogClassLevel {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface CatalogClassLevelGroup {
+  subLevelGroup: string | null;
+  classes: CatalogClassLevel[];
+}
+
+// ── Catalog service ───────────────────────────────────────────────────────────
+
+export const catalogService = {
+  /** Step 1 of 3: fetch all institution types (Nursery, Primary, Secondary …) */
+  getInstitutionTypes: async (): Promise<CatalogInstitutionType[]> => {
+    const response = await apiClient.get<{
+      data: CatalogInstitutionType[];
+    }>("/catalog/institution-types");
+    return response.data.data;
+  },
+
+  /** Step 2 of 3: fetch schools that offer the selected institution type */
+  getSchools: async (institutionTypeId: string): Promise<CatalogSchool[]> => {
+    const response = await apiClient.get<{ data: CatalogSchool[] }>(
+      `/catalog/schools?institutionTypeId=${institutionTypeId}`,
+    );
+    return response.data.data;
+  },
+
+  /** Step 3 of 3: fetch class levels for the selected school + institution type */
+  getClassLevels: async (
+    schoolId: string,
+    institutionTypeId: string,
+  ): Promise<CatalogClassLevelGroup[]> => {
+    const response = await apiClient.get<{ data: CatalogClassLevelGroup[] }>(
+      `/catalog/class-levels?schoolId=${schoolId}&institutionTypeId=${institutionTypeId}`,
+    );
+    return response.data.data;
+  },
 };

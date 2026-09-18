@@ -223,7 +223,11 @@ class AuthService {
       role: user.role,
       emailVerified: user.isEmailVerified,
     });
-    const refreshToken = await this.generateRefreshToken(user.id);
+    const refreshToken = await this.generateRefreshToken(user.id, {
+      email: user.email,
+      role: user.role,
+      isEmailVerified: user.isEmailVerified,
+    });
 
     const userJson = user.toJSON() as unknown as Record<string, unknown>;
     delete userJson.password;
@@ -375,17 +379,14 @@ class AuthService {
       iss: env.jwtIssuer,
       sub: userId,
       aud: env.jwtAudience,
-
       userId,
       email,
-
       roles: [role.toUpperCase() as Uppercase<typeof role>],
       permissions: {
         parent: role === "parent",
         school: role === "school",
         admin: role === "admin",
       },
-
       security: {
         tokenType: "ACCESS",
         sessionId,
@@ -394,7 +395,6 @@ class AuthService {
         mfaVerified,
         emailVerified,
       },
-
       nbf: now,
     };
 
@@ -403,10 +403,58 @@ class AuthService {
     });
   }
 
-  async generateRefreshToken(userId: string) {
-    const token = crypto.randomBytes(40).toString("hex");
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    return RefreshTokenRepository.create({ token, userId, expiresAt });
+  /**
+   * Generates a signed JWT refresh token with the same payload structure as
+   * the access token (tokenType: "REFRESH"), signed with jwtRefreshSecret,
+   * valid for 24 hours.  The JWT string is persisted to refresh_tokens so it
+   * can be revoked.
+   */
+  async generateRefreshToken(
+    userId: string,
+    user: { email: string; role: string; isEmailVerified: boolean },
+    sessionId?: string,
+  ) {
+    const role = user.role as Parameters<
+      typeof this.generateAccessToken
+    >[0]["role"];
+    const sid = sessionId ?? `sess_${crypto.randomBytes(8).toString("hex")}`;
+    const tokenId = `jti_${crypto.randomBytes(8).toString("hex")}`;
+    const now = Math.floor(Date.now() / 1000);
+
+    const payload: Omit<JwtPayload, "iat" | "exp"> = {
+      iss: env.jwtIssuer,
+      sub: userId,
+      aud: env.jwtAudience,
+      userId,
+      email: user.email,
+      roles: [role.toUpperCase() as Uppercase<typeof role>],
+      permissions: {
+        parent: role === "parent",
+        school: role === "school",
+        admin: role === "admin",
+      },
+      security: {
+        tokenType: "REFRESH",
+        sessionId: sid,
+        tokenId,
+        authLevel: "STANDARD",
+        mfaVerified: false,
+        emailVerified: user.isEmailVerified,
+      },
+      nbf: now,
+    };
+
+    const token = jwt.sign(payload, env.jwtRefreshSecret, {
+      expiresIn: env.jwtRefreshExpiresIn as jwt.SignOptions["expiresIn"],
+    });
+
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const record = await RefreshTokenRepository.create({
+      token,
+      userId,
+      expiresAt,
+    });
+    return record;
   }
 
   async revokeRefreshToken(token: string): Promise<void> {
@@ -417,18 +465,45 @@ class AuthService {
   }
 
   async refreshToken(token: string) {
-    const stored = await RefreshTokenRepository.findOne({ token });
-    if (!stored || !stored.isActive)
+    // 1. Verify the JWT signature and expiry first — fast path rejection
+    let decoded: JwtPayload;
+    try {
+      decoded = jwt.verify(token, env.jwtRefreshSecret) as JwtPayload;
+    } catch {
       throw new ApiError(401, "Invalid or expired refresh token");
+    }
 
+    // 2. Ensure it is actually a refresh token
+    if (decoded.security?.tokenType !== "REFRESH") {
+      throw new ApiError(401, "Invalid token type");
+    }
+
+    // 3. Check DB record hasn't been revoked (covers token rotation / reuse detection)
+    const stored = await RefreshTokenRepository.findOne({ token });
+    if (!stored || !stored.isActive) {
+      throw new ApiError(401, "Refresh token has been revoked");
+    }
+
+    // 4. Load user
     const user = await UserRepository.findById(stored.userId);
     if (!user) throw new ApiError(401, "User no longer exists");
     if (!user.isActive) throw new ApiError(401, "User account is deactivated");
 
-    const newRefreshToken = await this.generateRefreshToken(stored.userId);
+    // 5. Rotate — issue a new refresh token carrying forward the same sessionId
+    const newRefreshRecord = await this.generateRefreshToken(
+      user.id,
+      {
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+      },
+      decoded.security.sessionId,
+    );
+
+    // 6. Revoke the old one and link to the replacement
     await stored.update({
       revokedAt: new Date(),
-      replacedByToken: newRefreshToken.token,
+      replacedByToken: newRefreshRecord.token,
     });
 
     return {
@@ -437,8 +512,9 @@ class AuthService {
         email: user.email,
         role: user.role,
         emailVerified: user.isEmailVerified,
+        sessionId: decoded.security.sessionId,
       }),
-      refreshToken: newRefreshToken.token,
+      refreshToken: newRefreshRecord.token,
     };
   }
 

@@ -14,6 +14,10 @@ import SchoolRequest from "./SchoolRequest";
 import ApplicationEvent from "./ApplicationEvent";
 import Notification from "./Notification";
 import DeviceToken from "./DeviceToken";
+import LoanLedger from "./LoanLedger";
+import CatalogInstitutionType from "./CatalogInstitutionType";
+import CatalogSchool from "./CatalogSchool";
+import CatalogSchoolClassLevel from "./CatalogSchoolClassLevel";
 
 User.hasOne(Parent, { foreignKey: "userId", as: "parentProfile" });
 User.hasOne(School, { foreignKey: "userId", as: "schoolProfile" });
@@ -64,6 +68,15 @@ LoanApplication.hasMany(ApplicationEvent, {
   foreignKey: "loanApplicationId",
   as: "events",
 });
+LoanApplication.hasOne(LoanLedger, {
+  foreignKey: "loanApplicationId",
+  as: "ledger",
+});
+LoanLedger.belongsTo(LoanApplication, {
+  foreignKey: "loanApplicationId",
+  as: "loanApplication",
+});
+
 LoanApplication.hasOne(LoanOffer, {
   foreignKey: "loanApplicationId",
   as: "offer",
@@ -127,6 +140,27 @@ Notification.belongsTo(User, { foreignKey: "userId", as: "user" });
 DeviceToken.belongsTo(User, { foreignKey: "userId", as: "user" });
 User.hasMany(DeviceToken, { foreignKey: "userId", as: "deviceTokens" });
 
+// ── School Catalog associations ───────────────────────────────────────────────
+// A CatalogSchool offers many class levels; each level belongs to one school
+// and one institution type.
+CatalogSchool.hasMany(CatalogSchoolClassLevel, {
+  foreignKey: "schoolId",
+  as: "classLevels",
+});
+CatalogSchoolClassLevel.belongsTo(CatalogSchool, {
+  foreignKey: "schoolId",
+  as: "school",
+});
+
+CatalogInstitutionType.hasMany(CatalogSchoolClassLevel, {
+  foreignKey: "institutionTypeId",
+  as: "classLevels",
+});
+CatalogSchoolClassLevel.belongsTo(CatalogInstitutionType, {
+  foreignKey: "institutionTypeId",
+  as: "institutionType",
+});
+
 export {
   User,
   Parent,
@@ -135,6 +169,7 @@ export {
   Student,
   Term,
   LoanApplication,
+  LoanLedger,
   LoanOffer,
   RepaymentSchedule,
   Repayment,
@@ -144,4 +179,7 @@ export {
   ApplicationEvent,
   Notification,
   DeviceToken,
+  CatalogInstitutionType,
+  CatalogSchool,
+  CatalogSchoolClassLevel,
 };

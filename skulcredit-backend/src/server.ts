@@ -7,7 +7,9 @@ import { connectRabbitMQ, closeRabbitMQ } from "./config/rabbitmq";
 import { initSocketIO } from "./config/socketio";
 import { initFirebase } from "./config/firebase";
 import { startRabbitMQListener } from "./notifications/rabbitmq.listener";
+import { startLoanBookingConsumer } from "./queues/loan.queue";
 import { runMigrations } from "./migrations/runner";
+import { seedCatalog } from "./seeders/catalogSeeder";
 
 // Load all models and wire up associations before syncing
 import "./models/index";
@@ -19,6 +21,9 @@ const start = async (): Promise<void> => {
     // Run any pending schema migrations before the ORM sync
     await runMigrations();
 
+    // Seed reference data (no-op if already present)
+    await seedCatalog();
+
     await sequelize.sync({ alter: env.nodeEnv === "development" });
     logger.info("Database tables synced");
 
@@ -26,6 +31,7 @@ const start = async (): Promise<void> => {
 
     await connectRabbitMQ();
     await startRabbitMQListener();
+    await startLoanBookingConsumer();
 
     const httpServer = http.createServer(app);
     initSocketIO(httpServer);

@@ -7,9 +7,16 @@
  */
 import path from "path";
 import fs from "fs";
-import { QueryInterface, DataTypes, QueryTypes } from "sequelize";
+import { createRequire } from "module";
+import { QueryInterface, QueryTypes } from "sequelize";
 import { sequelize } from "../config/db";
 import logger from "../config/logger";
+
+// createRequire gives us a require() scoped to this file's location,
+// which works correctly for CJS output (module: commonjs in tsconfig).
+// Using pathToFileURL / dynamic import() with file:// URLs fails in CJS
+// because Node's require() does not accept URL strings.
+const _require = createRequire(__filename);
 
 const MIGRATIONS_TABLE = "schema_migrations";
 
@@ -50,8 +57,10 @@ export async function runMigrations(): Promise<void> {
 
     logger.info(`Running migration: ${name}`);
 
-    // dynamic import works for both CJS and ESM compiled output
-    const mod = (await import(path.join(migrationsDir, file))) as {
+    // Use require() via createRequire — works correctly in CJS output (module:
+    // commonjs). Dynamic import() with file:// URLs fails in CJS because
+    // Node's require() does not accept URL strings.
+    const mod = _require(path.join(migrationsDir, file)) as {
       up: (qi: QueryInterface) => Promise<void>;
     };
 

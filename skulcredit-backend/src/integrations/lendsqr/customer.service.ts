@@ -49,12 +49,23 @@ export interface CreateCustomerResponse {
   status: string;
   message: string;
   data: {
-    users: LendsqrCustomerUser[];
+    /** Some Lendsqr endpoints return the customer directly in data */
+    id?: number;
+    /** Others wrap in a users array */
+    users?: LendsqrCustomerUser[];
+    /** Or nest under a single user key */
+    user?: LendsqrCustomerUser;
+    [key: string]: unknown;
   };
   meta: { cost: number; balance: number };
 }
 
 class LendsqrCustomerService extends LendsqrBaseService {
+  /**
+   * Register/upsert a customer: POST /v2/customers
+   * Full URL: https://adjutor.lendsqr.com/v2/customers
+   * env.lendsqr.baseUrl must be "https://adjutor.lendsqr.com" (no trailing slash, no /v2).
+   */
   createCustomer(payload: CustomerPayload): Promise<CreateCustomerResponse> {
     return this.client.post<CustomerPayload, CreateCustomerResponse>(
       "/v2/customers",

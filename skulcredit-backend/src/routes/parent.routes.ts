@@ -13,6 +13,7 @@ import {
   changePasswordSchema,
   schoolRequestSchema,
   submitApplicationSchema,
+  submitWizardApplicationJsonSchema,
 } from "../validators/parent.validator";
 
 const router = Router();
@@ -172,6 +173,61 @@ router.post(
   ]),
   validate(submitApplicationSchema),
   parentController.submitApplication.bind(parentController),
+);
+
+/**
+ * @swagger
+ * /parents/apply:
+ *   post:
+ *     summary: Submit new tuition application (JSON, KYC already complete)
+ *     description: >
+ *       Used by the 5-step StudentDetailsPage wizard.  The parent must already
+ *       have completed KYC via the eligibility wizard.  Loan is booked with
+ *       Lendsqr asynchronously via RabbitMQ.
+ *     tags: [Parent]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [childId, schoolId, institutionTypeId, institutionTypeName,
+ *                        gradeLevel, tuitionAmount, repaymentPlanId, tenor]
+ *             properties:
+ *               childId:
+ *                 type: string
+ *                 format: uuid
+ *               schoolId:
+ *                 type: string
+ *                 format: uuid
+ *               institutionTypeId:
+ *                 type: string
+ *                 format: uuid
+ *               institutionTypeName:
+ *                 type: string
+ *               gradeLevel:
+ *                 type: string
+ *               tuitionAmount:
+ *                 type: number
+ *               repaymentPlanId:
+ *                 type: string
+ *                 enum: [full, 3month, 6month]
+ *               tenor:
+ *                 type: integer
+ *               academicSession:
+ *                 type: string
+ *               term:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Application created and loan booking queued
+ */
+router.post(
+  "/apply",
+  validate(submitWizardApplicationJsonSchema),
+  parentController.submitWizardApplicationJson.bind(parentController),
 );
 
 export default router;

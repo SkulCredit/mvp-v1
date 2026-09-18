@@ -370,6 +370,39 @@ class ParentController {
       next(error);
     }
   }
+
+  /**
+   * POST /parents/submit-application-json
+   *
+   * Streamlined JSON wizard submission from StudentDetailsPage.
+   * KYC must already be complete (done via EligibilityTestPage).
+   */
+  async submitWizardApplicationJson(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await parentService.submitWizardApplicationJson(
+        req.user!.userId,
+        req.body as {
+          childId: string;
+          schoolId: string;
+          institutionTypeId: string;
+          institutionTypeName: string;
+          gradeLevel: string;
+          tuitionAmount: number;
+          repaymentPlanId: "full" | "3month" | "6month";
+          tenor: number;
+          academicSession?: string;
+          term?: string;
+        },
+      );
+      successResponse(res, 201, "Application submitted successfully", result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new ParentController();

@@ -62,7 +62,7 @@ const StatCard: React.FC<StatCardProps> = ({
   </div>
 );
 
-// ── School-request helpers 
+// ── School-request helpers
 
 const STATUS_MESSAGES: Record<SchoolRequestStatus, string> = {
   pending:
@@ -93,6 +93,7 @@ const ParentDashboardHomePage: React.FC = () => {
     [],
   );
   const [hasSchoolRequest, setHasSchoolRequest] = useState(false);
+  const [kycStatus, setKycStatus] = useState<string>("pending");
   const [myApplications, setMyApplications] = useState<AppRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -106,6 +107,7 @@ const ParentDashboardHomePage: React.FC = () => {
           setStats(data.stats ?? DEFAULT_STATS);
           setSchoolRequests(data.schoolRequests ?? []);
           setHasSchoolRequest(data.hasSchoolRequest ?? false);
+          setKycStatus(data.kycStatus ?? "pending");
           setMyApplications((data.applications ?? []) as AppRow[]);
         }
       } catch {
@@ -121,9 +123,11 @@ const ParentDashboardHomePage: React.FC = () => {
 
   const schoolRequestStatus: SchoolRequestStatus | null =
     schoolRequests[0]?.status ?? null;
-  const showIncompleteBanner = !isLoading && !hasSchoolRequest;
+  // Show the banner only when the parent has NOT completed KYC.
+  // Once kycStatus is "approved" (Lendsqr registration succeeded) hide it forever.
+  const showIncompleteBanner = !isLoading && kycStatus !== "approved";
 
-  // ── Column definitions 
+  // ── Column definitions
   const appColumns: Column<AppRow>[] = [
     {
       header: "App ID",

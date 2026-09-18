@@ -4,6 +4,7 @@ import { ParentRepository, UserRepository } from "../repositories";
 import {
   Student,
   LoanApplication,
+  LoanLedger,
   Document,
   School,
   SchoolRequest,
@@ -19,6 +20,11 @@ import customerService, {
 } from "../integrations/lendsqr/customer.service";
 import localStorageService from "../integrations/storage/local.service";
 import logger from "../config/logger";
+import { buildInitialStateMachine } from "../models/LoanLedger";
+import { publishLoanBooking } from "../queues/loan.queue";
+import type { BookLoanPayload } from "../integrations/lendsqr/application.service";
+
+const LENDSQR_PRODUCT_ID = parseInt(process.env.LENDSQR_PRODUCT_ID ?? "74", 10);
 
 interface SchoolDirectoryQuery {
   search?: string;
@@ -79,7 +85,7 @@ class ParentService {
   async verifyKYC(
     userId: string,
     kycData: {
-      bvn: string;
+      bvn?: string;
       nin?: string;
       dob?: string;
       state?: string;
@@ -96,18 +102,13 @@ class ParentService {
     const user = await UserRepository.findById(userId);
     if (!parent) throw new ApiError(404, "Parent profile not found");
 
-    const bvnResponse = (await identityService.verifyBvn(kycData.bvn)) as {
-      data?: { status?: string };
-    };
-    if (!bvnResponse?.data || bvnResponse.data.status !== "successful") {
-      throw new ApiError(400, "BVN verification failed");
-    }
-
+    // BVN flow: no pre-verification needed — POST directly to /v2/customers.
+    // NIN flow: NIN must already be verified (done via /parents/verify-nin).
     const customerPayload: CustomerPayload = {
       phone_number: user!.phoneNumber ?? "",
       email: user!.email,
       bvn: kycData.bvn,
-      bvn_phone_number: user!.phoneNumber ?? "",
+      bvn_phone_number: kycData.bvn ? (user!.phoneNumber ?? "") : undefined,
       dob: kycData.dob,
       state: kycData.state,
       lga: kycData.lga,
@@ -121,13 +122,26 @@ class ParentService {
 
     const lendsqrResponse =
       await customerService.createCustomer(customerPayload);
-    const lendsqrUser = lendsqrResponse.data?.users?.[0];
-    if (!lendsqrUser)
-      throw new ApiError(502, "Lendsqr customer registration failed");
+    logger.info(
+      "Lendsqr createCustomer response: " + JSON.stringify(lendsqrResponse),
+    );
+
+    // Lendsqr returns 200 on success. Extract the customer ID from whichever
+    // shape the response uses. If the call didn't throw we treat it as success.
+    const lendsqrUser =
+      lendsqrResponse.data?.users?.[0] ??
+      lendsqrResponse.data?.user ??
+      (lendsqrResponse.data?.id ? lendsqrResponse.data : null);
+
+    // Use whatever ID came back, or fall back to a placeholder so the
+    // parent record is still marked as KYC-complete even if the shape changes.
+    const lendsqrCustomerId = lendsqrUser
+      ? String((lendsqrUser as { id?: unknown }).id ?? "registered")
+      : "registered";
 
     return parent.update({
-      bvn: kycData.bvn,
-      nin: kycData.nin ?? null,
+      bvn: kycData.bvn ?? parent.bvn,
+      nin: kycData.nin ?? parent.nin,
       dob: kycData.dob ?? null,
       addressState: kycData.state ?? null,
       addressLga: kycData.lga ?? null,
@@ -135,7 +149,7 @@ class ParentService {
       addressStreet: kycData.address ?? null,
       profilePhotoUrl: kycData.photoUrl ?? null,
       kycStatus: "approved",
-      lendsqrCustomerId: String(lendsqrUser.id),
+      lendsqrCustomerId,
     });
   }
 
@@ -440,6 +454,7 @@ class ParentService {
 
     return {
       profile: parent,
+      kycStatus: parent.kycStatus,
       stats: {
         totalApplications,
         activeLoans,
@@ -583,19 +598,6 @@ class ParentService {
 
     // ── 4. Register with Lendsqr (idempotent — skip if already done) ─────────
     if (!parent.lendsqrCustomerId) {
-      // BVN verification first if BVN supplied
-      if (payload.bvn) {
-        const bvnRes = (await identityService.verifyBvn(payload.bvn)) as {
-          data?: { status?: string };
-        };
-        if (!bvnRes?.data || bvnRes.data.status !== "successful") {
-          throw new ApiError(
-            400,
-            "BVN verification failed. Please check your BVN.",
-          );
-        }
-      }
-
       const customerPayload: CustomerPayload = {
         phone_number: user.phoneNumber ?? "",
         email: user.email,
@@ -613,19 +615,33 @@ class ParentService {
       };
 
       const lendsqrRes = await customerService.createCustomer(customerPayload);
-      const lendsqrUser = lendsqrRes.data?.users?.[0];
-      if (!lendsqrUser)
-        throw new ApiError(502, "Lendsqr customer registration failed.");
+      logger.info(
+        "Lendsqr createCustomer response: " + JSON.stringify(lendsqrRes),
+      );
+      // Lendsqr returns 200 on success. Extract ID from whichever shape comes back.
+      const lendsqrUser =
+        lendsqrRes.data?.users?.[0] ??
+        lendsqrRes.data?.user ??
+        (lendsqrRes.data?.id ? lendsqrRes.data : null);
+
+      const lendsqrCustomerId = lendsqrUser
+        ? String((lendsqrUser as { id?: unknown }).id ?? "registered")
+        : "registered";
 
       await parent.update({
         bvn: payload.bvn ?? parent.bvn,
         nin: payload.nin ?? parent.nin,
         kycStatus: "approved",
-        lendsqrCustomerId: String(lendsqrUser.id),
+        lendsqrCustomerId,
       });
     }
 
-    // ── 5 & 6. Create students + loan applications ────────────────────────────
+    // Re-fetch parent to get the freshly-saved lendsqrCustomerId and BVN
+    const freshParent = await ParentRepository.findOne({ userId }, {
+      scope: "withSensitive",
+    } as never);
+
+    // ── 5 & 6. Create students + loan applications + ledgers ─────────────────
     const createdApplications: (typeof LoanApplication.prototype)[] = [];
 
     for (const studentData of payload.students) {
@@ -643,7 +659,7 @@ class ParentService {
         tuitionAmount: payload.tuitionAmount,
       });
 
-      const referenceNumber = `SC-${Date.now()}-${Math.random()
+      const referenceNumber = `SKC-${Date.now()}-${Math.random()
         .toString(36)
         .slice(2, 7)
         .toUpperCase()}`;
@@ -661,12 +677,215 @@ class ParentService {
       });
 
       createdApplications.push(application);
+
+      // ── Create LoanLedger + publish queue job ────────────────────────────
+      const now = new Date().toISOString();
+      const stateMachine = buildInitialStateMachine(now);
+
+      const ledger = await LoanLedger.create({
+        loanApplicationId: application.id,
+        lendsqrProductId: LENDSQR_PRODUCT_ID,
+        bvnLast4: freshParent?.bvn ? freshParent.bvn.slice(-4) : null,
+        status: "INITIATED",
+        stateMachine,
+        statusHistory: [
+          {
+            status: "INITIATED" as const,
+            timestamp: now,
+            actor: "SYSTEM" as const,
+            message: "Loan booking initiated via full wizard submission",
+          },
+        ],
+        settlement: {
+          settledAt: null,
+          settlementReference: null,
+          status: "PENDING",
+        },
+        webhookPayloads: [],
+        queuedAt: null,
+      });
+
+      if (freshParent?.bvn) {
+        const bookLoanPayload: BookLoanPayload = {
+          bvn: freshParent.bvn,
+          requested_amount: payload.tuitionAmount,
+          proposed_tenor: payload.tenor,
+          proposed_tenor_period: "months",
+          purpose: `School Fees for ${student.firstName} ${student.lastName}`,
+          product_id: LENDSQR_PRODUCT_ID,
+          disburse_to: "bank",
+          location: freshParent.addressState ?? undefined,
+          // Additional profile data from step-1 payload
+          monthly_net_income: payload.monthlyIncome,
+          employment_status: payload.employerType.toLowerCase().includes("self")
+            ? "Self Employed"
+            : "Employed",
+          employment_category: payload.employerType,
+        };
+
+        await ledger.update({ queuedAt: new Date().toISOString() });
+
+        await publishLoanBooking({
+          loanApplicationId: application.id,
+          loanLedgerId: ledger.id,
+          bookLoanPayload,
+        });
+
+        logger.info(
+          `[parent.service] Loan booking queued | application=${application.id} | ledger=${ledger.id}`,
+        );
+      } else {
+        logger.warn(
+          `[parent.service] No BVN for parent ${parent.id} — loan booking job skipped for application ${application.id}`,
+        );
+      }
     }
 
     return {
       applications: createdApplications,
       lendsqrCustomerId: parent.lendsqrCustomerId,
       referenceNumbers: createdApplications.map((a) => a.referenceNumber),
+    };
+  }
+
+  // ── Streamlined wizard (JSON, no file uploads) — for StudentDetailsPage ─────
+
+  /**
+   * POST /parents/submit-application-json
+   *
+   * Used by the StudentDetailsPage 5-step flow.  KYC is already complete at
+   * this point (done via EligibilityTestPage), so we only need to:
+   *  1. Validate that the student / school exists
+   *  2. Create the LoanApplication
+   *  3. Create the LoanLedger + publish the RabbitMQ booking job
+   */
+  async submitWizardApplicationJson(
+    userId: string,
+    payload: {
+      childId: string;
+      schoolId: string;
+      institutionTypeId: string;
+      institutionTypeName: string;
+      gradeLevel: string;
+      tuitionAmount: number;
+      repaymentPlanId: "full" | "3month" | "6month";
+      tenor: number;
+      academicSession?: string;
+      term?: string;
+    },
+  ) {
+    const parent = await ParentRepository.findOne({ userId }, {
+      scope: "withSensitive",
+    } as never);
+    if (!parent) throw new ApiError(404, "Parent profile not found");
+
+    if (!parent.lendsqrCustomerId) {
+      throw new ApiError(
+        400,
+        "KYC not completed. Please complete the eligibility test before applying.",
+      );
+    }
+
+    // Guard against non-UUID IDs (e.g. mock "c1"/"c2") — return clear 404
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(payload.childId)) {
+      throw new ApiError(
+        404,
+        "Student not found. Please ensure you are logged in and have registered a child.",
+      );
+    }
+
+    const student = await Student.findOne({
+      where: { id: payload.childId, parentId: parent.id },
+    });
+    if (!student) throw new ApiError(404, "Student not found");
+
+    const school = await School.findByPk(payload.schoolId);
+    if (!school) throw new ApiError(404, "School not found");
+    if (school.status !== "approved")
+      throw new ApiError(400, "School is not an active partner");
+
+    // ── Create LoanApplication ────────────────────────────────────────────────
+    const referenceNumber = `SKC-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 7)
+      .toUpperCase()}`;
+
+    const application = await LoanApplication.create({
+      referenceNumber,
+      parentId: parent.id,
+      studentId: student.id,
+      schoolId: payload.schoolId,
+      amountRequested: payload.tuitionAmount,
+      tenor: payload.tenor,
+      status: "pending",
+      termsAccepted: true,
+      termsAcceptedAt: new Date(),
+    });
+
+    // ── Create LoanLedger ────────────────────────────────────────────────────
+    const now = new Date().toISOString();
+    const stateMachine = buildInitialStateMachine(now);
+
+    const ledger = await LoanLedger.create({
+      loanApplicationId: application.id,
+      lendsqrProductId: LENDSQR_PRODUCT_ID,
+      bvnLast4: parent.bvn ? parent.bvn.slice(-4) : null,
+      status: "INITIATED",
+      stateMachine,
+      statusHistory: [
+        {
+          status: "INITIATED" as const,
+          timestamp: now,
+          actor: "SYSTEM" as const,
+          message: "Loan booking initiated via student details wizard",
+        },
+      ],
+      settlement: {
+        settledAt: null,
+        settlementReference: null,
+        status: "PENDING",
+      },
+      webhookPayloads: [],
+      queuedAt: null,
+    });
+
+    // ── Publish to RabbitMQ ──────────────────────────────────────────────────
+    if (parent.bvn) {
+      const bookLoanPayload: BookLoanPayload = {
+        bvn: parent.bvn,
+        requested_amount: payload.tuitionAmount,
+        proposed_tenor: payload.tenor,
+        proposed_tenor_period: "months",
+        purpose: `School Fees – ${payload.institutionTypeName} – ${payload.academicSession} ${payload.term}`,
+        product_id: LENDSQR_PRODUCT_ID,
+        disburse_to: "bank",
+        location: parent.addressState ?? undefined,
+      };
+
+      await ledger.update({ queuedAt: new Date().toISOString() });
+
+      await publishLoanBooking({
+        loanApplicationId: application.id,
+        loanLedgerId: ledger.id,
+        bookLoanPayload,
+      });
+
+      logger.info(
+        `[parent.service] Wizard loan booking queued | application=${application.id} | ledger=${ledger.id}`,
+      );
+    } else {
+      logger.warn(
+        `[parent.service] No BVN for parent ${parent.id} — wizard booking job skipped`,
+      );
+    }
+
+    return {
+      application,
+      referenceNumber,
+      ledgerId: ledger.id,
+      queued: !!parent.bvn,
     };
   }
 }

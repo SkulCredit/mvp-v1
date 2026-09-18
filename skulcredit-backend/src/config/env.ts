@@ -15,9 +15,9 @@ const env = {
   },
 
   jwtSecret: process.env.JWT_SECRET ?? "supersecret",
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "30m",
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "5h",
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET ?? "refreshsecret",
-  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "7d",
+  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "24h",
   jwtIssuer: process.env.JWT_ISSUER ?? "SkulCredit",
   jwtAudience: process.env.JWT_AUDIENCE ?? "skulcredit-api",
 
