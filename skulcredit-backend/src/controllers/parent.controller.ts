@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import parentService from "../services/parent.service";
+import schoolTermService from "../services/schoolTerm.service";
 import { successResponse } from "../utils/response";
 import ApiError from "../utils/apiError";
 
@@ -416,6 +417,50 @@ class ParentController {
         },
       );
       successResponse(res, 201, "Application submitted successfully", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /parents/current-term
+   * Returns the currently active school term (date-based or admin-flagged).
+   * Used by the frontend to:
+   *  - Show/hide the new-term welcome modal
+   *  - Inform the wizard what the effective tenor ceiling is
+   * Public within the parent role — no sensitive data exposed.
+   */
+  async getCurrentTerm(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const term = await schoolTermService.getActiveTerm();
+
+      if (!term) {
+        // No active term — portal is closed
+        successResponse(res, 200, "No active term", {
+          isOpen: false,
+          term: null,
+        });
+        return;
+      }
+
+      const effectiveTenor = schoolTermService.computeEffectiveTenor(term);
+
+      successResponse(res, 200, "Current term fetched", {
+        isOpen: true,
+        term: {
+          id: term.id,
+          name: term.name,
+          academicYear: term.academicYear,
+          portalOpenDate: term.portalOpenDate,
+          portalCloseDate: term.portalCloseDate,
+          maxTenorMonths: term.maxTenorMonths,
+          effectiveTenor, // what a new applicant would actually get today
+        },
+      });
     } catch (error) {
       next(error);
     }

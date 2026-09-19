@@ -60,6 +60,12 @@ router.get(
 router.use(protect, authorize("parent"));
 
 router.get("/profile", parentController.getProfile.bind(parentController));
+
+// Current active school term — used by the dashboard modal and wizard
+router.get(
+  "/current-term",
+  parentController.getCurrentTerm.bind(parentController),
+);
 router.put(
   "/profile",
   validate(completeProfileSchema),

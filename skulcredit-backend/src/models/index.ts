@@ -18,6 +18,7 @@ import LoanLedger from "./LoanLedger";
 import CatalogInstitutionType from "./CatalogInstitutionType";
 import CatalogSchool from "./CatalogSchool";
 import CatalogSchoolClassLevel from "./CatalogSchoolClassLevel";
+import SchoolTerm from "./SchoolTerm";
 
 User.hasOne(Parent, { foreignKey: "userId", as: "parentProfile" });
 User.hasOne(School, { foreignKey: "userId", as: "schoolProfile" });
@@ -190,4 +191,5 @@ export {
   CatalogInstitutionType,
   CatalogSchool,
   CatalogSchoolClassLevel,
+  SchoolTerm,
 };
