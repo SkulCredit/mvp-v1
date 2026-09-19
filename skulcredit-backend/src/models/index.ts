@@ -42,7 +42,11 @@ Parent.hasMany(RepaymentSchedule, {
 School.belongsTo(User, { foreignKey: "userId", as: "user" });
 
 Document.belongsTo(Parent, { foreignKey: "parentId", as: "parent" });
-School.hasMany(Student, { foreignKey: "schoolId", as: "students" });
+CatalogSchool.hasMany(Student, { foreignKey: "schoolId", as: "students" });
+CatalogSchool.hasMany(LoanApplication, {
+  foreignKey: "catalogSchoolId",
+  as: "loanApplications",
+});
 School.hasMany(LoanApplication, {
   foreignKey: "schoolId",
   as: "loanApplications",
@@ -54,7 +58,7 @@ Term.belongsTo(School, { foreignKey: "schoolId", as: "school" });
 Term.hasMany(LoanApplication, { foreignKey: "termId", as: "loanApplications" });
 
 Student.belongsTo(Parent, { foreignKey: "parentId", as: "parent" });
-Student.belongsTo(School, { foreignKey: "schoolId", as: "school" });
+Student.belongsTo(CatalogSchool, { foreignKey: "schoolId", as: "school" });
 Student.hasMany(LoanApplication, {
   foreignKey: "studentId",
   as: "loanApplications",
@@ -62,6 +66,10 @@ Student.hasMany(LoanApplication, {
 
 LoanApplication.belongsTo(Parent, { foreignKey: "parentId", as: "parent" });
 LoanApplication.belongsTo(Student, { foreignKey: "studentId", as: "student" });
+LoanApplication.belongsTo(CatalogSchool, {
+  foreignKey: "catalogSchoolId",
+  as: "catalogSchool",
+});
 LoanApplication.belongsTo(School, { foreignKey: "schoolId", as: "school" });
 LoanApplication.belongsTo(Term, { foreignKey: "termId", as: "term" });
 LoanApplication.hasMany(ApplicationEvent, {

@@ -1,5 +1,5 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '../config/db';
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../config/db";
 
 export interface StudentAttributes {
   id: string;
@@ -14,9 +14,15 @@ export interface StudentAttributes {
   updatedAt?: Date;
 }
 
-type StudentCreationAttributes = Optional<StudentAttributes, 'id' | 'studentId'>;
+type StudentCreationAttributes = Optional<
+  StudentAttributes,
+  "id" | "studentId"
+>;
 
-export class StudentInstance extends Model<StudentAttributes, StudentCreationAttributes> implements StudentAttributes {
+export class StudentInstance
+  extends Model<StudentAttributes, StudentCreationAttributes>
+  implements StudentAttributes
+{
   declare id: string;
   declare parentId: string;
   declare schoolId: string;
@@ -39,27 +45,27 @@ StudentInstance.init(
     parentId: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: 'parents', key: 'id' },
-      onDelete: 'CASCADE',
+      references: { model: "parents", key: "id" },
+      onDelete: "CASCADE",
     },
     schoolId: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: 'schools', key: 'id' },
+      references: { model: "catalog_schools", key: "id" },
     },
-    firstName:     { type: DataTypes.STRING, allowNull: false },
-    lastName:      { type: DataTypes.STRING, allowNull: false },
-    studentId:     { type: DataTypes.STRING, allowNull: true },
-    gradeLevel:    { type: DataTypes.STRING, allowNull: false },
+    firstName: { type: DataTypes.STRING, allowNull: false },
+    lastName: { type: DataTypes.STRING, allowNull: false },
+    studentId: { type: DataTypes.STRING, allowNull: true },
+    gradeLevel: { type: DataTypes.STRING, allowNull: false },
     tuitionAmount: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
   },
   {
     sequelize,
-    modelName: 'Student',
-    tableName: 'students',
+    modelName: "Student",
+    tableName: "students",
     timestamps: true,
     underscored: true,
-  }
+  },
 );
 
 export default StudentInstance;

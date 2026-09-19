@@ -8,8 +8,6 @@ const seed = async (): Promise<void> => {
   try {
     await sequelize.authenticate();
     await sequelize.sync({ force: false });
-
-    // Wipe all data — order matters due to FK constraints
     await sequelize.query(`
       TRUNCATE TABLE
         notifications, application_events, repayments, repayment_schedules,

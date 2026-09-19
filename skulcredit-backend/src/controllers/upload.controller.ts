@@ -12,9 +12,6 @@ class UploadController {
   ): Promise<void> {
     try {
       if (!req.file) throw new ApiError(400, "No file uploaded");
-
-      // req.file.path is the absolute disk path written by multer disk storage
-      // Convert to a portable relative path for DB storage
       const relPath = path
         .relative(process.cwd(), req.file.path)
         .replace(/\\/g, "/");

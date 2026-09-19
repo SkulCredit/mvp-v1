@@ -18,10 +18,8 @@ const start = async (): Promise<void> => {
   try {
     await connectDB();
 
-    // Run any pending schema migrations before the ORM sync
     await runMigrations();
 
-    // Seed reference data (no-op if already present)
     await seedCatalog();
 
     await sequelize.sync({ alter: env.nodeEnv === "development" });

@@ -42,9 +42,6 @@ export const loginSchema = z.object({
 
 export const refreshTokenSchema = z.object({
   body: z.object({
-    // token is optional in the body — the preferred path is the httpOnly
-    // sc_refresh cookie set at login. Body fallback is kept for clients
-    // (e.g. mobile) that cannot use cookies.
     token: z.string().min(1).optional(),
   }),
 });

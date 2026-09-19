@@ -309,11 +309,8 @@ class ParentController {
         | Record<string, Express.Multer.File[]>
         | undefined;
 
-      // photo is uploaded under field name "photo" (single file)
       const photoFile = files?.["photo"]?.[0];
 
-      // KYC documents uploaded under field name "kycDocs" (multiple files)
-      // docTypes is a parallel JSON array sent in body: ["Bank Statement", ...]
       const rawDocTypes: string[] = Array.isArray(req.body.docTypes)
         ? req.body.docTypes
         : req.body.docTypes
@@ -371,14 +368,6 @@ class ParentController {
     }
   }
 
-  /**
-   * POST /parents/score-check
-   *
-   * Runs the Lendsqr loan-score / karma check using the parent's BVN.
-   * Called at step 2 of the eligibility wizard before full KYC submission.
-   * Returns { pass, decision, creditScore, advisoryAmount }.
-   * If pass=false the user's account is deactivated server-side.
-   */
   async checkLoanScore(
     req: Request,
     res: Response,
@@ -405,12 +394,6 @@ class ParentController {
     }
   }
 
-  /**
-   * POST /parents/submit-application-json
-   *
-   * Streamlined JSON wizard submission from StudentDetailsPage.
-   * KYC must already be complete (done via EligibilityTestPage).
-   */
   async submitWizardApplicationJson(
     req: Request,
     res: Response,

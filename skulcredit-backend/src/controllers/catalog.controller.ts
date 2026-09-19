@@ -3,12 +3,6 @@ import catalogService from "../services/catalog.service";
 import { successResponse } from "../utils/response";
 
 class CatalogController {
-  /**
-   * GET /api/v1/catalog/institution-types
-   *
-   * Returns all institution types ordered by sort_order.
-   * No auth required — this is public reference data.
-   */
   async getInstitutionTypes(
     req: Request,
     res: Response,
@@ -22,12 +16,6 @@ class CatalogController {
     }
   }
 
-  /**
-   * GET /api/v1/catalog/schools?institutionTypeId=<uuid>
-   *
-   * Returns active schools that offer the selected institution type.
-   * Query param `institutionTypeId` is required.
-   */
   async getSchools(
     req: Request,
     res: Response,
@@ -53,13 +41,6 @@ class CatalogController {
     }
   }
 
-  /**
-   * GET /api/v1/catalog/class-levels?schoolId=<uuid>&institutionTypeId=<uuid>
-   *
-   * Returns the class/level list for the chosen (school × institution type),
-   * grouped by sub-level (e.g. Junior / Senior Secondary).
-   * Both query params are required.
-   */
   async getClassLevels(
     req: Request,
     res: Response,

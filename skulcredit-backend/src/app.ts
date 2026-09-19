@@ -60,8 +60,6 @@ app.get("/metrics", async (req, res) => {
   }
 });
 
-// swagger-ui-express v5: use serveFiles() instead of serve to correctly
-// serve static assets (swagger-ui.css, swagger-ui-bundle.js, etc.)
 const swaggerUiOptions = {
   customSiteTitle: "SkulCredit API Docs",
   customCss: ".swagger-ui .topbar { background-color: #7A0E42; }",
@@ -81,8 +79,6 @@ app.get("/api/v1/docs.json", (req, res) => {
 
 app.use("/api/v1", routes);
 
-// ── Serve uploaded files ────────────────────────────────────────────────────
-// Files are stored at <UPLOADS_DIR>/ on disk and accessible at /uploads/*
 app.use(
   "/uploads",
   express.static(path.resolve(process.cwd(), env.uploads.dir), {

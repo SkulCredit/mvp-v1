@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../../components/Icon";
 import DataTable, { Column } from "../../components/DataTable";
@@ -20,8 +20,6 @@ import {
   ParentDashboardResponse,
 } from "../../services/dashboardService";
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 type ActiveTab = ParentTab;
 
 interface AppRow {
@@ -40,8 +38,6 @@ const DEFAULT_STATS: DashboardStats = {
   totalApprovedAmount: 0,
 };
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
-
 interface StatCardProps {
   icon: React.ReactNode;
   label: string;
@@ -56,7 +52,6 @@ const StatCard: React.FC<StatCardProps> = ({
   subLabel,
 }) => (
   <div className="bg-white rounded-2xl p-5 border border-[#f0d0de] shadow-sm flex flex-col gap-4 hover:shadow-md transition-shadow min-h-[110px]">
-    {/* Top row: solid brand icon box left, value right */}
     <div className="flex items-start justify-between">
       <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center text-white shrink-0">
         {icon}
@@ -72,8 +67,6 @@ const StatCard: React.FC<StatCardProps> = ({
     </div>
   </div>
 );
-
-// ── School-request status pill ────────────────────────────────────────────────
 
 const STATUS_MESSAGES: Record<SchoolRequestStatus, string> = {
   pending:
@@ -91,8 +84,6 @@ const STATUS_PILL_CLS: Record<SchoolRequestStatus, string> = {
   onboarded: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-600",
 };
-
-// ── Page ─────────────────────────────────────────────────────────────────────
 
 const ParentDashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>("dashboard");
@@ -132,14 +123,11 @@ const ParentDashboardPage: React.FC = () => {
     };
   }, []);
 
-  // The most-recent school request (if any)
   const schoolRequestStatus: SchoolRequestStatus | null =
     schoolRequests[0]?.status ?? null;
 
-  // Show the "complete your profile" banner only when no request has been filed
   const showIncompleteBanner = !isLoading && !hasSchoolRequest;
 
-  // ── Column definitions (dashboard preview table) ──────────────────────────
   const appColumns: Column<AppRow>[] = [
     {
       header: "App ID",
@@ -168,7 +156,6 @@ const ParentDashboardPage: React.FC = () => {
     },
   ];
 
-  // ── Top-bar slots ──────────────────────────────────────────────────────────
   const searchBar = (
     <div className="hidden md:block relative w-96">
       <Icon
@@ -184,8 +171,6 @@ const ParentDashboardPage: React.FC = () => {
       />
     </div>
   );
-
-  // ── Sample notifications (swap with real API data when ready) ──────────────
   const notifications: Notification[] = [
     {
       id: "1",
@@ -231,7 +216,6 @@ const ParentDashboardPage: React.FC = () => {
     },
   ];
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout
       sidebar={
@@ -248,7 +232,6 @@ const ParentDashboardPage: React.FC = () => {
         />
       }
     >
-      {/* ══════════════════ DASHBOARD TAB ══════════════════════ */}
       {activeTab === "dashboard" && isLoading && (
         <div className="flex h-full items-center justify-center pt-20">
           <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin" />
@@ -262,7 +245,21 @@ const ParentDashboardPage: React.FC = () => {
             <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
             <div className="relative z-10 space-y-2">
               <h2 className="text-2xl md:text-4xl font-extrabold">
-                Welcome back, {userName.split(" ")[0]} 👋
+                Welcome back, {userName.split(" ")[0]}{" "}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="inline-block w-7 h-7 md:w-9 md:h-9 align-middle -mt-1 ml-1"
+                  aria-hidden="true"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
               </h2>
               <p className="text-brand-50/80 font-medium max-w-md text-sm md:text-base">
                 Ensure your child's education never pauses. Fast, secure, and
@@ -283,8 +280,6 @@ const ParentDashboardPage: React.FC = () => {
               </button>
             </div>
           </div>
-
-          {/* ── Quick Actions ──────────────────────────────────── */}
           <section>
             <h3 className="mb-3 text-base font-bold text-gray-800">
               Quick Actions
@@ -356,7 +351,6 @@ const ParentDashboardPage: React.FC = () => {
             </div>
           </section>
 
-          {/* ── School request status pill ─────────────────────── */}
           {hasSchoolRequest && schoolRequestStatus && (
             <div className="flex items-center justify-between gap-4 rounded-xl bg-[#F0FDF4] border border-green-100 px-6 py-4">
               <div>
@@ -375,7 +369,6 @@ const ParentDashboardPage: React.FC = () => {
             </div>
           )}
 
-          {/* ── Incomplete-profile banner ──────────────────────── */}
           {showIncompleteBanner && (
             <div className="relative flex items-start justify-between gap-4 rounded-xl bg-[#FFF5F0] px-6 py-5 overflow-hidden">
               {/* Left accent bar */}
@@ -402,7 +395,6 @@ const ParentDashboardPage: React.FC = () => {
             </div>
           )}
 
-          {/* ── Tuition support CTA ────────────────────────────── */}
           <div className="flex items-center justify-between gap-4 bg-white rounded-3xl border border-slate-200 shadow-sm px-6 py-5">
             <div>
               <p className="text-sm font-bold text-slate-800">
@@ -421,8 +413,6 @@ const ParentDashboardPage: React.FC = () => {
               New Application
             </button>
           </div>
-
-          {/* ── Applications preview table ─────────────────────── */}
           <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm">
             <div className="border-b border-slate-100 px-6 py-4">
               <p className="text-sm font-semibold text-slate-800">
@@ -461,10 +451,8 @@ const ParentDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* ══════════════════ APPLICATIONS TAB ═══════════════════ */}
       {activeTab === "applications" && <MyApplicationsPage />}
 
-      {/* ══════════════════ REPAYMENT TAB ══════════════════════ */}
       {activeTab === "repayment" && (
         <div className="space-y-6 pt-8 animate-fade-in-up w-[90%] mx-auto">
           <h2 className="text-2xl font-bold text-slate-900">
@@ -486,7 +474,6 @@ const ParentDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* ══════════════════ VERIFICATION TAB ═══════════════════ */}
       {activeTab === "verification" &&
         (() => {
           const verifications = [
@@ -552,7 +539,6 @@ const ParentDashboardPage: React.FC = () => {
             },
           ];
 
-          // Marked icon — reusable for "verified" indicators
           const MarkedIcon = ({
             className = "w-8 h-8",
           }: {

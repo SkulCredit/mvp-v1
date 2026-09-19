@@ -35,8 +35,6 @@ const env = {
     apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
   uploads: {
-    // Absolute or relative path to the uploads directory on the server.
-    // On DigitalOcean: set UPLOADS_DIR=/var/www/skulcredit/uploads
     dir: process.env.UPLOADS_DIR ?? "uploads",
   },
   smtp: {

@@ -403,12 +403,6 @@ class AuthService {
     });
   }
 
-  /**
-   * Generates a signed JWT refresh token with the same payload structure as
-   * the access token (tokenType: "REFRESH"), signed with jwtRefreshSecret,
-   * valid for 24 hours.  The JWT string is persisted to refresh_tokens so it
-   * can be revoked.
-   */
   async generateRefreshToken(
     userId: string,
     user: { email: string; role: string; isEmailVerified: boolean },
@@ -465,7 +459,6 @@ class AuthService {
   }
 
   async refreshToken(token: string) {
-    // 1. Verify the JWT signature and expiry first — fast path rejection
     let decoded: JwtPayload;
     try {
       decoded = jwt.verify(token, env.jwtRefreshSecret) as JwtPayload;
@@ -473,23 +466,19 @@ class AuthService {
       throw new ApiError(401, "Invalid or expired refresh token");
     }
 
-    // 2. Ensure it is actually a refresh token
     if (decoded.security?.tokenType !== "REFRESH") {
       throw new ApiError(401, "Invalid token type");
     }
 
-    // 3. Check DB record hasn't been revoked (covers token rotation / reuse detection)
     const stored = await RefreshTokenRepository.findOne({ token });
     if (!stored || !stored.isActive) {
       throw new ApiError(401, "Refresh token has been revoked");
     }
 
-    // 4. Load user
     const user = await UserRepository.findById(stored.userId);
     if (!user) throw new ApiError(401, "User no longer exists");
     if (!user.isActive) throw new ApiError(401, "User account is deactivated");
 
-    // 5. Rotate — issue a new refresh token carrying forward the same sessionId
     const newRefreshRecord = await this.generateRefreshToken(
       user.id,
       {
@@ -500,7 +489,6 @@ class AuthService {
       decoded.security.sessionId,
     );
 
-    // 6. Revoke the old one and link to the replacement
     await stored.update({
       revokedAt: new Date(),
       replacedByToken: newRefreshRecord.token,

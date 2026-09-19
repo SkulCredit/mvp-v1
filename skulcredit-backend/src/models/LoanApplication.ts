@@ -1,13 +1,14 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '../config/db';
-import type { LoanApplicationStatus } from '../types';
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../config/db";
+import type { LoanApplicationStatus } from "../types";
 
 export interface LoanApplicationAttributes {
   id: string;
   referenceNumber: string | null;
   parentId: string;
   studentId: string;
-  schoolId: string;
+  catalogSchoolId: string; // catalog_schools.id — always set from parent selection
+  schoolId: string | null; // schools.id — set when a registered school partner is matched
   termId: string | null;
   lendsqrApplicationId: string | null;
   amountRequested: number;
@@ -16,7 +17,7 @@ export interface LoanApplicationAttributes {
   status: LoanApplicationStatus;
   termsAccepted: boolean;
   termsAcceptedAt: Date | null;
-  schoolVerificationStatus: 'pending' | 'confirmed' | 'rejected';
+  schoolVerificationStatus: "pending" | "confirmed" | "rejected";
   schoolVerifiedAt: Date | null;
   schoolVerificationNote: string | null;
   rejectionReason: string | null;
@@ -24,40 +25,43 @@ export interface LoanApplicationAttributes {
   decidedBy: string | null;
   decidedAt: Date | null;
   serviceFeePaid: boolean;
-  disbursementStatus: 'pending' | 'processing' | 'successful' | 'failed';
+  disbursementStatus: "pending" | "processing" | "successful" | "failed";
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 type LoanApplicationCreationAttributes = Optional<
   LoanApplicationAttributes,
-  | 'id'
-  | 'referenceNumber'
-  | 'termId'
-  | 'lendsqrApplicationId'
-  | 'amountApproved'
-  | 'status'
-  | 'termsAccepted'
-  | 'termsAcceptedAt'
-  | 'schoolVerificationStatus'
-  | 'schoolVerifiedAt'
-  | 'schoolVerificationNote'
-  | 'rejectionReason'
-  | 'adminNote'
-  | 'decidedBy'
-  | 'decidedAt'
-  | 'serviceFeePaid'
-  | 'disbursementStatus'
+  | "id"
+  | "referenceNumber"
+  | "termId"
+  | "lendsqrApplicationId"
+  | "amountApproved"
+  | "status"
+  | "termsAccepted"
+  | "termsAcceptedAt"
+  | "schoolVerificationStatus"
+  | "schoolVerifiedAt"
+  | "schoolVerificationNote"
+  | "rejectionReason"
+  | "adminNote"
+  | "decidedBy"
+  | "decidedAt"
+  | "serviceFeePaid"
+  | "disbursementStatus"
+  | "schoolId"
 >;
 
 export class LoanApplicationInstance
   extends Model<LoanApplicationAttributes, LoanApplicationCreationAttributes>
-  implements LoanApplicationAttributes {
+  implements LoanApplicationAttributes
+{
   declare id: string;
   declare referenceNumber: string | null;
   declare parentId: string;
   declare studentId: string;
-  declare schoolId: string;
+  declare catalogSchoolId: string;
+  declare schoolId: string | null;
   declare termId: string | null;
   declare lendsqrApplicationId: string | null;
   declare amountRequested: number;
@@ -66,7 +70,7 @@ export class LoanApplicationInstance
   declare status: LoanApplicationStatus;
   declare termsAccepted: boolean;
   declare termsAcceptedAt: Date | null;
-  declare schoolVerificationStatus: 'pending' | 'confirmed' | 'rejected';
+  declare schoolVerificationStatus: "pending" | "confirmed" | "rejected";
   declare schoolVerifiedAt: Date | null;
   declare schoolVerificationNote: string | null;
   declare rejectionReason: string | null;
@@ -74,7 +78,11 @@ export class LoanApplicationInstance
   declare decidedBy: string | null;
   declare decidedAt: Date | null;
   declare serviceFeePaid: boolean;
-  declare disbursementStatus: 'pending' | 'processing' | 'successful' | 'failed';
+  declare disbursementStatus:
+    | "pending"
+    | "processing"
+    | "successful"
+    | "failed";
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -86,47 +94,75 @@ LoanApplicationInstance.init(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    referenceNumber:      { type: DataTypes.STRING, allowNull: true, unique: true },
-    parentId:             { type: DataTypes.UUID, allowNull: false, references: { model: 'parents', key: 'id' } },
-    studentId:            { type: DataTypes.UUID, allowNull: false, references: { model: 'students', key: 'id' } },
-    schoolId:             { type: DataTypes.UUID, allowNull: false, references: { model: 'schools', key: 'id' } },
-    termId:               { type: DataTypes.UUID, allowNull: true, references: { model: 'terms', key: 'id' } },
+    referenceNumber: { type: DataTypes.STRING, allowNull: true, unique: true },
+    parentId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "parents", key: "id" },
+    },
+    studentId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "students", key: "id" },
+    },
+    catalogSchoolId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "catalog_schools", key: "id" },
+    },
+    schoolId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: "schools", key: "id" },
+    },
+    termId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: "terms", key: "id" },
+    },
     lendsqrApplicationId: { type: DataTypes.STRING, allowNull: true },
-    amountRequested:      { type: DataTypes.DECIMAL(15, 2), allowNull: false },
-    amountApproved:       { type: DataTypes.DECIMAL(15, 2), allowNull: true },
-    tenor:                { type: DataTypes.INTEGER, allowNull: false },
+    amountRequested: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
+    amountApproved: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
+    tenor: { type: DataTypes.INTEGER, allowNull: false },
     status: {
       type: DataTypes.ENUM(
-        'pending', 'under_review', 'info_requested', 'school_verification',
-        'approved', 'rejected', 'disbursed', 'repaid', 'cancelled'
+        "pending",
+        "under_review",
+        "info_requested",
+        "school_verification",
+        "approved",
+        "rejected",
+        "disbursed",
+        "repaid",
+        "cancelled",
       ),
-      defaultValue: 'pending',
+      defaultValue: "pending",
     },
-    termsAccepted:   { type: DataTypes.BOOLEAN, defaultValue: false },
+    termsAccepted: { type: DataTypes.BOOLEAN, defaultValue: false },
     termsAcceptedAt: { type: DataTypes.DATE, allowNull: true },
     schoolVerificationStatus: {
-      type: DataTypes.ENUM('pending', 'confirmed', 'rejected'),
-      defaultValue: 'pending',
+      type: DataTypes.ENUM("pending", "confirmed", "rejected"),
+      defaultValue: "pending",
     },
-    schoolVerifiedAt:      { type: DataTypes.DATE, allowNull: true },
+    schoolVerifiedAt: { type: DataTypes.DATE, allowNull: true },
     schoolVerificationNote: { type: DataTypes.TEXT, allowNull: true },
     rejectionReason: { type: DataTypes.TEXT, allowNull: true },
-    adminNote:       { type: DataTypes.TEXT, allowNull: true },
-    decidedBy:       { type: DataTypes.UUID, allowNull: true },
-    decidedAt:       { type: DataTypes.DATE, allowNull: true },
-    serviceFeePaid:  { type: DataTypes.BOOLEAN, defaultValue: false },
+    adminNote: { type: DataTypes.TEXT, allowNull: true },
+    decidedBy: { type: DataTypes.UUID, allowNull: true },
+    decidedAt: { type: DataTypes.DATE, allowNull: true },
+    serviceFeePaid: { type: DataTypes.BOOLEAN, defaultValue: false },
     disbursementStatus: {
-      type: DataTypes.ENUM('pending', 'processing', 'successful', 'failed'),
-      defaultValue: 'pending',
+      type: DataTypes.ENUM("pending", "processing", "successful", "failed"),
+      defaultValue: "pending",
     },
   },
   {
     sequelize,
-    modelName: 'LoanApplication',
-    tableName: 'loan_applications',
+    modelName: "LoanApplication",
+    tableName: "loan_applications",
     timestamps: true,
     underscored: true,
-  }
+  },
 );
 
 export default LoanApplicationInstance;

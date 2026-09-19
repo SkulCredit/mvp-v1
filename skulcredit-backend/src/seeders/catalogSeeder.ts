@@ -51,8 +51,6 @@ interface FlatClassRow {
   class_name: string;
 }
 
-// ── School data ───────────────────────────────────────────────────────────────
-
 const SCHOOLS: SchoolEntry[] = [
   {
     institution_name: "Gulf Flower Schools",
@@ -234,9 +232,7 @@ const SCHOOLS: SchoolEntry[] = [
   },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Canonical institution-type order for display */
 const PREFERRED_TYPE_ORDER = [
   "Nursery",
   "Primary",
@@ -279,10 +275,7 @@ function flattenClasses(it: InstitutionTypeEntry): FlatClassRow[] {
   return rows;
 }
 
-// ── Exported seeder function ──────────────────────────────────────────────────
-
 export async function seedCatalog(): Promise<void> {
-  // Idempotency guard — skip if data already present
   const [existing] = await sequelize.query<{ count: string }>(
     "SELECT COUNT(*)::text AS count FROM catalog_institution_types",
     { type: QueryTypes.SELECT },
@@ -298,7 +291,6 @@ export async function seedCatalog(): Promise<void> {
   const typeNames = collectInstitutionTypes(SCHOOLS);
   const typeIdMap = new Map<string, string>();
 
-  // 1. Institution types
   for (let i = 0; i < typeNames.length; i++) {
     const name = typeNames[i];
     const [row] = await sequelize.query<{ id: string }>(
@@ -310,7 +302,6 @@ export async function seedCatalog(): Promise<void> {
     typeIdMap.set(name, row.id);
   }
 
-  // 2. Schools + class levels
   for (const school of SCHOOLS) {
     const tier = school.tier ?? null;
     const isRegistered = tier !== null;
