@@ -1,22 +1,10 @@
-/**
- * src/seeders/catalogSeeder.ts
- *
- * Inserts the school catalog reference data (institution types, schools,
- * class levels) on first startup.  Safe to call on every boot — it checks
- * the row-count first and exits immediately if data already exists.
- *
- * This module is imported by server.ts so it is compiled into dist/ and
- * runs automatically inside the production Docker container.
- *
- * The standalone script at scripts/seedCatalog.ts delegates to this same
- * function so the data definition is never duplicated.
- */
+
 
 import { QueryTypes } from "sequelize";
 import { sequelize } from "../config/db";
 import logger from "../config/logger";
 
-// ── Service-charge rates by tier ─────────────────────────────────────────────
+
 const TIER_RATES: Record<string, number> = {
   "4":  0.2,     // Tier 4  → 20 %
   "3":  0.2,     // Tier 3  → 20 %
@@ -27,7 +15,6 @@ const TIER_RATES: Record<string, number> = {
 
 const NON_REGISTERED_RATE = 0.235; // 23.5 %
 
-// ── Type definitions ──────────────────────────────────────────────────────────
 
 interface SubLevel {
   level: string;
