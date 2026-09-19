@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, Link } from "react-router-dom";
 import Icon from "../../components/Icon";
@@ -268,7 +268,21 @@ const ParentDashboardHomePage: React.FC = () => {
         <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         <div className="relative z-10 space-y-2">
           <h2 className="text-2xl md:text-4xl font-extrabold">
-            Welcome back, {userName.split(" ")[0]} 👋
+            Welcome back, {userName.split(" ")[0]}{" "}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="inline-block w-7 h-7 md:w-9 md:h-9 align-middle -mt-1 ml-1"
+              aria-hidden="true"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
           </h2>
           <p className="text-brand-50/80 font-medium max-w-md text-sm md:text-base">
             Ensure your child's education never pauses. Fast, secure, and
