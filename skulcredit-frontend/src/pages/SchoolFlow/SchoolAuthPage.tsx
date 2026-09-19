@@ -187,7 +187,12 @@ const SchoolAuthPage: React.FC = () => {
       await login(loginEmail, loginPassword, "school");
       navigate("/school/dashboard");
     } catch (err) {
-      setLoginError((err as Error).message ?? "Invalid school credentials.");
+      const axErr = err as AxiosError<{ message?: string }>;
+      setLoginError(
+        axErr.response?.data?.message ??
+          (err as Error).message ??
+          "Invalid school credentials.",
+      );
     } finally {
       setIsLoading(false);
     }

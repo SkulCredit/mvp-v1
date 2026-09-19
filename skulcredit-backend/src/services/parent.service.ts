@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
 import { ParentRepository, UserRepository } from "../repositories";
+import sendEmail from "../utils/email";
 import {
   Student,
   LoanApplication,
@@ -10,6 +11,7 @@ import {
   SchoolRequest,
   ApplicationEvent,
   User,
+  CatalogSchool,
 } from "../models/index";
 import ApiError from "../utils/apiError";
 import identityService, {
@@ -102,9 +104,6 @@ class ParentService {
     const parent = await ParentRepository.findOne({ userId });
     const user = await UserRepository.findById(userId);
     if (!parent) throw new ApiError(404, "Parent profile not found");
-
-    // BVN flow: no pre-verification needed — POST directly to /v2/customers.
-    // NIN flow: NIN must already be verified (done via /parents/verify-nin).
     const customerPayload: CustomerPayload = {
       phone_number: user!.phoneNumber ?? "",
       email: user!.email,
@@ -127,15 +126,11 @@ class ParentService {
       "Lendsqr createCustomer response: " + JSON.stringify(lendsqrResponse),
     );
 
-    // Lendsqr returns 200 on success. Extract the customer ID from whichever
-    // shape the response uses. If the call didn't throw we treat it as success.
     const lendsqrUser =
       lendsqrResponse.data?.users?.[0] ??
       lendsqrResponse.data?.user ??
       (lendsqrResponse.data?.id ? lendsqrResponse.data : null);
 
-    // Use whatever ID came back, or fall back to a placeholder so the
-    // parent record is still marked as KYC-complete even if the shape changes.
     const lendsqrCustomerId = lendsqrUser
       ? String((lendsqrUser as { id?: unknown }).id ?? "registered")
       : "registered";
@@ -162,14 +157,6 @@ class ParentService {
     return response.data;
   }
 
-  /**
-   * Run a Lendsqr loan-score / karma check before allowing the parent to
-   * complete KYC.  Returns whether the applicant passes the credit gate and
-   * the raw decision data so the caller can decide what to do.
-   *
-   * If the check fails (pass === false) we also set isActive=false on the
-   * user account so the parent cannot re-enter the application funnel.
-   */
   async checkLoanScore(
     userId: string,
     bvn: string,
@@ -196,9 +183,6 @@ class ParentService {
     try {
       scoreRes = await applicationService.checkLoanScore(payload);
     } catch (err) {
-      // If the score endpoint itself errors (network / Lendsqr outage), log and
-      // allow the parent to continue — we don't want a 3rd-party outage to
-      // permanently block a legitimate user.
       logger.error("Loan score check failed (non-fatal): " + String(err));
       return {
         pass: true,
@@ -212,8 +196,6 @@ class ParentService {
     const pass = dd?.pass ?? true;
 
     if (!pass) {
-      // Block the account so the parent cannot attempt again until manually
-      // re-enabled by an admin.
       await user.update({ isActive: false });
       logger.warn(
         `Loan score FAILED for userId=${userId} — decision="${dd?.decision}" — account deactivated.`,
@@ -232,14 +214,14 @@ class ParentService {
     const parent = await ParentRepository.findOne({ userId });
     if (!parent) throw new ApiError(404, "Parent profile not found");
 
-    const school = await School.findByPk(studentData.schoolId as string);
+    const school = await CatalogSchool.findByPk(studentData.schoolId as string);
     if (!school) throw new ApiError(404, "School not found");
-    if (school.status !== "approved")
-      throw new ApiError(400, "School is not an active partner");
+    if (!school.isActive)
+      throw new ApiError(400, "School is not currently active");
 
     return Student.create({
       parentId: parent.id,
-      tuitionAmount: 0, // default — updated later when parent applies
+      tuitionAmount: 0,
       ...studentData,
     } as never);
   }
@@ -252,9 +234,9 @@ class ParentService {
       where: { parentId: parent.id },
       include: [
         {
-          model: School,
+          model: CatalogSchool,
           as: "school",
-          attributes: ["id", "schoolName", "addressCity", "addressState"],
+          attributes: ["id", "name"],
         },
       ],
       order: [["createdAt", "DESC"]],
@@ -269,9 +251,9 @@ class ParentService {
       where: { id: studentId, parentId: parent.id },
       include: [
         {
-          model: School,
+          model: CatalogSchool,
           as: "school",
-          attributes: ["id", "schoolName", "addressCity", "addressState"],
+          attributes: ["id", "name"],
         },
       ],
     });
@@ -293,10 +275,10 @@ class ParentService {
     if (!student) throw new ApiError(404, "Student not found");
 
     if (data.schoolId && data.schoolId !== student.schoolId) {
-      const school = await School.findByPk(data.schoolId as string);
+      const school = await CatalogSchool.findByPk(data.schoolId as string);
       if (!school) throw new ApiError(404, "School not found");
-      if (school.status !== "approved")
-        throw new ApiError(400, "School is not an active partner");
+      if (!school.isActive)
+        throw new ApiError(400, "School is not currently active");
     }
 
     return student.update(data);
@@ -339,7 +321,11 @@ class ParentService {
           as: "student",
           attributes: ["id", "firstName", "lastName", "gradeLevel"],
         },
-        { model: School, as: "school", attributes: ["id", "schoolName"] },
+        {
+          model: CatalogSchool,
+          as: "catalogSchool",
+          attributes: ["id", "name"],
+        },
       ],
       order: [["createdAt", "DESC"]],
     });
@@ -364,9 +350,9 @@ class ParentService {
           ],
         },
         {
-          model: School,
-          as: "school",
-          attributes: ["id", "schoolName", "addressCity", "addressState"],
+          model: CatalogSchool,
+          as: "catalogSchool",
+          attributes: ["id", "name"],
         },
         {
           model: ApplicationEvent,
@@ -460,7 +446,11 @@ class ParentService {
             model: Student,
             as: "students",
             include: [
-              { model: School, as: "school", attributes: ["id", "schoolName"] },
+              {
+                model: CatalogSchool,
+                as: "school",
+                attributes: ["id", "name"],
+              },
             ],
           },
           {
@@ -540,7 +530,6 @@ class ParentService {
   async submitApplication(
     userId: string,
     payload: {
-      // ── Step 1 ────
       dob: string;
       addressStreet: string;
       addressCity: string;
@@ -551,9 +540,7 @@ class ParentService {
       employerType: string;
       yearsInRole: string;
       monthlyIncome: string;
-      // ── Step 1 photo (multer file) ────
       photo?: Express.Multer.File;
-      // ── Step 2 ────
       bvn?: string;
       nin?: string;
       accountNumber?: string;
@@ -565,7 +552,6 @@ class ParentService {
           lendsqrSubTypeId?: number;
         }
       >;
-      // ── Step 3 ────
       schoolId: string;
       institutionType: string;
       gradeLevel: string;
@@ -573,7 +559,6 @@ class ParentService {
       academicSession: string;
       tuitionAmount: number;
       tenor: number;
-      // ── Step 4 ────
       students: Array<{
         fullName: string;
         dob: string;
@@ -588,21 +573,23 @@ class ParentService {
     if (!parent) throw new ApiError(404, "Parent profile not found");
     if (!user) throw new ApiError(404, "User not found");
 
-    const school = await School.findByPk(payload.schoolId);
-    if (!school) throw new ApiError(404, "School not found");
-    if (school.status !== "approved")
-      throw new ApiError(400, "School is not an active partner");
+    const catalogSchoolForWizard = await CatalogSchool.findByPk(
+      payload.schoolId,
+    );
+    if (!catalogSchoolForWizard) throw new ApiError(404, "School not found");
+    if (!catalogSchoolForWizard.isActive)
+      throw new ApiError(400, "School is not currently active");
 
-    // ── 1. Save profile photo to local disk ──────────────────────────────────
+    const partnerSchoolForWizard = await School.findOne({
+      where: { schoolName: catalogSchoolForWizard.name, status: "approved" },
+    });
+
     let photoUrl: string | null = parent.profilePhotoUrl ?? null;
 
     if (payload.photo) {
       const file = payload.photo;
-      // multer diskStorage already wrote the file — derive the paths
       const filePath = `uploads/photos/${file.filename}`;
       const publicUrl = `${process.env.APP_URL?.replace(/\/$/, "") ?? ""}/${filePath}`;
-
-      // Upsert: delete old file + DB row if one already exists
       const existingPhoto = await Document.findOne({
         where: { parentId: parent.id, category: "photo" },
       });
@@ -626,7 +613,6 @@ class ParentService {
       photoUrl = publicUrl;
     }
 
-    // ── 2. Save KYC documents to local disk ──────────────────────────────────
     const uploadedDocUrls: Array<{
       url: string;
       type_id: number;
@@ -656,7 +642,6 @@ class ParentService {
       });
     }
 
-    // ── 3. Save parent profile ────────────────────────────────────────────────
     await parent.update({
       dob: payload.dob,
       addressStreet: payload.addressStreet,
@@ -666,8 +651,6 @@ class ParentService {
       addressCountry: payload.addressCountry ?? null,
       ...(photoUrl ? { profilePhotoUrl: photoUrl } : {}),
     });
-
-    // ── 4. Register with Lendsqr (idempotent — skip if already done) ─────────
     if (!parent.lendsqrCustomerId) {
       const customerPayload: CustomerPayload = {
         phone_number: user.phoneNumber ?? "",
@@ -689,7 +672,6 @@ class ParentService {
       logger.info(
         "Lendsqr createCustomer response: " + JSON.stringify(lendsqrRes),
       );
-      // Lendsqr returns 200 on success. Extract ID from whichever shape comes back.
       const lendsqrUser =
         lendsqrRes.data?.users?.[0] ??
         lendsqrRes.data?.user ??
@@ -707,12 +689,10 @@ class ParentService {
       });
     }
 
-    // Re-fetch parent to get the freshly-saved lendsqrCustomerId and BVN
     const freshParent = await ParentRepository.findOne({ userId }, {
       scope: "withSensitive",
     } as never);
 
-    // ── 5 & 6. Create students + loan applications + ledgers ─────────────────
     const createdApplications: (typeof LoanApplication.prototype)[] = [];
 
     for (const studentData of payload.students) {
@@ -739,7 +719,8 @@ class ParentService {
         referenceNumber,
         parentId: parent.id,
         studentId: student.id,
-        schoolId: payload.schoolId,
+        catalogSchoolId: payload.schoolId,
+        schoolId: partnerSchoolForWizard?.id ?? null,
         amountRequested: payload.tuitionAmount,
         tenor: payload.tenor,
         status: "pending",
@@ -748,8 +729,6 @@ class ParentService {
       });
 
       createdApplications.push(application);
-
-      // ── Create LoanLedger + publish queue job ────────────────────────────
       const now = new Date().toISOString();
       const stateMachine = buildInitialStateMachine(now);
 
@@ -786,7 +765,6 @@ class ParentService {
           product_id: LENDSQR_PRODUCT_ID,
           disburse_to: "bank",
           location: freshParent.addressState ?? undefined,
-          // Additional profile data from step-1 payload
           monthly_net_income: payload.monthlyIncome,
           employment_status: payload.employerType.toLowerCase().includes("self")
             ? "Self Employed"
@@ -819,17 +797,6 @@ class ParentService {
     };
   }
 
-  // ── Streamlined wizard (JSON, no file uploads) — for StudentDetailsPage ─────
-
-  /**
-   * POST /parents/submit-application-json
-   *
-   * Used by the StudentDetailsPage 5-step flow.  KYC is already complete at
-   * this point (done via EligibilityTestPage), so we only need to:
-   *  1. Validate that the student / school exists
-   *  2. Create the LoanApplication
-   *  3. Create the LoanLedger + publish the RabbitMQ booking job
-   */
   async submitWizardApplicationJson(
     userId: string,
     payload: {
@@ -857,7 +824,6 @@ class ParentService {
       );
     }
 
-    // Guard against non-UUID IDs (e.g. mock "c1"/"c2") — return clear 404
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(payload.childId)) {
@@ -872,12 +838,40 @@ class ParentService {
     });
     if (!student) throw new ApiError(404, "Student not found");
 
-    const school = await School.findByPk(payload.schoolId);
-    if (!school) throw new ApiError(404, "School not found");
-    if (school.status !== "approved")
-      throw new ApiError(400, "School is not an active partner");
+    const catalogSchool = await CatalogSchool.findByPk(payload.schoolId);
+    if (!catalogSchool) throw new ApiError(404, "School not found");
+    if (!catalogSchool.isActive)
+      throw new ApiError(400, "School is not currently active");
 
-    // ── Create LoanApplication ────────────────────────────────────────────────
+    const partnerSchool = await School.findOne({
+      where: { schoolName: catalogSchool.name, status: "approved" },
+    });
+
+    // ── Duplicate application guard — one application per student per term ───
+    // A "term" is a rolling 4-month window anchored to the calendar year:
+    //   Term 1: Jan–Apr  |  Term 2: May–Aug  |  Term 3: Sep–Dec
+    const checkTime = new Date();
+    const termMonthStart = Math.floor(checkTime.getMonth() / 4) * 4; // 0, 4, or 8
+    const termStart = new Date(checkTime.getFullYear(), termMonthStart, 1);
+    const termEnd = new Date(checkTime.getFullYear(), termMonthStart + 4, 1);
+
+    const existingApplication = await LoanApplication.findOne({
+      where: {
+        studentId: student.id,
+        // Guard is per-student per-term regardless of school —
+        // a student's fees can only be financed once per term
+        status: { [Op.notIn]: ["rejected", "cancelled"] },
+        createdAt: { [Op.gte]: termStart, [Op.lt]: termEnd },
+      },
+    });
+
+    if (existingApplication) {
+      throw new ApiError(
+        409,
+        `You've already submitted an application for ${student.firstName} ${student.lastName} this term. A student's fees can only be financed once per term.`,
+      );
+    }
+
     const referenceNumber = `SKC-${Date.now()}-${Math.random()
       .toString(36)
       .slice(2, 7)
@@ -887,7 +881,8 @@ class ParentService {
       referenceNumber,
       parentId: parent.id,
       studentId: student.id,
-      schoolId: payload.schoolId,
+      catalogSchoolId: payload.schoolId,
+      schoolId: partnerSchool?.id ?? null,
       amountRequested: payload.tuitionAmount,
       tenor: payload.tenor,
       status: "pending",
@@ -895,7 +890,61 @@ class ParentService {
       termsAcceptedAt: new Date(),
     });
 
-    // ── Create LoanLedger ────────────────────────────────────────────────────
+    // ── Email notification ────────────────────────────────────────────────────
+    // Fire-and-forget — don't block the response if email fails
+    UserRepository.findById(userId)
+      .then((user) => {
+        if (!user?.email) return;
+        const planLabel =
+          payload.tenor === 1 ? "Full payment" : `${payload.tenor}-month plan`;
+        const amountFormatted = `₦${Number(payload.tuitionAmount).toLocaleString("en-NG")}`;
+        sendEmail({
+          email: user.email,
+          subject: `Application Received – ${application.referenceNumber}`,
+          message: `Your application for ${student.firstName} ${student.lastName} has been received and is under review.`,
+          html: `
+          <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#333">
+            <div style="background:#881337;padding:28px 32px;border-radius:12px 12px 0 0">
+              <h1 style="color:#fff;margin:0;font-size:22px">Application Received</h1>
+            </div>
+            <div style="background:#fff;padding:28px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
+              <p style="margin:0 0 16px">Hi <strong>${parent.firstName}</strong>,</p>
+              <p style="margin:0 0 20px">We've received your tuition application and it's now under review. Here's a summary:</p>
+              <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+                <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Application ID</td>
+                    <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${application.referenceNumber}</td></tr>
+                <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Student</td>
+                    <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${student.firstName} ${student.lastName}</td></tr>
+                <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">School</td>
+                    <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${catalogSchool.name}</td></tr>
+                <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Repayment Plan</td>
+                    <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${planLabel}</td></tr>
+                <tr><td style="padding:10px 0;color:#881337;font-weight:bold;font-size:15px">Total Amount</td>
+                    <td style="padding:10px 0;color:#881337;font-weight:bold;text-align:right;font-size:15px">${amountFormatted}</td></tr>
+              </table>
+              <div style="background:#fdf4f7;border-left:4px solid #881337;border-radius:6px;padding:14px 16px;margin-bottom:24px">
+                <p style="margin:0;font-size:13px;color:#881337">
+                  <strong>Status: Under Review</strong><br>
+                  You'll receive another email once a decision has been made.
+                </p>
+              </div>
+              <p style="font-size:13px;color:#6b7280;margin:0">
+                If you have questions, reply to this email or contact support.<br><br>
+                The SkulCredit Team
+              </p>
+            </div>
+          </div>
+        `,
+        }).catch((err) =>
+          logger.warn(
+            `[parent.service] Email send failed: ${(err as Error).message}`,
+          ),
+        );
+      })
+      .catch(() => {
+        /* silent */
+      });
+
     const now = new Date().toISOString();
     const stateMachine = buildInitialStateMachine(now);
 
@@ -922,7 +971,6 @@ class ParentService {
       queuedAt: null,
     });
 
-    // ── Publish to RabbitMQ ──────────────────────────────────────────────────
     if (parent.bvn) {
       const bookLoanPayload: BookLoanPayload = {
         bvn: parent.bvn,

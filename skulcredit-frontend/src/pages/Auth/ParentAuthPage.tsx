@@ -236,8 +236,11 @@ const ParentAuthPage: React.FC = () => {
       await login(loginEmail, loginPassword, "parent");
       navigate("/parent/dashboard");
     } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
       setLoginError(
-        (err as Error).message ?? "Invalid credentials. Please try again.",
+        axErr.response?.data?.message ??
+          (err as Error).message ??
+          "Invalid credentials. Please try again.",
       );
     } finally {
       setIsLoading(false);

@@ -30,11 +30,7 @@ const fileFilter = (
   }
 };
 
-/**
- * Disk storage engine — writes to <UPLOADS_DIR>/documents/<uuid>-<name>.<ext>
- * The `destination` sub-folder can be overridden per-route by setting
- * `req.uploadFolder` before the middleware runs.
- */
+
 const diskStorage: StorageEngine = multer.diskStorage({
   destination(_req, _file, cb) {
     const folder = path.resolve(process.cwd(), env.uploads.dir, "documents");

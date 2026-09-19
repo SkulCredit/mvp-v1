@@ -44,8 +44,6 @@ interface Student {
   school?: {
     id: string;
     name: string;
-    city?: string;
-    state?: string;
   };
   createdAt?: string;
 }
@@ -1426,10 +1424,7 @@ const ParentSettingsPage: React.FC = () => {
               </div>
             ) : (
               students.map((student) => {
-                const schoolLabel = [
-                  student.school?.name,
-                  student.school?.city ?? student.school?.state,
-                ]
+                const schoolLabel = [student.school?.name]
                   .filter(Boolean)
                   .join(" · ");
 

@@ -8,8 +8,6 @@ import type { BookLoanPayload } from "../integrations/lendsqr/application.servic
 import logger from "../config/logger";
 import env from "../config/env";
 
-// ── Lendsqr product ID ────────────────────────────────────────────────────────
-// Set LENDSQR_PRODUCT_ID in your .env.  Default 74 matches the API docs example.
 const LENDSQR_PRODUCT_ID = parseInt(process.env.LENDSQR_PRODUCT_ID ?? "74", 10);
 
 interface SubmitApplicationData {
@@ -36,14 +34,6 @@ class LoanService {
     return response.data;
   }
 
-  /**
-   * Create a LoanApplication record, create a LoanLedger with the initial
-   * state machine, then publish a loan-booking job to RabbitMQ so the
-   * Lendsqr call happens asynchronously.
-   *
-   * We no longer block the HTTP response on the Lendsqr round-trip — the
-   * webhook will advance the ledger once Lendsqr finishes processing.
-   */
   async submitApplication(userId: string, data: SubmitApplicationData) {
     const parent = await ParentRepository.findOne(
       { userId },
@@ -64,7 +54,6 @@ class LoanService {
       throw new ApiError(400, "Invalid student record");
     }
 
-    // ── 1. Create local LoanApplication ──────────────────────────────────────
     const referenceNumber = `SKC-${Date.now()}-${Math.random()
       .toString(36)
       .slice(2, 6)
@@ -74,13 +63,12 @@ class LoanService {
       referenceNumber,
       parentId: parent.id,
       studentId: student.id,
-      schoolId: student.schoolId,
+      catalogSchoolId: student.schoolId,
       amountRequested: data.amount,
       tenor: data.tenor,
       status: "pending",
     });
 
-    // ── 2. Create LoanLedger with INITIATED state ────────────────────────────
     const now = new Date().toISOString();
     const stateMachine = buildInitialStateMachine(now);
 
@@ -132,7 +120,6 @@ class LoanService {
         | undefined,
     };
 
-    // ── 4. Publish to RabbitMQ queue ──────────────────────────────────────────
     await ledger.update({ queuedAt: new Date().toISOString() });
 
     await publishLoanBooking({

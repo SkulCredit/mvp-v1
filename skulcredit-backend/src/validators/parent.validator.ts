@@ -125,8 +125,6 @@ export const schoolRequestSchema = z.object({
 
 export const submitWizardApplicationJsonSchema = z.object({
   body: z.object({
-    // childId is the student record ID — any non-empty string (real UUIDs from DB,
-    // or mock IDs during development). The service layer validates existence.
     childId: z.string().min(1, "childId is required"),
     schoolId: z.string().uuid("schoolId must be a valid UUID"),
     institutionTypeId: z
@@ -134,7 +132,6 @@ export const submitWizardApplicationJsonSchema = z.object({
       .uuid("institutionTypeId must be a valid UUID"),
     institutionTypeName: z.string().min(1, "Institution type name is required"),
     gradeLevel: z.string().min(1, "Grade level is required"),
-    // tuitionAmount comes from the child's record — may be 0 if not yet set
     tuitionAmount: z.preprocess(
       (v) => (typeof v === "string" ? parseFloat(v) : v),
       z.number().nonnegative("Tuition amount must be 0 or greater"),
@@ -152,7 +149,6 @@ export const submitWizardApplicationJsonSchema = z.object({
 export const submitApplicationSchema = z.object({
   body: z
     .object({
-      // Step 1
       dob: z.string().min(1, "Date of birth is required"),
       addressStreet: z.string().min(1, "Street address is required"),
       addressCity: z.string().min(1, "City is required"),
@@ -163,12 +159,10 @@ export const submitApplicationSchema = z.object({
       employerType: z.string().min(1, "Employer type is required"),
       yearsInRole: z.string().min(1, "Years in role is required"),
       monthlyIncome: z.string().min(1, "Monthly income is required"),
-      // Step 2
       bvn: z.string().length(11).regex(/^\d+$/).optional(),
       nin: z.string().length(11).regex(/^\d+$/).optional(),
       accountNumber: z.string().optional(),
       bankCode: z.string().optional(),
-      // Step 3 — multipart sends numbers as strings, coerce them
       schoolId: z.string().uuid("School ID must be a valid UUID"),
       institutionType: z.string().min(1),
       gradeLevel: z.string().min(1),
@@ -182,7 +176,6 @@ export const submitApplicationSchema = z.object({
         (v) => (typeof v === "string" ? parseInt(v, 10) : v),
         z.number().int().positive("Tenor must be a positive integer"),
       ),
-      // Step 4 — students arrives as a JSON string in multipart
       students: z.preprocess(
         (v) => {
           if (typeof v === "string") {
@@ -205,7 +198,6 @@ export const submitApplicationSchema = z.object({
           )
           .min(1, "At least one student is required"),
       ),
-      // docTypes arrives as a JSON string: ["Bank Statement", ...]
       docTypes: z.preprocess((v) => {
         if (typeof v === "string") {
           try {

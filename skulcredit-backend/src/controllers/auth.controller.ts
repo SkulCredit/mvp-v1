@@ -4,17 +4,16 @@ import { successResponse } from "../utils/response";
 import redis from "../config/redis";
 import env from "../config/env";
 
-// ── Cookie helpers ────────────────────────────────────────────────────────────
 const COOKIE_NAME = "sc_refresh";
-const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; 
 
 function setRefreshCookie(res: Response, token: string): void {
   res.cookie(COOKIE_NAME, token, {
-    httpOnly: true, // not accessible via JS
-    secure: env.nodeEnv === "production", // HTTPS-only in prod
+    httpOnly: true, 
+    secure: env.nodeEnv === "production", 
     sameSite: env.nodeEnv === "production" ? "strict" : "lax",
     maxAge: COOKIE_MAX_AGE_MS,
-    path: "/api/v1/auth", // cookie only sent to auth routes
+    path: "/api/v1/auth", 
   });
 }
 
@@ -88,10 +87,7 @@ class AuthController {
 
       const result = await authService.login(email, password, { ip, device });
 
-      // Refresh token goes into an httpOnly cookie — never exposed to JS
       setRefreshCookie(res, result.refreshToken);
-
-      // Return only the access token + user in the JSON body
       const { refreshToken: _drop, ...safeResult } = result;
       successResponse(res, 200, "Login successful", safeResult);
     } catch (error) {
@@ -101,7 +97,6 @@ class AuthController {
 
   async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      // Revoke the refresh token stored in the httpOnly cookie if present
       const token: string | undefined = req.cookies?.[COOKIE_NAME];
       if (token) {
         await authService.revokeRefreshToken(token).catch(() => {});
@@ -119,7 +114,6 @@ class AuthController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      // Accept token from httpOnly cookie (preferred) or request body (fallback)
       const token: string | undefined =
         req.cookies?.[COOKIE_NAME] ?? req.body?.token;
 
@@ -132,15 +126,11 @@ class AuthController {
 
       const result = await authService.refreshToken(token);
 
-      // Rotate the cookie with the new refresh token
       setRefreshCookie(res, result.refreshToken);
-
-      // Return only the new access token in the body
       successResponse(res, 200, "Token refreshed successfully", {
         accessToken: result.accessToken,
       });
     } catch (error) {
-      // Clear the cookie on any refresh failure so the client is forced to re-login
       clearRefreshCookie(res);
       next(error);
     }

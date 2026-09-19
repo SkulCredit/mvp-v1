@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, Link } from "react-router-dom";
 import Icon from "../../components/Icon";
 import DataTable, { Column } from "../../components/DataTable";
@@ -12,8 +13,6 @@ import {
 } from "../../services/dashboardService";
 import Button from "../../components/ui/Button";
 import { PlusIcon } from "lucide-react";
-
-// ── Types ──────────────
 
 interface AppRow {
   id: string;
@@ -31,7 +30,83 @@ const DEFAULT_STATS: DashboardStats = {
   totalApprovedAmount: 0,
 };
 
-// ── Stat card ──────────
+function getCurrentTermKey(): string {
+  const now = new Date();
+  const term = Math.floor(now.getMonth() / 4) + 1;
+  return `${now.getFullYear()}-T${term}`;
+}
+
+const TERM_MODAL_KEY = "skulcredit_last_seen_term";
+
+const NewTermModal: React.FC<{
+  firstName: string;
+  onYes: () => void;
+  onNo: () => void;
+}> = ({ firstName, onYes, onNo }) =>
+  createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="new-term-modal-title"
+    >
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden animate-fade-in-up">
+        <div className="bg-brand px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-5 h-5"
+                aria-hidden="true"
+              >
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                <path d="M6 12v5c3 3 9 3 12 0v-5" />
+              </svg>
+            </div>
+            <h2
+              id="new-term-modal-title"
+              className="text-base font-bold text-white leading-snug"
+            >
+              New School Term
+            </h2>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            Welcome back, <strong>{firstName}</strong>! It's a new school term.
+            Would you like to add a new child/student so you can easily pay
+            their school fees?
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="px-6 pb-6 flex gap-3">
+          <button
+            type="button"
+            onClick={onNo}
+            className="flex-1 rounded-full border border-gray-300 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Not now
+          </button>
+          <button
+            type="button"
+            onClick={onYes}
+            className="flex-1 rounded-full bg-brand py-2.5 text-sm font-bold text-white hover:bg-[#7a1848] transition-colors shadow-sm"
+          >
+            Yes, add student
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -62,8 +137,6 @@ const StatCard: React.FC<StatCardProps> = ({
   </div>
 );
 
-// ── School-request helpers
-
 const STATUS_MESSAGES: Record<SchoolRequestStatus, string> = {
   pending:
     "Your request is under review. We'll notify you once it's processed.",
@@ -81,8 +154,6 @@ const STATUS_PILL_CLS: Record<SchoolRequestStatus, string> = {
   rejected: "bg-red-100 text-red-600",
 };
 
-// ── Page ───────────────
-
 const ParentDashboardHomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -96,6 +167,26 @@ const ParentDashboardHomePage: React.FC = () => {
   const [kycStatus, setKycStatus] = useState<string>("pending");
   const [myApplications, setMyApplications] = useState<AppRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [showTermModal, setShowTermModal] = useState(false);
+
+  useEffect(() => {
+    const currentTerm = getCurrentTermKey();
+    const lastSeen = localStorage.getItem(TERM_MODAL_KEY);
+    if (lastSeen !== currentTerm) {
+      setShowTermModal(true);
+      localStorage.setItem(TERM_MODAL_KEY, currentTerm);
+    }
+  }, []);
+
+  const handleTermModalYes = () => {
+    setShowTermModal(false);
+    navigate("/parent/settings");
+  };
+
+  const handleTermModalNo = () => {
+    setShowTermModal(false);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -123,11 +214,8 @@ const ParentDashboardHomePage: React.FC = () => {
 
   const schoolRequestStatus: SchoolRequestStatus | null =
     schoolRequests[0]?.status ?? null;
-  // Show the banner only when the parent has NOT completed KYC.
-  // Once kycStatus is "approved" (Lendsqr registration succeeded) hide it forever.
   const showIncompleteBanner = !isLoading && kycStatus !== "approved";
 
-  // ── Column definitions
   const appColumns: Column<AppRow>[] = [
     {
       header: "App ID",
@@ -156,7 +244,6 @@ const ParentDashboardHomePage: React.FC = () => {
     },
   ];
 
-  // ── Loading ────────
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center pt-20">
@@ -167,6 +254,15 @@ const ParentDashboardHomePage: React.FC = () => {
 
   return (
     <div className="space-y-8 pt-8 animate-fade-in-up w-[90%] mx-auto">
+      {/* ── New-term modal */}
+      {showTermModal && (
+        <NewTermModal
+          firstName={userName.split(" ")[0]}
+          onYes={handleTermModalYes}
+          onNo={handleTermModalNo}
+        />
+      )}
+
       {/* ── Welcome banner  */}
       <div className="bg-brand rounded-3xl p-8 md:p-10 text-white relative overflow-hidden shadow-lg shadow-brand/10 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
@@ -194,7 +290,6 @@ const ParentDashboardHomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Stats ───────── */}
       <section>
         <h3 className="mb-3 text-base font-bold text-gray-800">
           Quick Actions
@@ -262,7 +357,6 @@ const ParentDashboardHomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* ── School request status pill  */}
       {hasSchoolRequest && schoolRequestStatus && (
         <div className="flex items-center justify-between gap-4 rounded-xl bg-[#F0FDF4] border border-green-100 px-6 py-4">
           <div>

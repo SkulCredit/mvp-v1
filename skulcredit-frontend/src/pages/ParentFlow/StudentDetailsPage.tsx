@@ -374,7 +374,14 @@ const StepSelectChild: React.FC<{
   selectedId: string | null;
   onSelect: (id: string) => void;
   onAddNew: () => void;
-}> = ({ children, selectedId, onSelect, onAddNew }) => (
+  blockedStudentIds?: Set<string>;
+}> = ({
+  children,
+  selectedId,
+  onSelect,
+  onAddNew,
+  blockedStudentIds = new Set(),
+}) => (
   <div className="space-y-6">
     <div>
       <h2 className="text-lg sm:text-2xl font-extrabold text-gray-900">
@@ -393,14 +400,17 @@ const StepSelectChild: React.FC<{
         <div className="space-y-3">
           {children.map((child) => {
             const selected = selectedId === child.id;
+            const blocked = blockedStudentIds.has(child.id);
             return (
               <div
                 key={child.id}
-                onClick={() => onSelect(child.id)}
-                className={`flex items-center gap-3 bg-white rounded-2xl border px-3 sm:px-5 py-3 sm:py-4 cursor-pointer transition-all ${
-                  selected
-                    ? "border-[#881337] ring-2 ring-[#881337]/20"
-                    : "border-gray-200 hover:border-[#881337]/40"
+                onClick={() => !blocked && onSelect(child.id)}
+                className={`flex items-center gap-3 bg-white rounded-2xl border px-3 sm:px-5 py-3 sm:py-4 transition-all ${
+                  blocked
+                    ? "border-gray-100 opacity-60 cursor-not-allowed bg-gray-50"
+                    : selected
+                      ? "border-[#881337] ring-2 ring-[#881337]/20 cursor-pointer"
+                      : "border-gray-200 hover:border-[#881337]/40 cursor-pointer"
                 }`}
               >
                 <img
@@ -466,14 +476,34 @@ const StepSelectChild: React.FC<{
                     </p>
                   )}
                 </div>
-                {/* Radio dot only — no extra "Select" button to avoid cramping */}
-                <div
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "border-[#881337]" : "border-gray-300"}`}
-                >
-                  {selected && (
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#881337]" />
-                  )}
-                </div>
+                {/* Radio dot — hidden when blocked */}
+                {blocked ? (
+                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2.5 py-1 text-[11px] font-semibold text-amber-700 whitespace-nowrap">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="w-3 h-3"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    Applied this term
+                  </span>
+                ) : (
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "border-[#881337]" : "border-gray-300"}`}
+                  >
+                    {selected && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#881337]" />
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1082,6 +1112,43 @@ const StudentDetailsPage: React.FC = () => {
   // ── Step 1: child ──────────────────────────────────────────────────────────
   const [children, setChildren] = useState<Child[]>(MOCK_CHILDREN);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const [blockedStudentIds, setBlockedStudentIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Compute which student IDs already have an active application this term
+  // Term window mirrors backend: Term1=Jan-Apr, Term2=May-Aug, Term3=Sep-Dec
+  useEffect(() => {
+    parentService
+      .getApplications()
+      .then((data) => {
+        const raw = Array.isArray(data)
+          ? (data as Array<{
+              studentId?: string;
+              status?: string;
+              createdAt?: string;
+            }>)
+          : [];
+
+        const now = new Date();
+        const termMonthStart = Math.floor(now.getMonth() / 4) * 4;
+        const termStart = new Date(now.getFullYear(), termMonthStart, 1);
+        const termEnd = new Date(now.getFullYear(), termMonthStart + 4, 1);
+        const INACTIVE = new Set(["rejected", "cancelled"]);
+
+        const blocked = new Set<string>();
+        for (const app of raw) {
+          if (!app.studentId || !app.createdAt) continue;
+          if (INACTIVE.has(app.status ?? "")) continue;
+          const d = new Date(app.createdAt);
+          if (d >= termStart && d < termEnd) blocked.add(app.studentId);
+        }
+        setBlockedStudentIds(blocked);
+      })
+      .catch(() => {
+        /* silent — don't break the wizard if this fails */
+      });
+  }, []);
 
   useEffect(() => {
     parentService
@@ -1247,8 +1314,10 @@ const StudentDetailsPage: React.FC = () => {
       setSubmittedRef(ref);
       setStep(5);
     } catch (err) {
+      const axErr = err as import("axios").AxiosError<{ message?: string }>;
       showToast(
-        (err as Error).message ??
+        axErr.response?.data?.message ??
+          (err as Error).message ??
           "Failed to submit application. Please try again.",
       );
     } finally {
@@ -1296,7 +1365,8 @@ const StudentDetailsPage: React.FC = () => {
   ]);
 
   const continueDisabled =
-    (step === 1 && !selectedChildId) ||
+    (step === 1 &&
+      (!selectedChildId || blockedStudentIds.has(selectedChildId ?? ""))) ||
     (step === 2 &&
       (!selectedInstitutionTypeId ||
         !selectedSchoolId ||
@@ -1370,6 +1440,7 @@ const StudentDetailsPage: React.FC = () => {
             children={children}
             selectedId={selectedChildId}
             onSelect={setSelectedChildId}
+            blockedStudentIds={blockedStudentIds}
             onAddNew={() => navigate("/parent/eligibility")}
           />
         )}
