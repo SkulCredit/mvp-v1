@@ -7,19 +7,12 @@ export interface DocumentAttributes {
   id: string;
   parentId: string;
   category: DocumentCategory;
-  /** Human-readable label e.g. "Bank Statement (Last 3 Months)" */
   docType: string | null;
-  /** Relative path on disk — e.g. "uploads/photos/uuid-photo.jpg" */
   filePath: string;
-  /** Public-accessible URL derived from filePath — not stored, computed on read */
   fileUrl: string | null;
-  /** MIME type e.g. "application/pdf" */
   mimeType: string | null;
-  /** File size in bytes */
   fileSize: number | null;
-  /** Lendsqr document type_id */
   lendsqrTypeId: number;
-  /** Lendsqr document sub_type_id (optional) */
   lendsqrSubTypeId: number | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -74,7 +67,6 @@ DocumentInstance.init(
       allowNull: false,
     },
     fileUrl: {
-      // Stored for convenience — can be regenerated from filePath + appUrl
       type: DataTypes.STRING(2048),
       allowNull: true,
     },

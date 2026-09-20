@@ -249,6 +249,8 @@ export const parentService = {
     tuitionAmount,
     repaymentPlanId,
     tenor,
+    academicSession,
+    term,
   }: {
     childId: string;
     schoolId: string;
@@ -258,10 +260,15 @@ export const parentService = {
     tuitionAmount: number;
     repaymentPlanId: "full" | "3month" | "6month";
     tenor: number;
+    academicSession?: string;
+    term?: string;
   }): Promise<{
     referenceNumber?: string;
     referenceNumbers?: string[];
     lendsqrLoanId?: number;
+    tenor?: number;
+    termName?: string;
+    termAcademicYear?: string;
     [key: string]: unknown;
   }> => {
     const response = await apiClient.post("/parents/apply", {
@@ -273,14 +280,42 @@ export const parentService = {
       tuitionAmount: Number(tuitionAmount),
       repaymentPlanId,
       tenor: Number(tenor),
+      ...(academicSession ? { academicSession } : {}),
+      ...(term ? { term } : {}),
     });
     return response.data.data as {
       referenceNumber?: string;
       referenceNumbers?: string[];
       lendsqrLoanId?: number;
+      tenor?: number;
+      termName?: string;
+      termAcademicYear?: string;
     };
   },
 };
+
+// ── Academic session/term types ───────────────────────────────────────────────
+
+export interface AcademicTermSummary {
+  id: string;
+  termId: string;
+  termCode: "FIRST_TERM" | "SECOND_TERM" | "THIRD_TERM";
+  termName: string;
+  status: string;
+  portalOpeningDate: string | null;
+  portalCloseDate: string | null;
+  maxRepaymentMonths: number;
+}
+
+export interface AcademicSessionSummary {
+  id: string;
+  sessionId: string;
+  sessionName: string; // "2026/2027"
+  startYear: number;
+  endYear: number;
+  isCurrent: boolean;
+  terms: AcademicTermSummary[];
+}
 
 // ── Catalog types ─────────────────────────────────────────────────────────────
 
@@ -312,6 +347,13 @@ export interface CatalogClassLevelGroup {
 // ── Catalog service ───────────────────────────────────────────────────────────
 
 export const catalogService = {
+  /** Fetch all academic sessions with their terms — for the wizard session/term picker */
+  getSessions: async (): Promise<AcademicSessionSummary[]> => {
+    const response = await apiClient.get<{ data: AcademicSessionSummary[] }>(
+      "/parents/sessions",
+    );
+    return response.data.data;
+  },
   /** Step 1 of 3: fetch all institution types (Nursery, Primary, Secondary …) */
   getInstitutionTypes: async (): Promise<CatalogInstitutionType[]> => {
     const response = await apiClient.get<{

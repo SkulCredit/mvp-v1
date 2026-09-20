@@ -7,8 +7,8 @@ export interface LoanApplicationAttributes {
   referenceNumber: string | null;
   parentId: string;
   studentId: string;
-  catalogSchoolId: string; // catalog_schools.id — always set from parent selection
-  schoolId: string | null; // schools.id — set when a registered school partner is matched
+  catalogSchoolId: string; 
+  schoolId: string | null; 
   termId: string | null;
   lendsqrApplicationId: string | null;
   amountRequested: number;

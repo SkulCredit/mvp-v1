@@ -584,7 +584,6 @@ const ParentDashboardPage: React.FC = () => {
 
           return (
             <div className="flex flex-col gap-4 pt-8 animate-fade-in-up w-[85%] mx-auto">
-              {/* ── Progress card ──────────────────────────────────────── */}
               <div className="bg-white rounded-2xl border-2 border-brand/30 px-6 py-5">
                 {/* Top row */}
                 <div className="flex items-start justify-between gap-4 mb-3">
@@ -626,8 +625,6 @@ const ParentDashboardPage: React.FC = () => {
                   </p>
                 </div>
               </div>
-
-              {/* ── Verification item cards ────────────────────────────── */}
               {verifications.map((item) => {
                 const isVerified = item.status === "verified";
                 const isIdentity = item.id === "identity";
@@ -730,8 +727,6 @@ const ParentDashboardPage: React.FC = () => {
                   </div>
                 );
               })}
-
-              {/* ── Why Verification Matters ───────────────────────────── */}
               <div className="bg-white rounded-2xl border border-slate-200 px-6 py-5">
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-brand">
@@ -745,7 +740,6 @@ const ParentDashboardPage: React.FC = () => {
                   Completing all verifications helps us serve you better and
                   improves your loan application success rate.
                 </p>
-                {/* 2-col grid on mobile, 4-col on desktop — each item is a bordered card */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {whyItems.map((w) => (
                     <div
@@ -768,8 +762,6 @@ const ParentDashboardPage: React.FC = () => {
             </div>
           );
         })()}
-
-      {/* ══════════════════ SUPPORT TAB ════════════════════════ */}
       {activeTab === "support" && (
         <div className="space-y-6 pt-8 animate-fade-in-up w-[90%] mx-auto">
           <h2 className="text-2xl font-bold text-slate-900">Help & Support</h2>

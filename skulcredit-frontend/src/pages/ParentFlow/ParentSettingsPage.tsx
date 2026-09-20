@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import apiClient from "../../services/apiClient";
 import {
@@ -6,9 +6,9 @@ import {
   CatalogInstitutionType,
   CatalogSchool,
   CatalogClassLevelGroup,
+  AcademicSessionSummary,
+  AcademicTermSummary,
 } from "../../services/parentService";
-
-// ── Types ──────────────────────────────────────────────────────────────────
 
 interface ParentProfile {
   firstName: string;
@@ -76,9 +76,10 @@ interface StudentFormData {
   gradeLevel: string;
   tuitionAmount: string;
   studentId: string;
+  academicSession: string; // e.g. "2026/2027"
+  termId: string; // academic_terms UUID
+  termName: string; // e.g. "First Term"
 }
-
-// ── Icons ──────────────────────────────────────────────────────────────────
 
 const UserIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
@@ -193,8 +194,6 @@ const ChevronDownIcon: React.FC = () => (
   </svg>
 );
 
-// ── Shared primitives ──────────────────────────────────────────────────────
-
 const inputCls =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 " +
   "placeholder-gray-400 outline-none transition-colors " +
@@ -250,8 +249,6 @@ const SelectField: React.FC<{
   </FormField>
 );
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function maskSensitive(val: string | null | undefined): string {
   if (!val) return "—";
   if (val.length <= 3) return "•".repeat(val.length);
@@ -263,8 +260,6 @@ const Spinner: React.FC<{ className?: string }> = ({ className }) => (
     className={`animate-spin rounded-full border-2 border-current border-t-transparent ${className ?? "h-4 w-4"}`}
   />
 );
-
-// ── Modal shell ────────────────────────────────────────────────────────────
 
 const Modal: React.FC<{
   title: string;
@@ -301,8 +296,6 @@ const Modal: React.FC<{
     </div>
   </div>
 );
-
-// ── Confirm modal ──────────────────────────────────────────────────────────
 
 const ConfirmModal: React.FC<{
   message: string;
@@ -346,8 +339,6 @@ const ConfirmModal: React.FC<{
   </div>
 );
 
-// ── Toast ──────────────────────────────────────────────────────────────────
-
 const Toast: React.FC<{ message: string; type: "success" | "error" }> = ({
   message,
   type,
@@ -359,8 +350,6 @@ const Toast: React.FC<{ message: string; type: "success" | "error" }> = ({
     {message}
   </div>
 );
-
-// ── Modal footer helpers ───────────────────────────────────────────────────
 
 const ModalFooter: React.FC<{
   saving: boolean;
@@ -388,8 +377,6 @@ const ModalFooter: React.FC<{
   </>
 );
 
-// ── EditButton (card top-right) ────────────────────────────────────────────
-
 const EditButton: React.FC<{ onClick: () => void; label?: string }> = ({
   onClick,
   label = "Edit",
@@ -404,8 +391,6 @@ const EditButton: React.FC<{ onClick: () => void; label?: string }> = ({
   </button>
 );
 
-// ── Skeleton rows ──────────────────────────────────────────────────────────
-
 const SkeletonRows: React.FC<{ count?: number }> = ({ count = 4 }) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
     {Array.from({ length: count }).map((_, i) => (
@@ -417,22 +402,15 @@ const SkeletonRows: React.FC<{ count?: number }> = ({ count = 4 }) => (
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Page
-// ─────────────────────────────────────────────────────────────────────────────
-
 const ParentSettingsPage: React.FC = () => {
   const { user } = useAuth();
   const photoInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Remote data ────────────────────────────────────────────
 
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingStudents, setLoadingStudents] = useState(true);
 
-  // Catalog data for student modal
   const [institutionTypes, setInstitutionTypes] = useState<
     CatalogInstitutionType[]
   >([]);
@@ -444,7 +422,9 @@ const ParentSettingsPage: React.FC = () => {
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [loadingClasses, setLoadingClasses] = useState(false);
 
-  // ── Modal visibility ───────────────────────────────────────
+  // Academic sessions for the student modal session/term dropdowns
+  const [sessions, setSessions] = useState<AcademicSessionSummary[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
 
   const [showPersonalModal, setShowPersonalModal] = useState(false);
   const [showEmploymentModal, setShowEmploymentModal] = useState(false);
@@ -453,8 +433,6 @@ const ParentSettingsPage: React.FC = () => {
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
   const [showDeleteStudentConfirm, setShowDeleteStudentConfirm] =
     useState(false);
-
-  // ── Form data ──────────────────────────────────────────────
 
   const [personalForm, setPersonalForm] = useState<PersonalFormData>({
     firstName: "",
@@ -468,13 +446,11 @@ const ParentSettingsPage: React.FC = () => {
     addressCountry: "",
   });
 
-  // Employment is stored locally (no backend field for it on the Parent model)
   const [employmentForm, setEmploymentForm] = useState<EmploymentFormData>({
     employmentStatus: "",
     employer: "",
     monthlyIncome: "",
   });
-  // Persisted employment display values (saved locally per-session after edit)
   const [savedEmployment, setSavedEmployment] = useState<EmploymentFormData>({
     employmentStatus: "",
     employer: "",
@@ -491,9 +467,10 @@ const ParentSettingsPage: React.FC = () => {
     gradeLevel: "",
     tuitionAmount: "",
     studentId: "",
+    academicSession: "",
+    termId: "",
+    termName: "",
   });
-
-  // ── Operation states ───────────────────────────────────────
 
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [savingStudent, setSavingStudent] = useState(false);
@@ -504,8 +481,6 @@ const ParentSettingsPage: React.FC = () => {
     message: string;
     type: "success" | "error";
   } | null>(null);
-
-  // ── Helpers ────────────────────────────────────────────────
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
@@ -530,8 +505,6 @@ const ParentSettingsPage: React.FC = () => {
   const phone = profile?.user?.phoneNumber ?? user?.phoneNumber ?? "—";
   const photoUrl = profile?.profilePhotoUrl ?? null;
 
-  // ── On mount: fetch profile + students ────────────────────
-
   useEffect(() => {
     const fetchProfile = async () => {
       setLoadingProfile(true);
@@ -553,7 +526,6 @@ const ParentSettingsPage: React.FC = () => {
           addressCountry: p.addressCountry ?? "",
         });
       } catch {
-        // non-blocking – fall back to auth context values
       } finally {
         setLoadingProfile(false);
       }
@@ -573,7 +545,6 @@ const ParentSettingsPage: React.FC = () => {
       }
     };
 
-    // Load institution types once (for student modal)
     const fetchInstitutionTypes = async () => {
       setLoadingTypes(true);
       try {
@@ -590,8 +561,6 @@ const ParentSettingsPage: React.FC = () => {
     fetchStudents();
     fetchInstitutionTypes();
   }, []);
-
-  // ── Catalog cascade: institution type → schools ───────────
 
   const handleInstitutionTypeChange = async (id: string, name: string) => {
     setStudentForm((p) => ({
@@ -616,8 +585,6 @@ const ParentSettingsPage: React.FC = () => {
       setLoadingSchools(false);
     }
   };
-
-  // ── Catalog cascade: school → class levels ────────────────
 
   const handleSchoolChange = async (id: string, name: string) => {
     setStudentForm((p) => ({
@@ -644,8 +611,6 @@ const ParentSettingsPage: React.FC = () => {
   };
 
   const flatClasses = classLevelGroups.flatMap((g) => g.classes);
-
-  // ── Photo upload ───────────────────────────────────────────
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -680,8 +645,6 @@ const ParentSettingsPage: React.FC = () => {
     }
   };
 
-  // ── Save personal info ─────────────────────────────────────
-
   const handleSavePersonal = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingPersonal(true);
@@ -710,8 +673,6 @@ const ParentSettingsPage: React.FC = () => {
     }
   };
 
-  // ── Save employment info (local only — no backend field) ───
-
   const handleSaveEmployment = (e: React.FormEvent) => {
     e.preventDefault();
     setSavedEmployment({ ...employmentForm });
@@ -723,8 +684,6 @@ const ParentSettingsPage: React.FC = () => {
     setEmploymentForm({ ...savedEmployment });
     setShowEmploymentModal(true);
   };
-
-  // ── Open student modal ─────────────────────────────────────
 
   const openAddStudent = () => {
     setEditingStudent(null);
@@ -738,15 +697,41 @@ const ParentSettingsPage: React.FC = () => {
       gradeLevel: "",
       tuitionAmount: "",
       studentId: "",
+      academicSession: "",
+      termId: "",
+      termName: "",
     });
     setCatalogSchools([]);
     setClassLevelGroups([]);
     setShowStudentModal(true);
+    // Load sessions for the modal dropdowns
+    if (!sessions.length) {
+      setLoadingSessions(true);
+      catalogService
+        .getSessions()
+        .then((data) => {
+          setSessions(data);
+          // Auto-select current session + active term for new students
+          const current = data.find((s) => s.isCurrent);
+          if (current) {
+            const activeTerm = current.terms.find(
+              (t) => t.status === "ACTIVE_APPLICATION",
+            );
+            setStudentForm((prev) => ({
+              ...prev,
+              academicSession: current.sessionName,
+              termId: activeTerm?.id ?? "",
+              termName: activeTerm?.termName ?? "",
+            }));
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingSessions(false));
+    }
   };
 
   const openEditStudent = async (s: Student) => {
     setEditingStudent(s);
-    // Pre-fill what we have
     setStudentForm({
       firstName: s.firstName,
       lastName: s.lastName,
@@ -757,14 +742,87 @@ const ParentSettingsPage: React.FC = () => {
       gradeLevel: s.gradeLevel,
       tuitionAmount: String(s.tuitionAmount),
       studentId: s.studentId ?? "",
+      academicSession: "",
+      termId: "",
+      termName: "",
     });
     setCatalogSchools([]);
     setClassLevelGroups([]);
     setShowStudentModal(true);
+
+    // Load sessions for the dropdowns, auto-select current session + active term
+    if (!sessions.length) {
+      setLoadingSessions(true);
+      catalogService
+        .getSessions()
+        .then((data) => {
+          setSessions(data);
+          const current = data.find((d) => d.isCurrent);
+          if (current) {
+            const activeTerm = current.terms.find(
+              (t) => t.status === "ACTIVE_APPLICATION",
+            );
+            setStudentForm((prev) => ({
+              ...prev,
+              academicSession: current.sessionName,
+              termId: activeTerm?.id ?? "",
+              termName: activeTerm?.termName ?? "",
+            }));
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingSessions(false));
+    }
+
+    // Resolve institution type + schools + class levels from the student's schoolId
+    if (!s.schoolId) return;
+    try {
+      const types = institutionTypes.length
+        ? institutionTypes
+        : await catalogService
+            .getInstitutionTypes()
+            .catch(() => [] as typeof institutionTypes);
+      if (!institutionTypes.length && types.length) setInstitutionTypes(types);
+
+      let matchedTypeId = "";
+      let matchedTypeName = "";
+      let matchedSchools: typeof catalogSchools = [];
+
+      for (const t of types) {
+        setLoadingSchools(true);
+        const schools = await catalogService
+          .getSchools(t.id)
+          .catch(() => [] as typeof catalogSchools);
+        const found = schools.find((sc) => sc.id === s.schoolId);
+        if (found) {
+          matchedTypeId = t.id;
+          matchedTypeName = t.name;
+          matchedSchools = schools;
+          break;
+        }
+      }
+      setLoadingSchools(false);
+
+      if (!matchedTypeId) return;
+
+      setCatalogSchools(matchedSchools);
+      setStudentForm((prev) => ({
+        ...prev,
+        institutionTypeId: matchedTypeId,
+        institutionTypeName: matchedTypeName,
+      }));
+
+      setLoadingClasses(true);
+      const groups = await catalogService
+        .getClassLevels(s.schoolId, matchedTypeId)
+        .catch(() => [] as typeof classLevelGroups);
+      setLoadingClasses(false);
+      setClassLevelGroups(groups);
+    } catch {
+      setLoadingSchools(false);
+      setLoadingClasses(false);
+    }
   };
-
-  // ── Save student ───────────────────────────────────────────
-
   const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingStudent(true);
@@ -803,8 +861,6 @@ const ParentSettingsPage: React.FC = () => {
     }
   };
 
-  // ── Delete student ─────────────────────────────────────────
-
   const handleDeleteStudent = async () => {
     if (!deletingStudent) return;
     setDeletingStudentLoading(true);
@@ -820,8 +876,6 @@ const ParentSettingsPage: React.FC = () => {
       setDeletingStudentLoading(false);
     }
   };
-
-  // ── Employment status labels ────────────────────────────────
 
   const EMPLOYMENT_OPTIONS = [
     { value: "employed_full", label: "Employed (Full-time)" },
@@ -842,16 +896,11 @@ const ParentSettingsPage: React.FC = () => {
     return "₦" + num.toLocaleString("en-NG", { minimumFractionDigits: 0 });
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
-
   return (
     <>
       {/* Toast */}
       {toast && <Toast message={toast.message} type={toast.type} />}
 
-      {/* ── Personal Info Modal ──────────────────────────────────── */}
       {showPersonalModal && (
         <Modal
           title="Edit Personal Information"
@@ -978,7 +1027,6 @@ const ParentSettingsPage: React.FC = () => {
         </Modal>
       )}
 
-      {/* ── Employment Modal ─────────────────────────────────────── */}
       {showEmploymentModal && (
         <Modal
           title="Edit Employment Information"
@@ -1047,7 +1095,6 @@ const ParentSettingsPage: React.FC = () => {
         </Modal>
       )}
 
-      {/* ── Student Add / Edit Modal ─────────────────────────────── */}
       {showStudentModal && (
         <Modal
           title={editingStudent ? "Edit Student" : "Add Student"}
@@ -1171,6 +1218,83 @@ const ParentSettingsPage: React.FC = () => {
               ))}
             </SelectField>
 
+            {/* ── Academic Session ── */}
+            <SelectField
+              label="Academic Session"
+              required
+              selectProps={{
+                value: studentForm.academicSession,
+                disabled: loadingSessions,
+                onChange: (e) => {
+                  setStudentForm((p) => ({
+                    ...p,
+                    academicSession: e.target.value,
+                    termId: "",
+                    termName: "",
+                  }));
+                },
+              }}
+            >
+              <option value="">
+                {loadingSessions ? "Loading sessions…" : "— Select session —"}
+              </option>
+              {sessions.map((s) => (
+                <option key={s.id} value={s.sessionName}>
+                  {s.sessionName}
+                  {s.isCurrent ? " (Current)" : ""}
+                </option>
+              ))}
+            </SelectField>
+
+            {/* ── Term ── */}
+            {(() => {
+              const activeSession = sessions.find(
+                (s) => s.sessionName === studentForm.academicSession,
+              );
+              const availableTerms: AcademicTermSummary[] =
+                activeSession?.terms ?? [];
+              return (
+                <SelectField
+                  label="Term"
+                  required
+                  selectProps={{
+                    value: studentForm.termId,
+                    disabled:
+                      !studentForm.academicSession ||
+                      availableTerms.length === 0,
+                    onChange: (e) => {
+                      const t = availableTerms.find(
+                        (x) => x.id === e.target.value,
+                      );
+                      setStudentForm((p) => ({
+                        ...p,
+                        termId: e.target.value,
+                        termName: t?.termName ?? "",
+                      }));
+                    },
+                  }}
+                >
+                  <option value="">
+                    {!studentForm.academicSession
+                      ? "Select a session first"
+                      : "— Select term —"}
+                  </option>
+                  {availableTerms.map((t) => {
+                    const isOpen = t.status === "ACTIVE_APPLICATION";
+                    const isClosed =
+                      t.status === "APPLICATION_CLOSED" ||
+                      t.status === "COMPLETED";
+                    return (
+                      <option key={t.id} value={t.id} disabled={isClosed}>
+                        {t.termName}
+                        {isOpen ? " ✓ Open" : isClosed ? " (Closed)" : ""}
+                      </option>
+                    );
+                  })}
+                </SelectField>
+              );
+            })()}
+
             {/* Student ID */}
             <FormField label="Student ID / Admission No.">
               <input
@@ -1191,7 +1315,6 @@ const ParentSettingsPage: React.FC = () => {
         </Modal>
       )}
 
-      {/* ── Delete Student Confirm ───────────────────────────────── */}
       {showDeleteStudentConfirm && deletingStudent && (
         <ConfirmModal
           message={`Remove ${deletingStudent.firstName} ${deletingStudent.lastName} from your saved students? This won't affect existing applications.`}
@@ -1204,9 +1327,6 @@ const ParentSettingsPage: React.FC = () => {
         />
       )}
 
-      {/* ════════════════════════════════════════════════════════════
-          PAGE BODY
-          ════════════════════════════════════════════════════════════ */}
       <div className="flex flex-col gap-6 px-4 sm:px-6 py-8 w-full max-w-3xl mx-auto pb-16">
         {/* Page title */}
         <div>
@@ -1216,7 +1336,6 @@ const ParentSettingsPage: React.FC = () => {
           </p>
         </div>
 
-        {/* ── Profile Header Banner ───────────────────────────────── */}
         <div className="rounded-2xl overflow-hidden bg-[#8B1C53] shadow-sm">
           <div className="px-6 py-6 flex flex-wrap items-center gap-4">
             {/* Avatar / Photo */}
@@ -1227,7 +1346,6 @@ const ParentSettingsPage: React.FC = () => {
                   alt="Profile photo"
                   className="h-16 w-16 rounded-full object-cover border-2 border-white/40"
                   onError={(e) => {
-                    // If the image fails to load, hide it and fall back to icon
                     (e.currentTarget as HTMLImageElement).style.display =
                       "none";
                     const fallback = e.currentTarget
@@ -1237,7 +1355,6 @@ const ParentSettingsPage: React.FC = () => {
                 />
               ) : null}
 
-              {/* Default avatar — shown always when no photoUrl, or as hidden fallback */}
               <div
                 className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center text-white border-2 border-white/30"
                 style={{ display: photoUrl ? "none" : "flex" }}
@@ -1246,7 +1363,6 @@ const ParentSettingsPage: React.FC = () => {
                 <UserIcon className="w-8 h-8" />
               </div>
 
-              {/* Spinner overlay while uploading */}
               {photoLoading && (
                 <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
                   <Spinner className="h-5 w-5 border-white" />
@@ -1298,7 +1414,6 @@ const ParentSettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Personal Information Card ────────────────────────────── */}
         <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <h2 className="text-sm font-bold text-[#8B1C53]">
@@ -1331,7 +1446,6 @@ const ParentSettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Employment Information Card ──────────────────────────── */}
         <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <h2 className="text-sm font-bold text-[#8B1C53]">
@@ -1376,7 +1490,6 @@ const ParentSettingsPage: React.FC = () => {
           )}
         </div>
 
-        {/* ── My Students Card ─────────────────────────────────────── */}
         <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <div>

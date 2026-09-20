@@ -18,6 +18,9 @@ import LoanLedger from "./LoanLedger";
 import CatalogInstitutionType from "./CatalogInstitutionType";
 import CatalogSchool from "./CatalogSchool";
 import CatalogSchoolClassLevel from "./CatalogSchoolClassLevel";
+import SchoolTerm from "./SchoolTerm";
+import AcademicSession from "./AcademicSession";
+import AcademicTerm from "./AcademicTerm";
 
 User.hasOne(Parent, { foreignKey: "userId", as: "parentProfile" });
 User.hasOne(School, { foreignKey: "userId", as: "schoolProfile" });
@@ -148,9 +151,6 @@ Notification.belongsTo(User, { foreignKey: "userId", as: "user" });
 DeviceToken.belongsTo(User, { foreignKey: "userId", as: "user" });
 User.hasMany(DeviceToken, { foreignKey: "userId", as: "deviceTokens" });
 
-// ── School Catalog associations ───────────────────────────────────────────────
-// A CatalogSchool offers many class levels; each level belongs to one school
-// and one institution type.
 CatalogSchool.hasMany(CatalogSchoolClassLevel, {
   foreignKey: "schoolId",
   as: "classLevels",
@@ -167,6 +167,12 @@ CatalogInstitutionType.hasMany(CatalogSchoolClassLevel, {
 CatalogSchoolClassLevel.belongsTo(CatalogInstitutionType, {
   foreignKey: "institutionTypeId",
   as: "institutionType",
+});
+
+AcademicSession.hasMany(AcademicTerm, { foreignKey: "sessionId", as: "terms" });
+AcademicTerm.belongsTo(AcademicSession, {
+  foreignKey: "sessionId",
+  as: "session",
 });
 
 export {
@@ -190,4 +196,7 @@ export {
   CatalogInstitutionType,
   CatalogSchool,
   CatalogSchoolClassLevel,
+  SchoolTerm,
+  AcademicSession,
+  AcademicTerm,
 };

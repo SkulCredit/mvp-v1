@@ -1,121 +1,74 @@
-import { Router } from 'express';
-import adminController from '../controllers/admin.controller';
-import { protect } from '../middlewares/auth.middleware';
-import { authorize } from '../middlewares/rbac.middleware';
+import { Router } from "express";
+import adminController from "../controllers/admin.controller";
+import { protect } from "../middlewares/auth.middleware";
+import { authorize } from "../middlewares/rbac.middleware";
 
 const router = Router();
 
-router.use(protect, authorize('admin'));
+router.use(protect, authorize("admin"));
 
 /**
  * @swagger
  * tags:
  *   name: Admin
- *   description: "Internal operations - schools, parents, loans (role: admin)"
+ *   description: "Internal operations - schools, parents, loans, academic sessions (role: admin)"
  */
 
-/**
- * @swagger
- * /admin/dashboard:
- *   get:
- *     summary: Get admin portfolio overview stats
- *     tags: [Admin]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: Dashboard stats returned
- */
-router.get('/dashboard', adminController.getDashboard.bind(adminController));
 
-/**
- * @swagger
- * /admin/schools:
- *   get:
- *     summary: List all schools, optionally filtered by status
- *     tags: [Admin]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [pending, under_review, approved, rejected]
- *     responses:
- *       200:
- *         description: List of schools
- */
-router.get('/schools', adminController.getSchools.bind(adminController));
+router.get("/dashboard", adminController.getDashboard.bind(adminController));
+router.get("/schools", adminController.getSchools.bind(adminController));
+router.put(
+  "/schools/:id/approve",
+  adminController.approveSchool.bind(adminController),
+);
+router.put(
+  "/schools/:id/reject",
+  adminController.rejectSchool.bind(adminController),
+);
+router.get("/parents", adminController.getParents.bind(adminController));
+router.get("/loans", adminController.getLoanApplications.bind(adminController));
 
-/**
- * @swagger
- * /admin/schools/{id}/approve:
- *   put:
- *     summary: Approve a school registration
- *     tags: [Admin]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: School approved
- */
-router.put('/schools/:id/approve', adminController.approveSchool.bind(adminController));
+// GET    /admin/sessions              — list all (with nested terms)
+// POST   /admin/sessions              — create new session
+// GET    /admin/sessions/:id          — get one session
+// PUT    /admin/sessions/:id          — update session metadata
+// DELETE /admin/sessions/:id          — delete (cascades to terms)
+// PUT    /admin/sessions/:id/current  — mark as current session
 
-/**
- * @swagger
- * /admin/schools/{id}/reject:
- *   put:
- *     summary: Reject a school registration
- *     tags: [Admin]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: School rejected
- */
-router.put('/schools/:id/reject', adminController.rejectSchool.bind(adminController));
+router.get("/sessions", adminController.listSessions.bind(adminController));
+router.post("/sessions", adminController.createSession.bind(adminController));
+router.get("/sessions/:id", adminController.getSession.bind(adminController));
+router.put(
+  "/sessions/:id",
+  adminController.updateSession.bind(adminController),
+);
+router.delete(
+  "/sessions/:id",
+  adminController.deleteSession.bind(adminController),
+);
+router.put(
+  "/sessions/:id/current",
+  adminController.setCurrentSession.bind(adminController),
+);
 
-/**
- * @swagger
- * /admin/parents:
- *   get:
- *     summary: List all parent accounts
- *     tags: [Admin]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: List of parents
- */
-router.get('/parents', adminController.getParents.bind(adminController));
+// GET    /admin/terms?sessionId=      — list terms (optionally filtered by session)
+// POST   /admin/sessions/:sessionId/terms  — create term in a session
+// GET    /admin/terms/:id             — get one term
+// PUT    /admin/terms/:id             — update term (dates, windows, status)
+// DELETE /admin/terms/:id             — delete term
+// PUT    /admin/terms/:id/activate    — set status=ACTIVE_APPLICATION
 
-/**
- * @swagger
- * /admin/loans:
- *   get:
- *     summary: List all loan applications
- *     tags: [Admin]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: List of loan applications
- */
-router.get('/loans', adminController.getLoanApplications.bind(adminController));
+router.get("/terms", adminController.listTerms.bind(adminController));
+router.post(
+  "/sessions/:sessionId/terms",
+  adminController.createTerm.bind(adminController),
+);
+router.get("/terms/:id", adminController.getTerm.bind(adminController));
+router.put("/terms/:id", adminController.updateTerm.bind(adminController));
+router.delete("/terms/:id", adminController.deleteTerm.bind(adminController));
+router.put(
+  "/terms/:id/activate",
+  adminController.activateTerm.bind(adminController),
+);
 
 export default router;

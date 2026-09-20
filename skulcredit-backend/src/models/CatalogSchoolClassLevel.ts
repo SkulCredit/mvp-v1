@@ -5,9 +5,7 @@ export interface CatalogSchoolClassLevelAttributes {
   id: string;
   schoolId: string;
   institutionTypeId: string;
-  /** e.g. "Junior Secondary", "Senior Secondary" — null for flat class lists */
   subLevelGroup: string | null;
-  /** e.g. "JSS 1 (Basic 7)", "Nursery I", "SSS 1" */
   className: string;
   sortOrder: number;
   createdAt?: Date;

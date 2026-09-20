@@ -60,6 +60,14 @@ router.get(
 router.use(protect, authorize("parent"));
 
 router.get("/profile", parentController.getProfile.bind(parentController));
+
+// Current active school term — used by the dashboard modal and wizard
+router.get(
+  "/current-term",
+  parentController.getCurrentTerm.bind(parentController),
+);
+// All academic sessions with nested terms — used by wizard session/term picker
+router.get("/sessions", parentController.getSessions.bind(parentController));
 router.put(
   "/profile",
   validate(completeProfileSchema),

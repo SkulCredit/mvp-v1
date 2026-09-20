@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   parentService,
@@ -6,6 +6,8 @@ import {
   CatalogInstitutionType,
   CatalogSchool,
   CatalogClassLevelGroup,
+  AcademicSessionSummary,
+  AcademicTermSummary,
 } from "../../services/parentService";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,8 +52,9 @@ interface TuitionDetails {
   gradeLevel: string;
   tuitionAmount: number;
   repaymentPlanId: "full" | "3month" | "6month";
-  academicSession: string;
-  term: string;
+  academicSession: string; // e.g. "2026/2027"
+  term: string; // e.g. "First Term"
+  termId: string; // academic_terms.id (UUID) — sent to backend
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -593,6 +596,13 @@ const StepSelectSchool: React.FC<{
   onInstitutionTypeChange: (id: string, name: string) => void;
   onSchoolChange: (id: string, name: string) => void;
   onGradeLevelChange: (level: string) => void;
+  // ── session / term ───────────────────────────────────────
+  sessions: AcademicSessionSummary[];
+  loadingSessions: boolean;
+  selectedSessionName: string;
+  selectedTermId: string;
+  onSessionChange: (sessionName: string) => void;
+  onTermChange: (termId: string, termName: string) => void;
 }> = ({
   institutionTypes,
   catalogSchools,
@@ -606,8 +616,18 @@ const StepSelectSchool: React.FC<{
   onInstitutionTypeChange,
   onSchoolChange,
   onGradeLevelChange,
+  sessions,
+  loadingSessions,
+  selectedSessionName,
+  selectedTermId,
+  onSessionChange,
+  onTermChange,
 }) => {
   const flatClasses = classLevelGroups.flatMap((g) => g.classes);
+  const activeSession = sessions.find(
+    (s) => s.sessionName === selectedSessionName,
+  );
+  const availableTerms: AcademicTermSummary[] = activeSession?.terms ?? [];
 
   return (
     <div className="space-y-5">
@@ -720,12 +740,261 @@ const StepSelectSchool: React.FC<{
           <ChevronDown />
         </div>
       </div>
+
+      {/* ── Academic Session ── */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-semibold text-gray-700">
+          Academic Session<span className="text-red-500 ml-0.5">*</span>
+        </label>
+        <div className="relative">
+          <select
+            value={selectedSessionName}
+            disabled={loadingSessions}
+            onChange={(e) => onSessionChange(e.target.value)}
+            className={
+              selectCls() + (loadingSessions ? " opacity-50 cursor-wait" : "")
+            }
+          >
+            <option value="">
+              {loadingSessions ? "Loading sessions…" : "— Select session —"}
+            </option>
+            {sessions.map((s) => (
+              <option key={s.id} value={s.sessionName}>
+                {s.sessionName}
+                {s.isCurrent ? " (Current)" : ""}
+              </option>
+            ))}
+          </select>
+          <ChevronDown />
+        </div>
+      </div>
+
+      {/* ── Term ── */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-semibold text-gray-700">
+          Term<span className="text-red-500 ml-0.5">*</span>
+        </label>
+        <div className="relative">
+          <select
+            value={selectedTermId}
+            disabled={!selectedSessionName || availableTerms.length === 0}
+            onChange={(e) => {
+              const t = availableTerms.find((x) => x.id === e.target.value);
+              onTermChange(e.target.value, t?.termName ?? "");
+            }}
+            className={
+              selectCls() +
+              (!selectedSessionName || availableTerms.length === 0
+                ? " opacity-50 cursor-not-allowed"
+                : "")
+            }
+          >
+            <option value="">
+              {!selectedSessionName
+                ? "Select a session first"
+                : "— Select term —"}
+            </option>
+            {availableTerms.map((t) => {
+              const isOpen = t.status === "ACTIVE_APPLICATION";
+              const isClosed =
+                t.status === "APPLICATION_CLOSED" || t.status === "COMPLETED";
+              return (
+                <option key={t.id} value={t.id} disabled={isClosed}>
+                  {t.termName}
+                  {isOpen ? " ✓ Open" : isClosed ? " (Closed)" : ""}
+                </option>
+              );
+            })}
+          </select>
+          <ChevronDown />
+        </div>
+
+        {/* Amber notice if session chosen but no term is open */}
+        {selectedSessionName &&
+          availableTerms.length > 0 &&
+          !availableTerms.some((t) => t.status === "ACTIVE_APPLICATION") && (
+            <p className="mt-1 flex items-start gap-1.5 text-xs text-amber-700">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-3.5 h-3.5 shrink-0 mt-px"
+                aria-hidden="true"
+              >
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              No term is currently open for this session. You may still select
+              an upcoming term to prepare your application.
+            </p>
+          )}
+      </div>
     </div>
   );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 3 — Tuition Details
+// Step 3 — Session / Term selection
+// ─────────────────────────────────────────────────────────────────────────────
+
+const sessionSelectCls =
+  "w-full rounded-2xl border border-gray-200 bg-slate-50/50 px-4 py-3 text-sm text-gray-800 " +
+  "outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/10 transition-all cursor-pointer " +
+  "disabled:opacity-50 disabled:cursor-not-allowed appearance-none";
+
+const StepSelectSessionTerm: React.FC<{
+  sessions: AcademicSessionSummary[];
+  loading: boolean;
+  selectedSessionName: string;
+  selectedTermId: string;
+  selectedTermName: string;
+  onSessionChange: (sessionName: string) => void;
+  onTermChange: (termId: string, termName: string) => void;
+}> = ({
+  sessions,
+  loading,
+  selectedSessionName,
+  selectedTermId,
+  onSessionChange,
+  onTermChange,
+}) => {
+  const activeSession = sessions.find(
+    (s) => s.sessionName === selectedSessionName,
+  );
+  const availableTerms: AcademicTermSummary[] = activeSession?.terms ?? [];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg sm:text-2xl font-extrabold text-gray-900">
+          Academic Session &amp; Term
+        </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Select the school session and term you are applying for
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {/* Session picker */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5">
+            Academic Session <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <select
+              className={sessionSelectCls}
+              value={selectedSessionName}
+              disabled={loading}
+              onChange={(e) => onSessionChange(e.target.value)}
+            >
+              <option value="">
+                {loading ? "Loading sessions…" : "— Select session —"}
+              </option>
+              {sessions.map((s) => (
+                <option key={s.id} value={s.sessionName}>
+                  {s.sessionName}
+                  {s.isCurrent ? " (Current)" : ""}
+                </option>
+              ))}
+            </select>
+            <svg
+              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Term picker */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1.5">
+            Term <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <select
+              className={sessionSelectCls}
+              value={selectedTermId}
+              disabled={!selectedSessionName || availableTerms.length === 0}
+              onChange={(e) => {
+                const t = availableTerms.find((x) => x.id === e.target.value);
+                onTermChange(e.target.value, t?.termName ?? "");
+              }}
+            >
+              <option value="">
+                {!selectedSessionName
+                  ? "Select a session first"
+                  : "— Select term —"}
+              </option>
+              {availableTerms.map((t) => {
+                const isOpen = t.status === "ACTIVE_APPLICATION";
+                const isClosed =
+                  t.status === "APPLICATION_CLOSED" || t.status === "COMPLETED";
+                return (
+                  <option key={t.id} value={t.id} disabled={isClosed}>
+                    {t.termName}
+                    {isOpen ? " ✓ Open" : isClosed ? " (Closed)" : ""}
+                  </option>
+                );
+              })}
+            </select>
+            <svg
+              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Info banner if no open term */}
+        {selectedSessionName &&
+          availableTerms.length > 0 &&
+          !availableTerms.some((t) => t.status === "ACTIVE_APPLICATION") && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-2">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-4 h-4 text-amber-600 shrink-0 mt-0.5"
+                aria-hidden="true"
+              >
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                No term is currently open for applications in this session. You
+                may still select an upcoming term to prepare your application.
+              </p>
+            </div>
+          )}
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 4 — Tuition Details (was Step 3)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const StepTuitionDetails: React.FC<{
@@ -1254,7 +1523,40 @@ const StudentDetailsPage: React.FC = () => {
       .finally(() => setLoadingClasses(false));
   }, [selectedSchoolId, selectedInstitutionTypeId, showToast]);
 
-  // ── Step 3: repayment plan + tuition amount ───────────────────────────────
+  // ── Step 3: session / term ─────────────────────────────────────────────────
+  const [sessions, setSessions] = useState<AcademicSessionSummary[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [selectedSessionName, setSelectedSessionName] = useState("");
+  const [selectedTermId, setSelectedTermId] = useState("");
+  const [selectedTermName, setSelectedTermName] = useState("");
+
+  // Load sessions when entering step 2 (they're now inline in StepSelectSchool)
+  useEffect(() => {
+    if (step !== 2) return;
+    setLoadingSessions(true);
+    catalogService
+      .getSessions()
+      .then((data) => {
+        setSessions(data);
+        // Auto-select current session
+        const current = data.find((s) => s.isCurrent);
+        if (current && !selectedSessionName) {
+          setSelectedSessionName(current.sessionName);
+          // Auto-select the active term if there is one
+          const activeTerm = current.terms.find(
+            (t) => t.status === "ACTIVE_APPLICATION",
+          );
+          if (activeTerm && !selectedTermId) {
+            setSelectedTermId(activeTerm.id);
+            setSelectedTermName(activeTerm.termName);
+          }
+        }
+      })
+      .catch(() => showToast("Failed to load academic sessions."))
+      .finally(() => setLoadingSessions(false));
+  }, [step, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Step 4: repayment plan + tuition amount ────────────────────────────────
   const [selectedPlanId, setSelectedPlanId] = useState<
     "full" | "3month" | "6month" | null
   >(null);
@@ -1271,12 +1573,12 @@ const StudentDetailsPage: React.FC = () => {
     schoolId: selectedSchoolId,
     schoolName: selectedSchoolName,
     gradeLevel: selectedGradeLevel,
-    // Use the same amount StepTuitionDetails shows on the plan cards
     tuitionAmount:
       childTuitionAmount > 0 ? childTuitionAmount : FALLBACK_TUITION_AMOUNT,
     repaymentPlanId: selectedPlanId ?? "full",
-    academicSession: "",
-    term: "",
+    academicSession: selectedSessionName,
+    term: selectedTermName,
+    termId: selectedTermId,
   };
 
   // ── Navigation ─────────────────────────────────────────────────────────────
@@ -1304,6 +1606,8 @@ const StudentDetailsPage: React.FC = () => {
           childTuitionAmount > 0 ? childTuitionAmount : FALLBACK_TUITION_AMOUNT,
         repaymentPlanId: selectedPlanId ?? "full",
         tenor: tenorFromPlanId(selectedPlanId ?? "full"),
+        academicSession: selectedSessionName,
+        term: selectedTermName,
       });
 
       const ref =
@@ -1332,17 +1636,26 @@ const StudentDetailsPage: React.FC = () => {
     selectedGradeLevel,
     childTuitionAmount,
     selectedPlanId,
+    selectedSessionName,
+    selectedTermName,
     showToast,
   ]);
 
   const handleContinue = useCallback(() => {
     if (step === 1 && !selectedChildId) return;
-    if (
-      step === 2 &&
-      (!selectedInstitutionTypeId || !selectedSchoolId || !selectedGradeLevel)
-    ) {
-      showToast("Please select institution type, school, and class.");
-      return;
+    if (step === 2) {
+      if (
+        !selectedInstitutionTypeId ||
+        !selectedSchoolId ||
+        !selectedGradeLevel
+      ) {
+        showToast("Please select institution type, school, and class.");
+        return;
+      }
+      if (!selectedSessionName || !selectedTermId) {
+        showToast("Please select an academic session and term.");
+        return;
+      }
     }
     if (step === 3 && !selectedPlanId) {
       showToast("Please select a repayment plan.");
@@ -1359,6 +1672,8 @@ const StudentDetailsPage: React.FC = () => {
     selectedInstitutionTypeId,
     selectedSchoolId,
     selectedGradeLevel,
+    selectedSessionName,
+    selectedTermId,
     selectedPlanId,
     showToast,
     handleSubmitApplication,
@@ -1370,7 +1685,9 @@ const StudentDetailsPage: React.FC = () => {
     (step === 2 &&
       (!selectedInstitutionTypeId ||
         !selectedSchoolId ||
-        !selectedGradeLevel)) ||
+        !selectedGradeLevel ||
+        !selectedSessionName ||
+        !selectedTermId)) ||
     (step === 3 && !selectedPlanId) ||
     (step === 4 && isSubmitting);
 
@@ -1469,6 +1786,19 @@ const StudentDetailsPage: React.FC = () => {
               setSelectedGradeLevel("");
             }}
             onGradeLevelChange={setSelectedGradeLevel}
+            sessions={sessions}
+            loadingSessions={loadingSessions}
+            selectedSessionName={selectedSessionName}
+            selectedTermId={selectedTermId}
+            onSessionChange={(name) => {
+              setSelectedSessionName(name);
+              setSelectedTermId("");
+              setSelectedTermName("");
+            }}
+            onTermChange={(id, name) => {
+              setSelectedTermId(id);
+              setSelectedTermName(name);
+            }}
           />
         )}
 
@@ -1504,6 +1834,9 @@ const StudentDetailsPage: React.FC = () => {
               setSelectedSchoolId("");
               setSelectedSchoolName("");
               setSelectedGradeLevel("");
+              setSelectedSessionName("");
+              setSelectedTermId("");
+              setSelectedTermName("");
               setSelectedPlanId(null);
               setSubmittedRef("");
             }}

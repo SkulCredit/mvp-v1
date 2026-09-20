@@ -11,8 +11,11 @@ import {
   SchoolRequestStatus,
   ParentDashboardResponse,
 } from "../../services/dashboardService";
+import apiClient from "../../services/apiClient";
 import Button from "../../components/ui/Button";
 import { PlusIcon } from "lucide-react";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface AppRow {
   id: string;
@@ -23,6 +26,16 @@ interface AppRow {
   [key: string]: unknown;
 }
 
+interface CurrentTermData {
+  id: string;
+  name: string;
+  academicYear: string;
+  portalOpenDate: string;
+  portalCloseDate: string;
+  maxTenorMonths: number;
+  effectiveTenor: number;
+}
+
 const DEFAULT_STATS: DashboardStats = {
   totalApplications: 0,
   activeLoans: 0,
@@ -30,19 +43,18 @@ const DEFAULT_STATS: DashboardStats = {
   totalApprovedAmount: 0,
 };
 
-function getCurrentTermKey(): string {
-  const now = new Date();
-  const term = Math.floor(now.getMonth() / 4) + 1;
-  return `${now.getFullYear()}-T${term}`;
-}
+// ── localStorage key — stores the last term ID the parent saw the modal for ──
+const TERM_MODAL_SEEN_KEY = "skulcredit_term_modal_seen_id";
 
-const TERM_MODAL_KEY = "skulcredit_last_seen_term";
+// ── New Term Modal ─────────────────────────────────────────────────────────────
 
 const NewTermModal: React.FC<{
   firstName: string;
+  termName: string;
+  academicYear: string;
   onYes: () => void;
   onNo: () => void;
-}> = ({ firstName, onYes, onNo }) =>
+}> = ({ firstName, termName, academicYear, onYes, onNo }) =>
   createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4"
@@ -50,7 +62,8 @@ const NewTermModal: React.FC<{
       aria-modal="true"
       aria-labelledby="new-term-modal-title"
     >
-      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden animate-fade-in-up">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden">
+        {/* Header */}
         <div className="bg-brand px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0">
@@ -68,21 +81,26 @@ const NewTermModal: React.FC<{
                 <path d="M6 12v5c3 3 9 3 12 0v-5" />
               </svg>
             </div>
-            <h2
-              id="new-term-modal-title"
-              className="text-base font-bold text-white leading-snug"
-            >
-              New School Term
-            </h2>
+            <div>
+              <h2
+                id="new-term-modal-title"
+                className="text-base font-bold text-white leading-snug"
+              >
+                New School Term
+              </h2>
+              <p className="text-xs text-white/70 mt-0.5">
+                {termName} &middot; {academicYear}
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Body */}
         <div className="px-6 py-5">
           <p className="text-sm text-gray-700 leading-relaxed">
-            Welcome back, <strong>{firstName}</strong>! It's a new school term.
-            Would you like to add a new child/student so you can easily pay
-            their school fees?
+            Welcome back, <strong>{firstName}</strong>! It&apos;s a new school
+            term ({termName}). Would you like to add a new child/student so you
+            can easily pay their school fees?
           </p>
         </div>
 
@@ -107,6 +125,8 @@ const NewTermModal: React.FC<{
     </div>,
     document.body,
   );
+
+// ── Stat card ──────────────────────────────────────────────────────────────────
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -137,6 +157,8 @@ const StatCard: React.FC<StatCardProps> = ({
   </div>
 );
 
+// ── School-request helpers ─────────────────────────────────────────────────────
+
 const STATUS_MESSAGES: Record<SchoolRequestStatus, string> = {
   pending:
     "Your request is under review. We'll notify you once it's processed.",
@@ -154,6 +176,8 @@ const STATUS_PILL_CLS: Record<SchoolRequestStatus, string> = {
   rejected: "bg-red-100 text-red-600",
 };
 
+// ── Page ───────────────────────────────────────────────────────────────────────
+
 const ParentDashboardHomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -168,15 +192,32 @@ const ParentDashboardHomePage: React.FC = () => {
   const [myApplications, setMyApplications] = useState<AppRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ── New-term modal (backend-driven) ────────────────────────────────────────
   const [showTermModal, setShowTermModal] = useState(false);
+  const [currentTerm, setCurrentTerm] = useState<CurrentTermData | null>(null);
 
   useEffect(() => {
-    const currentTerm = getCurrentTermKey();
-    const lastSeen = localStorage.getItem(TERM_MODAL_KEY);
-    if (lastSeen !== currentTerm) {
-      setShowTermModal(true);
-      localStorage.setItem(TERM_MODAL_KEY, currentTerm);
-    }
+    // Fetch active term from the backend
+    apiClient
+      .get<{ data: { isOpen: boolean; term: CurrentTermData | null } }>(
+        "/parents/current-term",
+      )
+      .then(({ data }) => {
+        const term = data.data.term;
+        if (!data.data.isOpen || !term) return;
+
+        // Show modal only if this is a term the parent hasn't been notified about yet
+        const seenId = localStorage.getItem(TERM_MODAL_SEEN_KEY);
+        if (seenId !== term.id) {
+          setCurrentTerm(term);
+          setShowTermModal(true);
+          // Record immediately so a page refresh doesn't re-show the modal
+          localStorage.setItem(TERM_MODAL_SEEN_KEY, term.id);
+        }
+      })
+      .catch(() => {
+        /* silent — modal is non-critical */
+      });
   }, []);
 
   const handleTermModalYes = () => {
@@ -188,6 +229,7 @@ const ParentDashboardHomePage: React.FC = () => {
     setShowTermModal(false);
   };
 
+  // ── Dashboard data ─────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -254,16 +296,18 @@ const ParentDashboardHomePage: React.FC = () => {
 
   return (
     <div className="space-y-8 pt-8 animate-fade-in-up w-[90%] mx-auto">
-      {/* ── New-term modal */}
-      {showTermModal && (
+      {/* ── New-term modal — shown once per term, keyed on term ID from DB ── */}
+      {showTermModal && currentTerm && (
         <NewTermModal
           firstName={userName.split(" ")[0]}
+          termName={currentTerm.name}
+          academicYear={currentTerm.academicYear}
           onYes={handleTermModalYes}
           onNo={handleTermModalNo}
         />
       )}
 
-      {/* ── Welcome banner  */}
+      {/* ── Welcome banner ── */}
       <div className="bg-brand rounded-3xl p-8 md:p-10 text-white relative overflow-hidden shadow-lg shadow-brand/10 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         <div className="relative z-10 space-y-2">
@@ -304,6 +348,7 @@ const ParentDashboardHomePage: React.FC = () => {
         </div>
       </div>
 
+      {/* ── Stats ── */}
       <section>
         <h3 className="mb-3 text-base font-bold text-gray-800">
           Quick Actions
@@ -371,6 +416,7 @@ const ParentDashboardHomePage: React.FC = () => {
         </div>
       </section>
 
+      {/* ── School request status ── */}
       {hasSchoolRequest && schoolRequestStatus && (
         <div className="flex items-center justify-between gap-4 rounded-xl bg-[#F0FDF4] border border-green-100 px-6 py-4">
           <div>
@@ -389,7 +435,7 @@ const ParentDashboardHomePage: React.FC = () => {
         </div>
       )}
 
-      {/* ── Incomplete-profile banner ─ */}
+      {/* ── Incomplete-profile banner ── */}
       {showIncompleteBanner && (
         <div className="relative flex items-start justify-between gap-4 rounded-xl bg-[#FFF5F0] px-6 py-5 overflow-hidden">
           <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-orange-400" />
@@ -403,8 +449,7 @@ const ParentDashboardHomePage: React.FC = () => {
             </p>
             <button
               onClick={() => navigate("/parent/eligibility")}
-              className="mt-4 inline-flex items-center gap-1.5 bg-brand text-white text-xs font-bold
-                         px-5 py-2 rounded-full hover:bg-brand-hover transition-colors shadow-sm"
+              className="mt-4 inline-flex items-center gap-1.5 bg-brand text-white text-xs font-bold px-5 py-2 rounded-full hover:bg-brand-hover transition-colors shadow-sm"
             >
               Complete Profile &amp; Apply
             </button>
@@ -415,7 +460,7 @@ const ParentDashboardHomePage: React.FC = () => {
         </div>
       )}
 
-      {/* ── Tuition support CTA ─────── */}
+      {/* ── Tuition support CTA ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl bg-white border border-gray-100 shadow-sm px-5 py-4">
         <div>
           <p className="text-sm font-bold text-gray-800">
@@ -434,7 +479,7 @@ const ParentDashboardHomePage: React.FC = () => {
         </Button>
       </div>
 
-      {/* ── Applications preview table  */}
+      {/* ── Applications preview table ── */}
       <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm">
         <div className="border-b border-slate-100 px-6 py-4 flex items-center justify-between">
           <p className="text-sm font-semibold text-slate-800">
@@ -463,8 +508,7 @@ const ParentDashboardHomePage: React.FC = () => {
             </p>
             <button
               onClick={() => navigate("/parent/details")}
-              className="inline-flex items-center gap-1.5 bg-brand text-white text-sm font-bold
-                         px-5 py-2.5 rounded-xl hover:bg-brand-hover transition-colors shadow-sm"
+              className="inline-flex items-center gap-1.5 bg-brand text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-brand-hover transition-colors shadow-sm"
             >
               <Icon name="plus" className="w-4 h-4" />
               Create Application

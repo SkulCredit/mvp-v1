@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
 import { ParentRepository, UserRepository } from "../repositories";
 import sendEmail from "../utils/email";
+import schoolTermService from "./schoolTerm.service";
 import {
   Student,
   LoanApplication,
@@ -847,30 +848,37 @@ class ParentService {
       where: { schoolName: catalogSchool.name, status: "approved" },
     });
 
-    // ── Duplicate application guard — one application per student per term ───
-    // A "term" is a rolling 4-month window anchored to the calendar year:
-    //   Term 1: Jan–Apr  |  Term 2: May–Aug  |  Term 3: Sep–Dec
-    const checkTime = new Date();
-    const termMonthStart = Math.floor(checkTime.getMonth() / 4) * 4; // 0, 4, or 8
-    const termStart = new Date(checkTime.getFullYear(), termMonthStart, 1);
-    const termEnd = new Date(checkTime.getFullYear(), termMonthStart + 4, 1);
+    const activeTerm = await schoolTermService.getActiveTerm();
+
+    if (!activeTerm) {
+      throw new ApiError(
+        403,
+        "The application portal is currently closed. Please check back when the next school term opens.",
+      );
+    }
 
     const existingApplication = await LoanApplication.findOne({
       where: {
         studentId: student.id,
-        // Guard is per-student per-term regardless of school —
-        // a student's fees can only be financed once per term
         status: { [Op.notIn]: ["rejected", "cancelled"] },
-        createdAt: { [Op.gte]: termStart, [Op.lt]: termEnd },
+        createdAt: {
+          [Op.gte]: new Date(activeTerm.portalOpeningDate),
+          [Op.lt]: new Date(
+            new Date(activeTerm.portalCloseDate).getTime() +
+              24 * 60 * 60 * 1000,
+          ),
+        },
       },
     });
 
     if (existingApplication) {
       throw new ApiError(
         409,
-        `You've already submitted an application for ${student.firstName} ${student.lastName} this term. A student's fees can only be financed once per term.`,
+        `You've already submitted an application for ${student.firstName} ${student.lastName} this term (${activeTerm.termName} ${activeTerm.sessionName}). A student's fees can only be financed once per term.`,
       );
     }
+
+    const effectiveTenor = schoolTermService.computeEffectiveTenor(activeTerm);
 
     const referenceNumber = `SKC-${Date.now()}-${Math.random()
       .toString(36)
@@ -884,14 +892,12 @@ class ParentService {
       catalogSchoolId: payload.schoolId,
       schoolId: partnerSchool?.id ?? null,
       amountRequested: payload.tuitionAmount,
-      tenor: payload.tenor,
+      tenor: effectiveTenor, 
       status: "pending",
       termsAccepted: true,
       termsAcceptedAt: new Date(),
     });
 
-    // ── Email notification ────────────────────────────────────────────────────
-    // Fire-and-forget — don't block the response if email fails
     UserRepository.findById(userId)
       .then((user) => {
         if (!user?.email) return;
@@ -1003,6 +1009,9 @@ class ParentService {
     return {
       application,
       referenceNumber,
+      tenor: effectiveTenor,
+      termName: activeTerm.termName,
+      termAcademicYear: activeTerm.sessionName,
       ledgerId: ledger.id,
       queued: !!parent.bvn,
     };
