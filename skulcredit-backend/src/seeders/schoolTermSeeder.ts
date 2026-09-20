@@ -1,6 +1,4 @@
 /**
- * src/seeders/schoolTermSeeder.ts
- *
  * Seeds the default Nigerian school term calendar into school_terms.
  * Safe to call on every boot — skips if rows already exist.
  *
@@ -8,11 +6,6 @@
  *   Term 1 — Sep 1 → Oct 31  (portal open, max 4 months, reduces to 3 in October)
  *   Term 2 — Jan 1 → Feb 28  (portal open, max 4 months, reduces to 3 in February)
  *   Term 3 — Apr 1 → Apr 30  (short term, max 3 months only)
- *
- * The admin can edit these dates at any time via the Admin API.
- * A term is considered "active" if today falls within its portalOpenDate–portalCloseDate.
- * `isActive` is a convenience flag that the admin manually sets; the system
- * ALSO computes active status by date so the flag is only a fallback override.
  */
 
 import { QueryTypes } from "sequelize";
@@ -65,7 +58,6 @@ function buildDefaultTerms(): TermSeed[] {
 }
 
 export async function seedSchoolTerms(): Promise<void> {
-  // Idempotency guard
   const [existing] = await sequelize.query<{ count: string }>(
     "SELECT COUNT(*)::text AS count FROM school_terms",
     { type: QueryTypes.SELECT },

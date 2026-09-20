@@ -7,8 +7,8 @@ export interface LoanApplicationAttributes {
   referenceNumber: string | null;
   parentId: string;
   studentId: string;
-  catalogSchoolId: string; 
-  schoolId: string | null; 
+  catalogSchoolId: string;
+  schoolId: string | null;
   termId: string | null;
   lendsqrApplicationId: string | null;
   amountRequested: number;
@@ -26,6 +26,8 @@ export interface LoanApplicationAttributes {
   decidedAt: Date | null;
   serviceFeePaid: boolean;
   disbursementStatus: "pending" | "processing" | "successful" | "failed";
+  serviceChargeRate: number | null; 
+  serviceChargeAmount: number | null; 
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -50,6 +52,8 @@ type LoanApplicationCreationAttributes = Optional<
   | "serviceFeePaid"
   | "disbursementStatus"
   | "schoolId"
+  | "serviceChargeRate"
+  | "serviceChargeAmount"
 >;
 
 export class LoanApplicationInstance
@@ -83,6 +87,8 @@ export class LoanApplicationInstance
     | "processing"
     | "successful"
     | "failed";
+  declare serviceChargeRate: number | null;
+  declare serviceChargeAmount: number | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -154,6 +160,14 @@ LoanApplicationInstance.init(
     disbursementStatus: {
       type: DataTypes.ENUM("pending", "processing", "successful", "failed"),
       defaultValue: "pending",
+    },
+    serviceChargeRate: {
+      type: DataTypes.DECIMAL(5, 4),
+      allowNull: true,
+    },
+    serviceChargeAmount: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: true,
     },
   },
   {

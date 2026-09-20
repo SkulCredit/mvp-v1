@@ -2,6 +2,8 @@
 import adminService from "../services/admin.service";
 import schoolTermService from "../services/schoolTerm.service";
 import { successResponse } from "../utils/response";
+import { SchoolBankAccount, CatalogSchool } from "../models/index";
+import ApiError from "../utils/apiError";
 
 class AdminController {
   async getDashboard(
@@ -306,6 +308,102 @@ class AdminController {
         "Term activated",
         await schoolTermService.activateTerm(String(req.params.id)),
       );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ── School Bank Accounts ──────────────────────────────────────────────────
+
+  async getBankAccounts(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const accounts = await SchoolBankAccount.findAll({
+        where: { catalogSchoolId: String(req.params.schoolId) },
+        include: [
+          { model: CatalogSchool, as: "school", attributes: ["id", "name"] },
+        ],
+        order: [
+          ["isPrimary", "DESC"],
+          ["createdAt", "ASC"],
+        ],
+      });
+      successResponse(res, 200, "Bank accounts fetched", accounts);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addBankAccount(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const school = await CatalogSchool.findByPk(String(req.params.schoolId));
+      if (!school) throw new ApiError(404, "School not found");
+      const account = await SchoolBankAccount.create({
+        catalogSchoolId: school.id,
+        ...req.body,
+      });
+      successResponse(res, 201, "Bank account added", account);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateBankAccount(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const account = await SchoolBankAccount.findByPk(String(req.params.id));
+      if (!account) throw new ApiError(404, "Bank account not found");
+      await account.update(req.body);
+      successResponse(res, 200, "Bank account updated", account);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteBankAccount(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const account = await SchoolBankAccount.findByPk(String(req.params.id));
+      if (!account) throw new ApiError(404, "Bank account not found");
+      await account.destroy();
+      successResponse(res, 200, "Bank account deleted");
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateSchoolTier(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const school = await CatalogSchool.findByPk(String(req.params.schoolId));
+      if (!school) throw new ApiError(404, "School not found");
+      const { tier, isRegistered, serviceChargeRate } = req.body as {
+        tier?: string | null;
+        isRegistered?: boolean;
+        serviceChargeRate?: number;
+      };
+      await school.update({
+        ...(tier !== undefined && { tier }),
+        ...(isRegistered !== undefined && { isRegistered }),
+        ...(serviceChargeRate !== undefined && { serviceChargeRate }),
+      });
+      successResponse(res, 200, "School tier updated", school);
     } catch (error) {
       next(error);
     }

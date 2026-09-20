@@ -14,7 +14,6 @@ router.use(protect, authorize("admin"));
  *   description: "Internal operations - schools, parents, loans, academic sessions (role: admin)"
  */
 
-
 router.get("/dashboard", adminController.getDashboard.bind(adminController));
 router.get("/schools", adminController.getSchools.bind(adminController));
 router.put(
@@ -72,3 +71,32 @@ router.put(
 );
 
 export default router;
+
+// PATCH /admin/catalog-schools/:schoolId/tier
+//   Body: { tier?, isRegistered?, serviceChargeRate? }
+router.patch(
+  "/catalog-schools/:schoolId/tier",
+  adminController.updateSchoolTier.bind(adminController),
+);
+
+// GET    /admin/catalog-schools/:schoolId/bank-accounts
+// POST   /admin/catalog-schools/:schoolId/bank-accounts
+// PUT    /admin/bank-accounts/:id
+// DELETE /admin/bank-accounts/:id
+
+router.get(
+  "/catalog-schools/:schoolId/bank-accounts",
+  adminController.getBankAccounts.bind(adminController),
+);
+router.post(
+  "/catalog-schools/:schoolId/bank-accounts",
+  adminController.addBankAccount.bind(adminController),
+);
+router.put(
+  "/bank-accounts/:id",
+  adminController.updateBankAccount.bind(adminController),
+);
+router.delete(
+  "/bank-accounts/:id",
+  adminController.deleteBankAccount.bind(adminController),
+);
