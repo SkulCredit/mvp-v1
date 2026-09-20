@@ -100,10 +100,6 @@ class LendsqrApplicationService extends LendsqrBaseService {
     return this.client.get(`/v1/loans/applications/${applicationId}`);
   }
 
-  /**
-   * Check a borrower's loan score / karma before KYC.
-   * POST /v2/customers/loans/score
-   */
   checkLoanScore(payload: LoanScorePayload): Promise<LoanScoreResponse> {
     return this.client.post(
       "/v2/customers/loans/score",
@@ -111,13 +107,6 @@ class LendsqrApplicationService extends LendsqrBaseService {
     ) as Promise<LoanScoreResponse>;
   }
 
-  /**
-   * Book a loan using customer BVN details.
-   * POST /v2/customers/loans
-   *
-   * Called asynchronously via RabbitMQ after a LoanApplication is recorded
-   * so the parent doesn't wait for Lendsqr's processing time.
-   */
   bookLoan(payload: BookLoanPayload): Promise<BookLoanResponse> {
     return this.client.post(
       "/v2/customers/loans",

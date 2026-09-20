@@ -15,7 +15,7 @@ export type LedgerState =
 export type LedgerActor = 'SYSTEM' | 'LENDSQR' | 'ADMIN';
 
 export interface StateEntry {
-  timestamp: string | null;         // ISO-8601
+  timestamp: string | null;    
   actor: LedgerActor | null;
   message: string | null;
   nextState: LedgerState | null;

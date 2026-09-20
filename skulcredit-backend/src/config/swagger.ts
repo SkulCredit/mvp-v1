@@ -1,16 +1,8 @@
 import env from "./env";
 
-// Resolve the public-facing base URL for Swagger UI's "Try it out" requests.
-// Priority:
-//   1. APP_URL env var  — set this in production (e.g. https://api.skulcredit.com)
-//   2. nginx proxy URL  — http://localhost (port 80, reachable from the browser via Docker)
-//   3. Direct API port  — http://localhost:PORT (only works when the API is exposed directly)
-//
-// Swagger sends requests FROM the browser, so the URL must be reachable from
-// the host machine, not from inside the Docker network.
 const publicBaseUrl =
   env.appUrl !== `http://localhost:${env.port}`
-    ? env.appUrl // APP_URL was customised — trust it
+    ? env.appUrl
     : "http://localhost"; // default: go through nginx on port 80
 
 const swaggerSpec: Record<string, unknown> = {
@@ -271,7 +263,7 @@ const swaggerSpec: Record<string, unknown> = {
     {
       name: "Admin",
       description:
-        "Internal operations — schools, parents, loans (role: admin)",
+        "Full platform management — users, parents, schools, catalog, students, loans, ledgers, offers, disbursements, repayments, documents, school requests, notifications, academic sessions and terms, analytics and projections (role: admin)",
     },
     {
       name: "Loans",
@@ -536,7 +528,7 @@ const swaggerSpec: Record<string, unknown> = {
     },
     "/admin/schools": {
       get: {
-        summary: "List all schools, optionally filtered by status",
+        summary: "List all partner schools, optionally filtered by status",
         tags: ["Admin"],
         parameters: [
           {
@@ -585,20 +577,6 @@ const swaggerSpec: Record<string, unknown> = {
           "200": { description: "School rejected" },
           "404": { description: "School not found" },
         },
-      },
-    },
-    "/admin/parents": {
-      get: {
-        summary: "List all parent accounts",
-        tags: ["Admin"],
-        responses: { "200": { description: "List of parents" } },
-      },
-    },
-    "/admin/loans": {
-      get: {
-        summary: "List all loan applications",
-        tags: ["Admin"],
-        responses: { "200": { description: "List of loan applications" } },
       },
     },
 
@@ -1184,6 +1162,1803 @@ const swaggerSpec: Record<string, unknown> = {
           "200": { description: "Device token removed" },
           "404": { description: "Token not found" },
         },
+      },
+    },
+
+    "/admin/analytics/applications": {
+      get: {
+        summary: "Application stats grouped by day/month/year",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "period",
+            schema: {
+              type: "string",
+              enum: ["today", "week", "month", "quarter", "year", "all"],
+            },
+          },
+          {
+            in: "query",
+            name: "groupBy",
+            schema: {
+              type: "string",
+              enum: ["day", "month", "year"],
+              default: "month",
+            },
+          },
+        ],
+        responses: { "200": { description: "Application stats time-series" } },
+      },
+    },
+    "/admin/analytics/revenue": {
+      get: {
+        summary: "Revenue stats grouped by day/month/year",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "period",
+            schema: {
+              type: "string",
+              enum: ["today", "week", "month", "quarter", "year", "all"],
+            },
+          },
+          {
+            in: "query",
+            name: "groupBy",
+            schema: {
+              type: "string",
+              enum: ["day", "month", "year"],
+              default: "month",
+            },
+          },
+        ],
+        responses: { "200": { description: "Revenue stats time-series" } },
+      },
+    },
+    "/admin/analytics/market-projection": {
+      get: {
+        summary:
+          "Market projection — potential students and revenue from non-registered schools",
+        tags: ["Admin"],
+        responses: { "200": { description: "Market projection data" } },
+      },
+    },
+
+    "/admin/users": {
+      get: {
+        summary: "List all users (any role)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "role",
+            schema: { type: "string", enum: ["parent", "school", "admin"] },
+          },
+          { in: "query", name: "search", schema: { type: "string" } },
+        ],
+        responses: { "200": { description: "List of users" } },
+      },
+    },
+    "/admin/users/{id}": {
+      get: {
+        summary: "Get a single user by ID",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": { description: "User record" },
+          "404": { description: "Not found" },
+        },
+      },
+    },
+    "/admin/users/{id}/toggle-active": {
+      patch: {
+        summary: "Enable or disable a user account",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["isActive"],
+                properties: { isActive: { type: "boolean" } },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "User status updated" } },
+      },
+    },
+    "/admin/users/{id}/email": {
+      patch: {
+        summary: "Reset a user's email address",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["email"],
+                properties: { email: { type: "string", format: "email" } },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Email updated" } },
+      },
+    },
+
+    "/admin/parents": {
+      get: {
+        summary: "List all parents with pagination and filters",
+        tags: ["Admin"],
+        parameters: [
+          { in: "query", name: "search", schema: { type: "string" } },
+          {
+            in: "query",
+            name: "kycStatus",
+            schema: {
+              type: "string",
+              enum: ["pending", "submitted", "approved", "rejected"],
+            },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Paginated parent list" } },
+      },
+    },
+    "/admin/parents/{id}": {
+      get: {
+        summary:
+          "Get full parent profile with students, applications and documents",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Parent detail" } },
+      },
+    },
+    "/admin/parents/{id}/kyc": {
+      patch: {
+        summary: "Update parent KYC status",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["kycStatus"],
+                properties: {
+                  kycStatus: {
+                    type: "string",
+                    enum: ["pending", "submitted", "approved", "rejected"],
+                  },
+                  adminNote: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "KYC status updated" } },
+      },
+    },
+
+    "/admin/schools/{id}": {
+      get: {
+        summary: "Get full partner school detail",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "School detail" } },
+      },
+    },
+    "/admin/schools/{id}/status": {
+      patch: {
+        summary: "Update school registration status",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["status"],
+                properties: {
+                  status: {
+                    type: "string",
+                    enum: ["pending", "under_review", "approved", "rejected"],
+                  },
+                  adminNote: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Status updated" } },
+      },
+    },
+
+    "/admin/catalog-schools": {
+      get: {
+        summary: "List all catalog schools (browsable school directory)",
+        tags: ["Admin"],
+        parameters: [
+          { in: "query", name: "search", schema: { type: "string" } },
+          { in: "query", name: "isRegistered", schema: { type: "boolean" } },
+        ],
+        responses: {
+          "200": { description: "Catalog school list with bank accounts" },
+        },
+      },
+    },
+    "/admin/catalog-schools/{id}": {
+      get: {
+        summary: "Get catalog school with class levels and bank accounts",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Catalog school detail" } },
+      },
+      patch: {
+        summary: "Update catalog school (name, tier, rate, isActive)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  tier: { type: "string", enum: ["1+", "1", "2", "3", "4"] },
+                  isRegistered: { type: "boolean" },
+                  serviceChargeRate: { type: "number", example: 0.15 },
+                  isActive: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Catalog school updated" } },
+      },
+    },
+    "/admin/catalog-schools/{schoolId}/tier": {
+      patch: {
+        summary: "Update school tier and service charge rate",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "schoolId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  tier: { type: "string" },
+                  isRegistered: { type: "boolean" },
+                  serviceChargeRate: { type: "number" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Tier updated" } },
+      },
+    },
+    "/admin/catalog-schools/{schoolId}/bank-accounts": {
+      get: {
+        summary: "List bank accounts for a catalog school",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "schoolId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Bank account list" } },
+      },
+      post: {
+        summary: "Add a bank account to a catalog school",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "schoolId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["bankName", "accountNumber", "accountName"],
+                properties: {
+                  bankName: { type: "string" },
+                  accountNumber: { type: "string" },
+                  accountName: { type: "string" },
+                  bankCode: { type: "string" },
+                  isPrimary: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "201": { description: "Bank account added" } },
+      },
+    },
+    "/admin/bank-accounts/{id}": {
+      put: {
+        summary: "Update a school bank account",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  bankName: { type: "string" },
+                  accountNumber: { type: "string" },
+                  accountName: { type: "string" },
+                  bankCode: { type: "string" },
+                  isPrimary: { type: "boolean" },
+                  isVerified: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Bank account updated" } },
+      },
+      delete: {
+        summary: "Delete a school bank account",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Bank account deleted" } },
+      },
+    },
+
+    "/admin/institution-types": {
+      get: {
+        summary: "List all institution types (Nursery, Primary, Secondary…)",
+        tags: ["Admin"],
+        responses: { "200": { description: "Institution type list" } },
+      },
+      post: {
+        summary: "Create a new institution type",
+        tags: ["Admin"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name"],
+                properties: {
+                  name: { type: "string" },
+                  sortOrder: { type: "integer" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "201": { description: "Created" } },
+      },
+    },
+    "/admin/institution-types/{id}": {
+      put: {
+        summary: "Update an institution type",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  sortOrder: { type: "integer" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Updated" } },
+      },
+      delete: {
+        summary: "Delete an institution type",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Deleted" } },
+      },
+    },
+
+    "/admin/class-levels": {
+      get: {
+        summary:
+          "List class levels, optionally filtered by school or institution type",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "schoolId",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "institutionTypeId",
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Class level list" } },
+      },
+      post: {
+        summary: "Create a new class level entry",
+        tags: ["Admin"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["schoolId", "institutionTypeId", "className"],
+                properties: {
+                  schoolId: { type: "string", format: "uuid" },
+                  institutionTypeId: { type: "string", format: "uuid" },
+                  className: { type: "string" },
+                  subLevelGroup: { type: "string" },
+                  sortOrder: { type: "integer" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "201": { description: "Class level created" } },
+      },
+    },
+    "/admin/class-levels/{id}": {
+      put: {
+        summary: "Update a class level",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  className: { type: "string" },
+                  subLevelGroup: { type: "string" },
+                  sortOrder: { type: "integer" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Updated" } },
+      },
+      delete: {
+        summary: "Delete a class level",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Deleted" } },
+      },
+    },
+
+    "/admin/students": {
+      get: {
+        summary: "List all students with optional parent/school filters",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "parentId",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "schoolId",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Paginated student list" } },
+      },
+    },
+    "/admin/students/{id}": {
+      get: {
+        summary: "Get student detail with loan history",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Student detail" } },
+      },
+      put: {
+        summary: "Update student information",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  firstName: { type: "string" },
+                  lastName: { type: "string" },
+                  gradeLevel: { type: "string" },
+                  tuitionAmount: { type: "number" },
+                  studentId: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Updated" } },
+      },
+      delete: {
+        summary: "Delete a student (blocked if active loans exist)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": { description: "Deleted" },
+          "400": { description: "Active loan exists" },
+        },
+      },
+    },
+
+    "/admin/loans": {
+      get: {
+        summary: "List all loan applications with filters and pagination",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "status",
+            schema: {
+              type: "string",
+              enum: [
+                "pending",
+                "under_review",
+                "info_requested",
+                "school_verification",
+                "approved",
+                "rejected",
+                "disbursed",
+                "repaid",
+                "cancelled",
+              ],
+            },
+          },
+          {
+            in: "query",
+            name: "parentId",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "studentId",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "catalogSchoolId",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "fromDate",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            in: "query",
+            name: "toDate",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: {
+          "200": { description: "Paginated loan application list" },
+        },
+      },
+    },
+    "/admin/loans/{id}": {
+      get: {
+        summary:
+          "Get full loan application detail (ledger, offer, disbursement, schedule, events)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Loan application detail" } },
+      },
+    },
+    "/admin/loans/{id}/status": {
+      patch: {
+        summary: "Update loan application status",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["status"],
+                properties: {
+                  status: { type: "string" },
+                  rejectionReason: { type: "string" },
+                  adminNote: { type: "string" },
+                  decidedBy: { type: "string", format: "uuid" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Status updated and event logged" },
+        },
+      },
+    },
+    "/admin/loans/{id}/note": {
+      patch: {
+        summary: "Add or update admin note on a loan application",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["adminNote"],
+                properties: { adminNote: { type: "string" } },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Note updated" } },
+      },
+    },
+    "/admin/loans/{id}/events": {
+      get: {
+        summary: "Get audit event log for a loan application",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": { description: "Event list in chronological order" },
+        },
+      },
+      post: {
+        summary: "Manually create an audit event on a loan application",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["actor", "status"],
+                properties: {
+                  actor: {
+                    type: "string",
+                    enum: ["admin", "system", "parent", "school"],
+                  },
+                  actorId: { type: "string", format: "uuid" },
+                  status: { type: "string" },
+                  note: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "201": { description: "Event created" } },
+      },
+    },
+    "/admin/loans/{id}/schedule": {
+      get: {
+        summary: "Get repayment schedule for a loan application",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": { description: "Repayment schedule installments" },
+        },
+      },
+    },
+
+    "/admin/ledgers": {
+      get: {
+        summary:
+          "List all loan ledgers (Lendsqr booking state machine records)",
+        tags: ["Admin"],
+        parameters: [
+          { in: "query", name: "status", schema: { type: "string" } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Paginated ledger list" } },
+      },
+    },
+    "/admin/ledgers/loan/{loanApplicationId}": {
+      get: {
+        summary: "Get the ledger for a specific loan application",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "loanApplicationId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Loan ledger" } },
+      },
+    },
+
+    "/admin/loan-offers": {
+      get: {
+        summary: "List all loan offers",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "status",
+            schema: {
+              type: "string",
+              enum: ["pending", "accepted", "declined", "expired"],
+            },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Paginated offer list" } },
+      },
+    },
+    "/admin/loan-offers/loan/{loanApplicationId}": {
+      get: {
+        summary: "Get the loan offer for a specific application",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "loanApplicationId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Loan offer" } },
+      },
+    },
+    "/admin/loan-offers/{id}/status": {
+      patch: {
+        summary: "Update loan offer status (accept/decline/expire)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["status"],
+                properties: {
+                  status: {
+                    type: "string",
+                    enum: ["pending", "accepted", "declined", "expired"],
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Offer status updated" } },
+      },
+    },
+
+    "/admin/disbursements": {
+      get: {
+        summary: "List disbursements with filters",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "status",
+            schema: {
+              type: "string",
+              enum: [
+                "pending",
+                "processing",
+                "successful",
+                "failed",
+                "reversed",
+              ],
+            },
+          },
+          {
+            in: "query",
+            name: "schoolId",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "fromDate",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            in: "query",
+            name: "toDate",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Paginated disbursement list" } },
+      },
+    },
+    "/admin/disbursements/{id}": {
+      get: {
+        summary: "Get disbursement detail",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Disbursement detail" } },
+      },
+    },
+    "/admin/disbursements/{id}/status": {
+      patch: {
+        summary:
+          "Update disbursement status (processing/successful/failed/reversed)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["status"],
+                properties: {
+                  status: { type: "string" },
+                  paystackTransferCode: { type: "string" },
+                  paystackTransferId: { type: "string" },
+                  paystackReference: { type: "string" },
+                  failureReason: { type: "string" },
+                  notes: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Status updated" } },
+      },
+    },
+
+    "/admin/repayments": {
+      get: {
+        summary: "List repayment records with filters",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "loanApplicationId",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "parentId",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "status",
+            schema: {
+              type: "string",
+              enum: ["pending", "successful", "failed", "reversed"],
+            },
+          },
+          {
+            in: "query",
+            name: "fromDate",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            in: "query",
+            name: "toDate",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Paginated repayment list" } },
+      },
+    },
+    "/admin/repayments/manual": {
+      post: {
+        summary: "Record a manual repayment transaction",
+        tags: ["Admin"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: [
+                  "loanApplicationId",
+                  "parentId",
+                  "amount",
+                  "paymentMethod",
+                  "type",
+                ],
+                properties: {
+                  loanApplicationId: { type: "string", format: "uuid" },
+                  parentId: { type: "string", format: "uuid" },
+                  amount: { type: "number" },
+                  paymentMethod: {
+                    type: "string",
+                    enum: [
+                      "card",
+                      "bank_transfer",
+                      "direct_debit",
+                      "ussd",
+                      "manual",
+                    ],
+                  },
+                  type: {
+                    type: "string",
+                    enum: [
+                      "scheduled",
+                      "early_partial",
+                      "early_full",
+                      "late",
+                      "manual_reversal",
+                    ],
+                  },
+                  paidAt: { type: "string", format: "date-time" },
+                  notes: { type: "string" },
+                  receiptNumber: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "201": { description: "Manual repayment recorded" } },
+      },
+    },
+    "/admin/repayments/{id}": {
+      get: {
+        summary: "Get repayment detail",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Repayment detail" } },
+      },
+    },
+    "/admin/schedule/{id}": {
+      patch: {
+        summary: "Update a repayment schedule installment",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  status: {
+                    type: "string",
+                    enum: [
+                      "upcoming",
+                      "due",
+                      "paid",
+                      "partially_paid",
+                      "overdue",
+                      "waived",
+                    ],
+                  },
+                  amountPaid: { type: "number" },
+                  paidAt: { type: "string", format: "date-time" },
+                  lateFeeApplied: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Installment updated" } },
+      },
+    },
+
+    "/admin/documents": {
+      get: {
+        summary: "List KYC documents",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "parentId",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "category",
+            schema: { type: "string", enum: ["photo", "kyc_document"] },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Document list" } },
+      },
+    },
+    "/admin/documents/{id}": {
+      get: {
+        summary: "Get a single KYC document",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Document detail" } },
+      },
+      delete: {
+        summary: "Delete a KYC document",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Deleted" } },
+      },
+    },
+
+    "/admin/school-requests": {
+      get: {
+        summary: "List school onboarding requests from parents",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "status",
+            schema: {
+              type: "string",
+              enum: ["pending", "in_progress", "onboarded", "rejected"],
+            },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Paginated school request list" } },
+      },
+    },
+    "/admin/school-requests/{id}": {
+      get: {
+        summary: "Get a single school request",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "School request detail" } },
+      },
+    },
+    "/admin/school-requests/{id}/status": {
+      patch: {
+        summary: "Update school request status and add admin note",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["status"],
+                properties: {
+                  status: {
+                    type: "string",
+                    enum: ["pending", "in_progress", "onboarded", "rejected"],
+                  },
+                  adminNote: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Status updated" } },
+      },
+    },
+
+    "/admin/notifications": {
+      get: {
+        summary: "List in-app notifications for all users (admin view)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "userId",
+            schema: { type: "string", format: "uuid" },
+          },
+          { in: "query", name: "isRead", schema: { type: "boolean" } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Paginated notification list" } },
+      },
+    },
+    "/admin/notifications/broadcast": {
+      post: {
+        summary:
+          "Broadcast a notification to users (all, by role, or specific IDs)",
+        tags: ["Admin"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["title", "message", "type"],
+                properties: {
+                  userIds: {
+                    type: "array",
+                    items: { type: "string", format: "uuid" },
+                  },
+                  role: { type: "string", enum: ["parent", "school"] },
+                  title: { type: "string" },
+                  message: { type: "string" },
+                  type: { type: "string" },
+                  referenceId: { type: "string", format: "uuid" },
+                  referenceType: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Notification sent — returns count of recipients",
+          },
+        },
+      },
+    },
+    "/admin/notifications/{id}": {
+      delete: {
+        summary: "Delete a notification record",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Deleted" } },
+      },
+    },
+
+    "/admin/device-tokens": {
+      get: {
+        summary: "List device tokens for push notifications",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "userId",
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Device token list" } },
+      },
+    },
+    "/admin/device-tokens/{id}": {
+      delete: {
+        summary: "Delete a device token",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Deleted" } },
+      },
+    },
+
+    "/admin/sessions": {
+      get: {
+        summary: "List all academic sessions with nested terms",
+        tags: ["Admin"],
+        responses: { "200": { description: "Session list" } },
+      },
+      post: {
+        summary: "Create a new academic session",
+        tags: ["Admin"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["sessionName", "startYear", "endYear"],
+                properties: {
+                  sessionName: { type: "string", example: "2026/2027" },
+                  startYear: { type: "integer" },
+                  endYear: { type: "integer" },
+                  isCurrent: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "201": { description: "Session created" } },
+      },
+    },
+    "/admin/sessions/{id}": {
+      get: {
+        summary: "Get a single academic session with nested terms",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Session detail" } },
+      },
+      put: {
+        summary: "Update academic session metadata",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  sessionName: { type: "string" },
+                  isCurrent: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Updated" } },
+      },
+      delete: {
+        summary: "Delete a session (cascades to all its terms)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Deleted" } },
+      },
+    },
+    "/admin/sessions/{id}/current": {
+      put: {
+        summary: "Mark a session as current (unsets all others)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Session set as current" } },
+      },
+    },
+    "/admin/sessions/{sessionId}/terms": {
+      post: {
+        summary: "Create a term inside a session",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "sessionId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: [
+                  "termCode",
+                  "termName",
+                  "defaultResumptionMonth",
+                  "maxRepaymentMonths",
+                ],
+                properties: {
+                  termCode: {
+                    type: "string",
+                    enum: ["FIRST_TERM", "SECOND_TERM", "THIRD_TERM"],
+                  },
+                  termName: { type: "string" },
+                  defaultResumptionMonth: { type: "string" },
+                  maxRepaymentMonths: { type: "integer" },
+                  resumptionDate: { type: "string", format: "date" },
+                  portalOpeningDate: { type: "string", format: "date" },
+                  portalCloseDate: { type: "string", format: "date" },
+                  status: { type: "string" },
+                  applicationWindows: { type: "array" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "201": { description: "Term created" } },
+      },
+    },
+
+    "/admin/terms": {
+      get: {
+        summary: "List academic terms, optionally filtered by session",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "sessionId",
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Term list" } },
+      },
+    },
+    "/admin/terms/{id}": {
+      get: {
+        summary: "Get a single academic term",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Term detail" } },
+      },
+      put: {
+        summary: "Update term dates, windows, or status",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  portalOpeningDate: { type: "string", format: "date" },
+                  portalCloseDate: { type: "string", format: "date" },
+                  maxRepaymentMonths: { type: "integer" },
+                  status: { type: "string" },
+                  applicationWindows: { type: "array" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Updated" } },
+      },
+      delete: {
+        summary: "Delete an academic term",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Deleted" } },
+      },
+    },
+    "/admin/terms/{id}/activate": {
+      put: {
+        summary: "Activate a term (closes all other active terms)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Term activated" } },
+      },
+    },
+
+    "/admin/school-terms": {
+      get: {
+        summary: "List legacy per-school terms created by school accounts",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "query",
+            name: "schoolId",
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "School term list" } },
+      },
+    },
+    "/admin/school-terms/{id}": {
+      get: {
+        summary: "Get a legacy school term",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Term detail" } },
+      },
+      delete: {
+        summary: "Delete a legacy school term",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: { "200": { description: "Deleted" } },
       },
     },
   },

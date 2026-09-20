@@ -1,20 +1,3 @@
-/**
- * src/seeders/schoolBankAccountSeeder.ts
- *
- * Seeds known school bank accounts from the client-provided data (Term.md).
- * Safe to call on every boot — skips if data already exists (idempotent).
- *
- * Client-provided accounts:
- *   Gulf Flower Schools        — 1224592025  Zenith Bank
- *   Foster Prime School Ltd    — 1228726145  Zenith Bank
- *   Camilla Brook Place        — 2022385370  First Bank  (account name: CAMILLA BROOK PLACE (TUITION))
- *   Dothan Nursery & Pry School — 2028767398  First Bank
- *   Dothan Nursery & Pry School — 0126041565  Wema Bank  (secondary account)
- *
- * No bank details provided for: Stars International College, St. Jude's Private Schools,
- * Loral International Schools, Gracewood International School.
- */
-
 import { QueryTypes } from "sequelize";
 import { sequelize } from "../config/db";
 import logger from "../config/logger";
@@ -28,7 +11,6 @@ interface BankAccountSeed {
   isPrimary: boolean;
 }
 
-// CBN bank codes (used for API payouts)
 const BANK_CODES: Record<string, string> = {
   "Zenith Bank":  "057",
   "First Bank":   "011",
@@ -60,7 +42,6 @@ const BANK_ACCOUNTS: BankAccountSeed[] = [
     bankCode:       BANK_CODES["First Bank"],
     isPrimary:      true,
   },
-  // Dothan has two accounts — First Bank is primary, Wema is secondary
   {
     schoolName:     "Dothan Comprehensive Schools",
     bankName:       "First Bank",
@@ -80,7 +61,6 @@ const BANK_ACCOUNTS: BankAccountSeed[] = [
 ];
 
 export async function seedSchoolBankAccounts(): Promise<void> {
-  // Idempotency guard
   const [existing] = await sequelize.query<{ count: string }>(
     "SELECT COUNT(*)::text AS count FROM school_bank_account_details",
     { type: QueryTypes.SELECT },
@@ -94,7 +74,6 @@ export async function seedSchoolBankAccounts(): Promise<void> {
   logger.info(`Seeding ${BANK_ACCOUNTS.length} school bank account(s)…`);
 
   for (const acct of BANK_ACCOUNTS) {
-    // Look up the catalog_schools row by name
     const [school] = await sequelize.query<{ id: string }>(
       `SELECT id FROM catalog_schools WHERE name = :name LIMIT 1`,
       { replacements: { name: acct.schoolName }, type: QueryTypes.SELECT },

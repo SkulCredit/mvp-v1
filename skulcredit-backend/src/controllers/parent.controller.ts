@@ -422,21 +422,12 @@ class ParentController {
     }
   }
 
-  /**
-   * GET /parents/current-term
-   * Returns the currently active school term (date-based or admin-flagged).
-   * Used by the frontend to:
-   *  - Show/hide the new-term welcome modal
-   *  - Inform the wizard what the effective tenor ceiling is
-   * Public within the parent role — no sensitive data exposed.
-   */
   async getSessions(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      // Return all sessions ordered by start_year, with their terms nested
       const sessions = await schoolTermService.listSessions();
       successResponse(res, 200, "Sessions fetched", sessions);
     } catch (error) {
@@ -453,7 +444,6 @@ class ParentController {
       const term = await schoolTermService.getActiveTerm();
 
       if (!term) {
-        // No active term — portal is closed
         successResponse(res, 200, "No active term", {
           isOpen: false,
           term: null,

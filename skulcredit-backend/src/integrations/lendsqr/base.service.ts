@@ -15,7 +15,6 @@ export class LendsqrBaseService {
       },
     });
 
-    // Log every outgoing request — shows the full URL and payload
     this.client.interceptors.request.use((config) => {
       logger.info(
         `Lendsqr request: ${config.method?.toUpperCase()} ${config.baseURL ?? ""}${config.url ?? ""} | payload: ${JSON.stringify(config.data ?? {})}`,
@@ -23,7 +22,6 @@ export class LendsqrBaseService {
       return config;
     });
 
-    // Log every response — shows status, endpoint, and full response body
     this.client.interceptors.response.use(
       (response) => {
         logger.info(

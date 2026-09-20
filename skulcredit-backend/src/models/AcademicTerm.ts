@@ -9,24 +9,24 @@ export type TermStatus =
   | "COMPLETED";
 
 export interface ApplicationWindow {
-  window_name: string;          // e.g. "Early Applicant Window"
-  start_date: string;           // YYYY-MM-DD
-  end_date: string;             // YYYY-MM-DD
+  window_name: string;          
+  start_date: string;   
+  end_date: string;     
   repayment_duration_months: number;
   is_open: boolean;
 }
 
 export interface AcademicTermAttributes {
   id: string;
-  termId: string;               // e.g. "TERM-2026-2027-T1"
-  sessionId: string;            // FK → academic_sessions.id
+  termId: string;  
+  sessionId: string;        
   termCode: TermCode;
-  termName: string;             // e.g. "First Term"
-  defaultResumptionMonth: string; // e.g. "September"
+  termName: string;   
+  defaultResumptionMonth: string; 
   maxRepaymentMonths: number;
   resumptionDate: string | null;
   portalOpeningDate: string | null;
-  portalCloseDate: string | null; // last day parents can apply (end of last window)
+  portalCloseDate: string | null; 
   status: TermStatus;
   applicationWindows: ApplicationWindow[];
   createdAt?: Date;

@@ -1,16 +1,8 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
-/**
- * Migration 008: Create academic_sessions and academic_terms tables.
- * Replaces the simpler school_terms table with a proper two-level hierarchy:
- *   academic_sessions  (e.g. 2026/2027, 2027/2028 …)
- *     └── academic_terms  (First Term, Second Term, Third Term per session)
- *           └── application_windows  (JSONB — early/late windows with tenor)
- */
 export const up = async (queryInterface: QueryInterface): Promise<void> => {
   const tables = await queryInterface.showAllTables();
 
-  // ── academic_sessions ────────────────────────────────────────────────────
   if (!tables.includes("academic_sessions")) {
     await queryInterface.createTable("academic_sessions", {
       id: {
@@ -41,7 +33,6 @@ export const up = async (queryInterface: QueryInterface): Promise<void> => {
     });
   }
 
-  // ── academic_terms ───────────────────────────────────────────────────────
   if (!tables.includes("academic_terms")) {
     await queryInterface.createTable("academic_terms", {
       id: {
@@ -91,7 +82,6 @@ export const up = async (queryInterface: QueryInterface): Promise<void> => {
       updated_at: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
     });
 
-    // Unique: only one term_code per session
     await queryInterface.addIndex("academic_terms", ["session_id", "term_code"], {
       unique: true,
       name: "academic_terms_session_id_term_code_unique",
@@ -102,7 +92,6 @@ export const up = async (queryInterface: QueryInterface): Promise<void> => {
 export const down = async (queryInterface: QueryInterface): Promise<void> => {
   await queryInterface.dropTable("academic_terms").catch(() => null);
   await queryInterface.dropTable("academic_sessions").catch(() => null);
-  // Also remove ENUM types created by Postgres
   await queryInterface.sequelize
     .query('DROP TYPE IF EXISTS "enum_academic_terms_term_code"')
     .catch(() => null);

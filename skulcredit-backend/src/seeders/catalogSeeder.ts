@@ -34,16 +34,6 @@ interface FlatClassRow {
   class_name: string;
 }
 
-/**
- * SCHOOLS — client-provided list (8 schools total).
- *
- * Per client spec (Term.md):
- *   - ONLY "Dothan Comprehensive Schools" is a registered school (tier = "2")
- *   - All other 7 schools are NON-REGISTERED (tier = null, rate = 23.5%)
- *
- * The tier field and isRegistered flag drive the service charge applied to
- * loan applications.  Do NOT add any school not on this list.
- */
 const SCHOOLS: SchoolEntry[] = [
   {
     institution_name: "Gulf Flower Schools",
