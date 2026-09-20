@@ -1,24 +1,7 @@
-/**
- * src/seeders/academicSessionSeeder.ts
- *
- * Seeds academic_sessions and academic_terms from 2026/2027 → 2035/2036.
- * Safe to call on every boot — skips if data already exists (idempotent).
- *
- * Data based on Term.md spec:
- *   First Term  — Sep resumption, portal Sep 1–Oct 31, max 4 months
- *   Second Term — Jan resumption, portal Jan 1–Feb 28/29, max 4 months
- *   Third Term  — Apr resumption, portal Apr 1–Apr 30, max 3 months
- *
- * Each term has two application windows:
- *   - Early window (month 1):  full max_repayment_months
- *   - Late window  (month 2):  max_repayment_months - 1
- */
-
 import { QueryTypes } from "sequelize";
 import { sequelize } from "../config/db";
 import logger from "../config/logger";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface AppWindow {
   window_name: string;
@@ -50,8 +33,6 @@ interface SessionData {
   terms: TermData[];
 }
 
-// ── Resumption dates from Term.md ─────────────────────────────────────────────
-
 const RESUMPTION_DATES: Record<string, { t1: string; t2: string; t3: string }> = {
   "2026/2027": { t1: "2026-09-14", t2: "2027-01-11", t3: "2027-04-26" },
   "2027/2028": { t1: "2027-09-13", t2: "2028-01-10", t3: "2028-04-24" },
@@ -65,9 +46,7 @@ const RESUMPTION_DATES: Record<string, { t1: string; t2: string; t3: string }> =
   "2035/2036": { t1: "2035-09-10", t2: "2036-01-07", t3: "2036-04-28" },
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Returns the last day of February for a given year (handles leap years) */
 function febEnd(year: number): string {
   const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
   return `${year}-02-${isLeap ? "29" : "28"}`;
@@ -80,15 +59,12 @@ function computeStatus(portalOpen: string, portalClose: string): TermData["statu
   return "APPLICATION_CLOSED";
 }
 
-// ── Session builder ───────────────────────────────────────────────────────────
-
 function buildSession(startYear: number, isCurrent: boolean): SessionData {
   const endYear = startYear + 1;
   const sessionName = `${startYear}/${endYear}`;
   const sessionId = `SESS-${startYear}-${endYear}`;
   const dates = RESUMPTION_DATES[sessionName];
 
-  // ── First Term: Sep 1 → Oct 31 ─────────────────────────────────────────
   const t1Open  = `${startYear}-09-01`;
   const t1Close = `${startYear}-10-31`;
   const term1: TermData = {
@@ -119,7 +95,7 @@ function buildSession(startYear: number, isCurrent: boolean): SessionData {
     ],
   };
 
-  // ── Second Term: Jan 1 → Feb 28/29 ────────────────────────────────────
+
   const t2Open  = `${endYear}-01-01`;
   const t2Close = febEnd(endYear);
   const term2: TermData = {
@@ -150,7 +126,6 @@ function buildSession(startYear: number, isCurrent: boolean): SessionData {
     ],
   };
 
-  // ── Third Term: Apr 1 → May 31  (short — max 3 months) ────────────────
   const t3Open  = `${endYear}-04-01`;
   const t3Close = `${endYear}-05-31`;
   const term3: TermData = {
@@ -191,11 +166,8 @@ function buildSession(startYear: number, isCurrent: boolean): SessionData {
   };
 }
 
-// ── All sessions 2026/2027 → 2035/2036 ───────────────────────────────────────
-
 function buildAllSessions(): SessionData[] {
   const currentYear = new Date().getFullYear();
-  // Current session = the one whose start_year is currentYear (or currentYear-1 if before Sep)
   const currentStartYear = new Date().getMonth() >= 8 ? currentYear : currentYear - 1;
 
   return [
@@ -204,10 +176,7 @@ function buildAllSessions(): SessionData[] {
   ].map((y) => buildSession(y, y === currentStartYear));
 }
 
-// ── Exported seeder ───────────────────────────────────────────────────────────
-
 export async function seedAcademicSessions(): Promise<void> {
-  // Idempotency guard
   const [existing] = await sequelize.query<{ count: string }>(
     "SELECT COUNT(*)::text AS count FROM academic_sessions",
     { type: QueryTypes.SELECT },
@@ -222,7 +191,6 @@ export async function seedAcademicSessions(): Promise<void> {
   logger.info(`Seeding ${sessions.length} academic sessions (${sessions.length * 3} terms total)…`);
 
   for (const session of sessions) {
-    // Insert session row
     const [sessionRow] = await sequelize.query<{ id: string }>(
       `INSERT INTO academic_sessions
          (id, session_id, session_name, start_year, end_year, is_current, created_at, updated_at)
@@ -242,7 +210,7 @@ export async function seedAcademicSessions(): Promise<void> {
       },
     );
 
-    if (!sessionRow) continue; // already existed — skip terms too
+    if (!sessionRow) continue; 
     const sessionPkId = sessionRow.id;
 
     for (const term of session.terms) {

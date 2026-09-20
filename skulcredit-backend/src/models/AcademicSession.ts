@@ -3,8 +3,8 @@ import { sequelize } from "../config/db";
 
 export interface AcademicSessionAttributes {
   id: string;
-  sessionId: string;        // e.g. "SESS-2026-2027"
-  sessionName: string;      // e.g. "2026/2027"
+  sessionId: string;  
+  sessionName: string;  
   startYear: number;
   endYear: number;
   isCurrent: boolean;

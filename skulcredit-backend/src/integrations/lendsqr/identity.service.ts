@@ -1,6 +1,5 @@
 import { LendsqrBaseService } from "./base.service";
 
-// NIN verification response shape from Lendsqr Adjutor API
 export interface NinVerificationData {
   nin: string;
   first_name: string;
@@ -27,11 +26,6 @@ export interface NinVerificationResponse {
 }
 
 class LendsqrIdentityService extends LendsqrBaseService {
-  /**
-   * Verify a NIN via Lendsqr Adjutor: GET /v2/verification/nin/:nin
-   * The base URL already includes the host; the path must not repeat /v2.
-   * env.lendsqr.baseUrl should be "https://adjutor.lendsqr.com" (no trailing /v2).
-   */
   verifyNin(nin: string): Promise<NinVerificationResponse> {
     return this.client.get<NinVerificationResponse, NinVerificationResponse>(
       `/v2/verification/nin/${nin}`,

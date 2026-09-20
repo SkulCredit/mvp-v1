@@ -1,8 +1,6 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
 export const up = async (queryInterface: QueryInterface): Promise<void> => {
-  // Guard: if the parents table doesn't exist yet (fresh DB before first sync)
-  // there is nothing to alter — skip safely.
   const tables = await queryInterface.showAllTables();
   if (!tables.includes("parents")) return;
 

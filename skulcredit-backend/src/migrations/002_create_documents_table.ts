@@ -3,8 +3,6 @@ import { QueryInterface, DataTypes } from "sequelize";
 export const up = async (queryInterface: QueryInterface): Promise<void> => {
   const tables = await queryInterface.showAllTables();
 
-  // If parents doesn't exist yet (fresh DB, before sequelize.sync()) skip —
-  // the documents table will be created by sync() via the Document model.
   if (!tables.includes("parents")) return;
 
   if (tables.includes("documents")) return;

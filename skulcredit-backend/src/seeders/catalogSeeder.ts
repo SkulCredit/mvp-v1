@@ -1,20 +1,16 @@
-
-
 import { QueryTypes } from "sequelize";
 import { sequelize } from "../config/db";
 import logger from "../config/logger";
 
-
 const TIER_RATES: Record<string, number> = {
-  "4":  0.2,     // Tier 4  → 20 %
-  "3":  0.2,     // Tier 3  → 20 %
-  "2":  0.15,    // Tier 2  → 15 %
-  "1":  0.125,   // Tier 1  → 12.5 %
-  "1+": 0.1,     // Tier 1+ → 10 %
+  "4": 0.2, // Tier 4  → 20 %
+  "3": 0.2, // Tier 3  → 20 %
+  "2": 0.15, // Tier 2  → 15 %
+  "1": 0.125, // Tier 1  → 12.5 %
+  "1+": 0.1, // Tier 1+ → 10 %
 };
 
 const NON_REGISTERED_RATE = 0.235; // 23.5 %
-
 
 interface SubLevel {
   level: string;
@@ -29,7 +25,7 @@ interface InstitutionTypeEntry {
 
 interface SchoolEntry {
   institution_name: string;
-  tier?: string;
+  tier?: string | null;
   institution_types: InstitutionTypeEntry[];
 }
 
@@ -41,7 +37,7 @@ interface FlatClassRow {
 const SCHOOLS: SchoolEntry[] = [
   {
     institution_name: "Gulf Flower Schools",
-    tier: "2",
+    tier: null, // non-registered
     institution_types: [
       {
         type: "Nursery",
@@ -49,12 +45,22 @@ const SCHOOLS: SchoolEntry[] = [
       },
       {
         type: "Primary",
-        classes: ["Basic I", "Basic II", "Basic III", "Basic IV", "Basic V", "Basic VI"],
+        classes: [
+          "Basic I",
+          "Basic II",
+          "Basic III",
+          "Basic IV",
+          "Basic V",
+          "Basic VI",
+        ],
       },
       {
         type: "Secondary",
         sub_levels: [
-          { level: "Junior Secondary", classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"] },
+          {
+            level: "Junior Secondary",
+            classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"],
+          },
           { level: "Senior Secondary", classes: ["SSS 1", "SSS 2", "SSS 3"] },
         ],
       },
@@ -62,7 +68,7 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "Foster Prime Schools",
-    tier: "2",
+    tier: null, // non-registered
     institution_types: [
       {
         type: "Nursery",
@@ -70,12 +76,22 @@ const SCHOOLS: SchoolEntry[] = [
       },
       {
         type: "Primary",
-        classes: ["Basic I", "Basic II", "Basic III", "Basic IV", "Basic V", "Basic VI"],
+        classes: [
+          "Basic I",
+          "Basic II",
+          "Basic III",
+          "Basic IV",
+          "Basic V",
+          "Basic VI",
+        ],
       },
       {
         type: "Secondary",
         sub_levels: [
-          { level: "Junior Secondary", classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"] },
+          {
+            level: "Junior Secondary",
+            classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"],
+          },
           { level: "Senior Secondary", classes: ["SSS 1", "SSS 2", "SSS 3"] },
         ],
       },
@@ -83,20 +99,35 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "Dothan Comprehensive Schools",
-    tier: "2",
+    tier: "2", // REGISTERED — Tier 2 = 15% service charge
     institution_types: [
       {
         type: "Nursery",
-        classes: ["Creche / Toddler", "Preparatory / Playgroup", "Nursery I", "Nursery II"],
+        classes: [
+          "Creche / Toddler",
+          "Preparatory / Playgroup",
+          "Nursery I",
+          "Nursery II",
+        ],
       },
       {
         type: "Primary",
-        classes: ["Basic I", "Basic II", "Basic III", "Basic IV", "Basic V", "Basic VI"],
+        classes: [
+          "Basic I",
+          "Basic II",
+          "Basic III",
+          "Basic IV",
+          "Basic V",
+          "Basic VI",
+        ],
       },
       {
         type: "Secondary",
         sub_levels: [
-          { level: "Junior Secondary", classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"] },
+          {
+            level: "Junior Secondary",
+            classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"],
+          },
           { level: "Senior Secondary", classes: ["SSS 1", "SSS 2", "SSS 3"] },
         ],
       },
@@ -104,7 +135,7 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "Stars International College",
-    tier: "1",
+    tier: null, // non-registered
     institution_types: [
       {
         type: "Nursery",
@@ -112,12 +143,22 @@ const SCHOOLS: SchoolEntry[] = [
       },
       {
         type: "Primary",
-        classes: ["Basic I", "Basic II", "Basic III", "Basic IV", "Basic V", "Basic VI"],
+        classes: [
+          "Basic I",
+          "Basic II",
+          "Basic III",
+          "Basic IV",
+          "Basic V",
+          "Basic VI",
+        ],
       },
       {
         type: "Secondary",
         sub_levels: [
-          { level: "Junior Secondary", classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"] },
+          {
+            level: "Junior Secondary",
+            classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"],
+          },
           {
             level: "Senior Secondary",
             classes: [
@@ -132,20 +173,35 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "St. Jude's Private Schools",
-    tier: "2",
+    tier: null, // non-registered
     institution_types: [
       {
         type: "Nursery",
-        classes: ["Creche / Playgroup", "Pre-Nursery", "Nursery I", "Nursery II"],
+        classes: [
+          "Creche / Playgroup",
+          "Pre-Nursery",
+          "Nursery I",
+          "Nursery II",
+        ],
       },
       {
         type: "Primary",
-        classes: ["Basic I", "Basic II", "Basic III", "Basic IV", "Basic V", "Basic VI"],
+        classes: [
+          "Basic I",
+          "Basic II",
+          "Basic III",
+          "Basic IV",
+          "Basic V",
+          "Basic VI",
+        ],
       },
       {
         type: "Secondary",
         sub_levels: [
-          { level: "Junior Secondary", classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"] },
+          {
+            level: "Junior Secondary",
+            classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"],
+          },
           { level: "Senior Secondary", classes: ["SSS 1", "SSS 2", "SSS 3"] },
         ],
       },
@@ -153,7 +209,7 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "Loral International Schools",
-    tier: "1+",
+    tier: null, // non-registered
     institution_types: [
       {
         type: "Nursery",
@@ -161,43 +217,76 @@ const SCHOOLS: SchoolEntry[] = [
       },
       {
         type: "Primary",
-        classes: ["Basic I", "Basic II", "Basic III", "Basic IV", "Basic V", "Basic VI"],
+        classes: [
+          "Basic I",
+          "Basic II",
+          "Basic III",
+          "Basic IV",
+          "Basic V",
+          "Basic VI",
+        ],
       },
       {
         type: "Secondary",
         sub_levels: [
           {
             level: "Junior Secondary",
-            classes: ["JSS 1 (Basic 7 / Year 7)", "JSS 2 (Basic 8 / Year 8)", "JSS 3 (Basic 9 / Year 9)"],
+            classes: [
+              "JSS 1 (Basic 7 / Year 7)",
+              "JSS 2 (Basic 8 / Year 8)",
+              "JSS 3 (Basic 9 / Year 9)",
+            ],
           },
           {
             level: "Senior Secondary",
-            classes: ["SSS 1 (Year 10 / IGCSE Foundation)", "SSS 2 (Year 11 / IGCSE)", "SSS 3 (Year 12 / SSCE)"],
+            classes: [
+              "SSS 1 (Year 10 / IGCSE Foundation)",
+              "SSS 2 (Year 11 / IGCSE)",
+              "SSS 3 (Year 12 / SSCE)",
+            ],
           },
         ],
       },
       {
         type: "Tertiary / Sixth Form",
-        classes: ["Cambridge A-Level (Year 12 - Year 13)", "University Foundation Programme"],
+        classes: [
+          "Cambridge A-Level (Year 12 - Year 13)",
+          "University Foundation Programme",
+        ],
       },
     ],
   },
   {
     institution_name: "Gracewood International School",
-    tier: "1",
+    tier: null, // non-registered
     institution_types: [
       {
         type: "Nursery",
-        classes: ["Creche / Playgroup", "Pre-Nursery", "Nursery I", "Nursery II"],
+        classes: [
+          "Creche / Playgroup",
+          "Pre-Nursery",
+          "Nursery I",
+          "Nursery II",
+        ],
       },
       {
         type: "Primary",
-        classes: ["Basic I", "Basic II", "Basic III", "Basic IV", "Basic V", "Basic VI"],
+        classes: [
+          "Basic I",
+          "Basic II",
+          "Basic III",
+          "Basic IV",
+          "Basic V",
+          "Basic VI",
+        ],
       },
       {
         type: "Secondary",
         sub_levels: [
-          { level: "Junior Secondary", classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"] },
+          {
+            level: "Junior Secondary",
+            classes: ["JSS 1 (Basic 7)", "JSS 2 (Basic 8)", "JSS 3 (Basic 9)"],
+          },
           { level: "Senior Secondary", classes: ["SSS 1", "SSS 2", "SSS 3"] },
         ],
       },
@@ -205,20 +294,31 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "Camilla Brook Place",
-    tier: "3",
+    tier: null, // non-registered
     institution_types: [
       {
         type: "Nursery",
-        classes: ["Creche / Daycare", "Playgroup / Toddler", "Nursery I", "Nursery II"],
+        classes: [
+          "Creche / Daycare",
+          "Playgroup / Toddler",
+          "Nursery I",
+          "Nursery II",
+        ],
       },
       {
         type: "Primary",
-        classes: ["Basic I", "Basic II", "Basic III", "Basic IV", "Basic V", "Basic VI"],
+        classes: [
+          "Basic I",
+          "Basic II",
+          "Basic III",
+          "Basic IV",
+          "Basic V",
+          "Basic VI",
+        ],
       },
     ],
   },
 ];
-
 
 const PREFERRED_TYPE_ORDER = [
   "Nursery",
@@ -292,7 +392,9 @@ export async function seedCatalog(): Promise<void> {
   for (const school of SCHOOLS) {
     const tier = school.tier ?? null;
     const isRegistered = tier !== null;
-    const rate = tier ? (TIER_RATES[tier] ?? NON_REGISTERED_RATE) : NON_REGISTERED_RATE;
+    const rate = tier
+      ? (TIER_RATES[tier] ?? NON_REGISTERED_RATE)
+      : NON_REGISTERED_RATE;
 
     const [schoolRow] = await sequelize.query<{ id: string }>(
       `INSERT INTO catalog_schools
@@ -301,7 +403,12 @@ export async function seedCatalog(): Promise<void> {
          (gen_random_uuid(), :name, :is_registered, :tier, :rate, true, NOW(), NOW())
        RETURNING id`,
       {
-        replacements: { name: school.institution_name, is_registered: isRegistered, tier, rate },
+        replacements: {
+          name: school.institution_name,
+          is_registered: isRegistered,
+          tier,
+          rate,
+        },
         type: QueryTypes.SELECT,
       },
     );
@@ -321,7 +428,13 @@ export async function seedCatalog(): Promise<void> {
            VALUES
              (gen_random_uuid(), :school_id, :type_id, :sub_level_group, :class_name, :sort_order, NOW(), NOW())`,
           {
-            replacements: { school_id: schoolId, type_id: typeId, sub_level_group, class_name, sort_order: sortOrder },
+            replacements: {
+              school_id: schoolId,
+              type_id: typeId,
+              sub_level_group,
+              class_name,
+              sort_order: sortOrder,
+            },
             type: QueryTypes.INSERT,
           },
         );
@@ -329,5 +442,7 @@ export async function seedCatalog(): Promise<void> {
     }
   }
 
-  logger.info(`School catalog seeded: ${typeNames.length} types, ${SCHOOLS.length} schools`);
+  logger.info(
+    `School catalog seeded: ${typeNames.length} types, ${SCHOOLS.length} schools`,
+  );
 }

@@ -1,20 +1,3 @@
-/**
- * src/seeders/schoolTermSeeder.ts
- *
- * Seeds the default Nigerian school term calendar into school_terms.
- * Safe to call on every boot — skips if rows already exist.
- *
- * Term windows (based on owner's spec):
- *   Term 1 — Sep 1 → Oct 31  (portal open, max 4 months, reduces to 3 in October)
- *   Term 2 — Jan 1 → Feb 28  (portal open, max 4 months, reduces to 3 in February)
- *   Term 3 — Apr 1 → Apr 30  (short term, max 3 months only)
- *
- * The admin can edit these dates at any time via the Admin API.
- * A term is considered "active" if today falls within its portalOpenDate–portalCloseDate.
- * `isActive` is a convenience flag that the admin manually sets; the system
- * ALSO computes active status by date so the flag is only a fallback override.
- */
-
 import { QueryTypes } from "sequelize";
 import { sequelize } from "../config/db";
 import logger from "../config/logger";
@@ -22,8 +5,8 @@ import logger from "../config/logger";
 interface TermSeed {
   name: string;
   academicYear: string;
-  portalOpenDate: string;  // YYYY-MM-DD
-  portalCloseDate: string; // YYYY-MM-DD
+  portalOpenDate: string; 
+  portalCloseDate: string;
   maxTenorMonths: number;
   isActive: boolean;
 }
@@ -31,33 +14,30 @@ interface TermSeed {
 function buildDefaultTerms(): TermSeed[] {
   const now = new Date();
   const year = now.getFullYear();
-
-  // Academic year format: "2026/2027"
-  // Term 1 is in the second half of `year`, Terms 2 & 3 are in `year+1`
   const ay = `${year}/${year + 1}`;
 
   return [
     {
       name: "Term 1",
       academicYear: ay,
-      portalOpenDate:  `${year}-09-01`,   // September 1
-      portalCloseDate: `${year}-10-31`,   // October 31 — window closes after Oct
+      portalOpenDate:  `${year}-09-01`,
+      portalCloseDate: `${year}-10-31`,  
       maxTenorMonths: 4,
-      isActive: false, // seeder leaves activation to date-based logic / admin
+      isActive: false, 
     },
     {
       name: "Term 2",
       academicYear: ay,
-      portalOpenDate:  `${year + 1}-01-01`, // January 1
-      portalCloseDate: `${year + 1}-02-28`, // February 28
+      portalOpenDate:  `${year + 1}-01-01`,
+      portalCloseDate: `${year + 1}-02-28`, 
       maxTenorMonths: 4,
       isActive: false,
     },
     {
       name: "Term 3",
       academicYear: ay,
-      portalOpenDate:  `${year + 1}-04-01`, // April 1
-      portalCloseDate: `${year + 1}-04-30`, // April 30 — short term
+      portalOpenDate:  `${year + 1}-04-01`, 
+      portalCloseDate: `${year + 1}-04-30`, 
       maxTenorMonths: 3,
       isActive: false,
     },
@@ -65,7 +45,6 @@ function buildDefaultTerms(): TermSeed[] {
 }
 
 export async function seedSchoolTerms(): Promise<void> {
-  // Idempotency guard
   const [existing] = await sequelize.query<{ count: string }>(
     "SELECT COUNT(*)::text AS count FROM school_terms",
     { type: QueryTypes.SELECT },

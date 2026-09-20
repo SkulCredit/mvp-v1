@@ -3,10 +3,9 @@ import { LendsqrBaseService } from "./base.service";
 export interface CustomerPayload {
   phone_number: string;
   email: string;
-  /** Provide bvn when using BVN flow */
   bvn?: string;
   bvn_phone_number?: string;
-  dob?: string; // YYYY-MM-DD
+  dob?: string; 
   account_number?: string;
   bank_code?: string;
   state?: string;
@@ -49,11 +48,8 @@ export interface CreateCustomerResponse {
   status: string;
   message: string;
   data: {
-    /** Some Lendsqr endpoints return the customer directly in data */
     id?: number;
-    /** Others wrap in a users array */
     users?: LendsqrCustomerUser[];
-    /** Or nest under a single user key */
     user?: LendsqrCustomerUser;
     [key: string]: unknown;
   };
@@ -61,11 +57,6 @@ export interface CreateCustomerResponse {
 }
 
 class LendsqrCustomerService extends LendsqrBaseService {
-  /**
-   * Register/upsert a customer: POST /v2/customers
-   * Full URL: https://adjutor.lendsqr.com/v2/customers
-   * env.lendsqr.baseUrl must be "https://adjutor.lendsqr.com" (no trailing slash, no /v2).
-   */
   createCustomer(payload: CustomerPayload): Promise<CreateCustomerResponse> {
     return this.client.post<CustomerPayload, CreateCustomerResponse>(
       "/v2/customers",

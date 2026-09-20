@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+﻿import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
 import { ParentRepository, UserRepository } from "../repositories";
 import sendEmail from "../utils/email";
@@ -892,10 +892,15 @@ class ParentService {
       catalogSchoolId: payload.schoolId,
       schoolId: partnerSchool?.id ?? null,
       amountRequested: payload.tuitionAmount,
-      tenor: effectiveTenor, 
+      tenor: effectiveTenor,
       status: "pending",
       termsAccepted: true,
       termsAcceptedAt: new Date(),
+      // Snapshot the service charge at submission time — rate may change later
+      serviceChargeRate:   Number(catalogSchool.serviceChargeRate ?? 0.235),
+      serviceChargeAmount: Math.round(
+        payload.tuitionAmount * Number(catalogSchool.serviceChargeRate ?? 0.235),
+      ),
     });
 
     UserRepository.findById(userId)

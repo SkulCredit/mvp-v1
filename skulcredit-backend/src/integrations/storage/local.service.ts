@@ -1,10 +1,4 @@
-/**
- * Local filesystem storage service.
- *
- * Saves uploaded buffers to  <UPLOADS_DIR>/<folder>/<uuid>-<safe-filename>
- * and returns the relative path (stored in DB) plus the public URL
- * (served by Express via /uploads static route).
- */
+
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,7 +9,6 @@ class LocalStorageService {
   private readonly uploadsDir: string;
 
   constructor() {
-    // Resolve relative to process.cwd() so it works from any launch dir
     this.uploadsDir = path.resolve(process.cwd(), env.uploads.dir);
     this.ensureDir(this.uploadsDir);
   }
@@ -28,14 +21,10 @@ class LocalStorageService {
   }
 
   /**
-   * Save a Buffer to disk.
-   *
    * @param buffer      File contents
    * @param originalName Original filename (used to preserve extension)
    * @param folder      Sub-folder inside uploadsDir, e.g. "photos" | "kyc_docs"
    * @returns `{ filePath, publicUrl }`
-   *   - filePath  — relative path stored in DB: "uploads/photos/abc-photo.jpg"
-   *   - publicUrl — full URL: "https://api.example.com/uploads/photos/abc-photo.jpg"
    */
   saveFile(
     buffer: Buffer,
@@ -55,19 +44,12 @@ class LocalStorageService {
 
     fs.writeFileSync(absPath, buffer);
     logger.debug(`File saved: ${absPath}`);
-
-    // Relative path stored in DB (portable — not tied to server absolute path)
     const filePath  = path.join('uploads', folder, fileName).replace(/\\/g, '/');
-    // Public URL — fronted by APP_URL
     const publicUrl = `${env.appUrl.replace(/\/$/, '')}/${filePath}`;
 
     return { filePath, publicUrl };
   }
 
-  /**
-   * Delete a previously saved file by its stored relative filePath.
-   * Silently ignores missing files.
-   */
   deleteFile(filePath: string): void {
     try {
       const absPath = path.resolve(process.cwd(), filePath);

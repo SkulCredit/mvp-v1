@@ -191,21 +191,17 @@ export const up = async (queryInterface: QueryInterface): Promise<void> => {
       },
     });
 
-    // Fast lookup: all classes for a given school
     await queryInterface.addIndex(
       "catalog_school_class_levels",
       ["school_id"],
       { name: "catalog_school_class_levels_school_id_idx" },
     );
 
-    // Fast lookup: classes filtered by institution type (used by the endpoint)
     await queryInterface.addIndex(
       "catalog_school_class_levels",
       ["school_id", "institution_type_id"],
       { name: "catalog_school_class_levels_school_type_idx" },
     );
-
-    // Fast lookup: all schools that offer a given institution type
     await queryInterface.addIndex(
       "catalog_school_class_levels",
       ["institution_type_id"],
@@ -215,7 +211,6 @@ export const up = async (queryInterface: QueryInterface): Promise<void> => {
 };
 
 export const down = async (queryInterface: QueryInterface): Promise<void> => {
-  // Drop in reverse FK dependency order
   await queryInterface.dropTable("catalog_school_class_levels");
   await queryInterface.dropTable("catalog_schools");
   await queryInterface.dropTable("catalog_institution_types");

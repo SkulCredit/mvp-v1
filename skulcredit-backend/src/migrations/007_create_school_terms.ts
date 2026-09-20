@@ -1,12 +1,5 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
-/**
- * Migration 007: Create school_terms table.
- *
- * This table holds the national school calendar terms that control
- * when the parent application portal is open and what repayment
- * tenors are available.
- */
 export const up = async (queryInterface: QueryInterface): Promise<void> => {
   const tables = await queryInterface.showAllTables();
   if (tables.includes("school_terms")) return;
@@ -56,7 +49,6 @@ export const up = async (queryInterface: QueryInterface): Promise<void> => {
     },
   });
 
-  // Unique constraint: no duplicate term name in the same academic year
   await queryInterface.addIndex("school_terms", ["name", "academic_year"], {
     unique: true,
     name: "school_terms_name_academic_year_unique",

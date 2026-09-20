@@ -21,6 +21,7 @@ import CatalogSchoolClassLevel from "./CatalogSchoolClassLevel";
 import SchoolTerm from "./SchoolTerm";
 import AcademicSession from "./AcademicSession";
 import AcademicTerm from "./AcademicTerm";
+import SchoolBankAccount from "./SchoolBankAccount";
 
 User.hasOne(Parent, { foreignKey: "userId", as: "parentProfile" });
 User.hasOne(School, { foreignKey: "userId", as: "schoolProfile" });
@@ -175,6 +176,15 @@ AcademicTerm.belongsTo(AcademicSession, {
   as: "session",
 });
 
+CatalogSchool.hasMany(SchoolBankAccount, {
+  foreignKey: "catalogSchoolId",
+  as: "bankAccounts",
+});
+SchoolBankAccount.belongsTo(CatalogSchool, {
+  foreignKey: "catalogSchoolId",
+  as: "school",
+});
+
 export {
   User,
   Parent,
@@ -199,4 +209,5 @@ export {
   SchoolTerm,
   AcademicSession,
   AcademicTerm,
+  SchoolBankAccount,
 };
