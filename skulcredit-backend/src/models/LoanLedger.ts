@@ -1,19 +1,8 @@
-/**
- * LoanLedger — tracks every loan's lifecycle with a full state machine,
- * status history, and settlement details.
- *
- * State flow:
- *   INITIATED → PROCESSING → AUTHORIZED → SETTLEMENT_PENDING → DELIVERED
- *                                                            ↘ FAILED (any state)
- *
- * The `stateMachine` and `statusHistory` JSONB columns are updated by the
- * loan queue consumer and the Lendsqr webhook handler.
- */
+
 
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../config/db';
 
-// ── Shared state-machine types ────────────────────────────────────────────────
 
 export type LedgerState =
   | 'INITIATED'
@@ -64,8 +53,6 @@ export interface LedgerTimestamps {
   completedAt: string | null;
 }
 
-// ── Default state machine skeleton ────────────────────────────────────────────
-
 export function buildInitialStateMachine(now: string): StateMachine {
   const blank = (): StateEntry => ({
     timestamp: null,
@@ -106,32 +93,22 @@ export function buildInitialStateMachine(now: string): StateMachine {
   };
 }
 
-// ── Model attributes ───────────────────────────────────────────────────────────
 
 export interface LoanLedgerAttributes {
   id: string;
   loanApplicationId: string;
-  /** Lendsqr loan_id returned from POST /v2/customers/loans */
   lendsqrLoanId: number | null;
-  /** Lendsqr loan_profile_id returned from POST /v2/customers/loans */
   lendsqrLoanProfileId: number | null;
-  /** Lendsqr product_id used when booking the loan */
   lendsqrProductId: number | null;
-  /** The BVN used to book the loan (masked after storage) */
   bvnLast4: string | null;
   status: LedgerState;
   stateMachine: StateMachine;
   statusHistory: StatusHistoryEntry[];
   settlement: Settlement;
-  /** Raw webhook payloads stored for audit / replay */
   webhookPayloads: Record<string, unknown>[];
-  /** ISO-8601 when the loan booking job was dispatched to the queue */
   queuedAt: string | null;
-  /** ISO-8601 when Lendsqr confirmed the booking */
   bookedAt: string | null;
-  /** ISO-8601 when the final terminal state was reached */
   completedAt: string | null;
-  /** Last error message if state is FAILED */
   errorMessage: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -153,8 +130,6 @@ type LoanLedgerCreationAttributes = Optional<
   | 'completedAt'
   | 'errorMessage'
 >;
-
-// ── Sequelize model ────────────────────────────────────────────────────────────
 
 export class LoanLedgerInstance
   extends Model<LoanLedgerAttributes, LoanLedgerCreationAttributes>
@@ -178,13 +153,7 @@ export class LoanLedgerInstance
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 
-  // ── Helper: transition to a new state ──────────────────────────────────────
 
-  /**
-   * Advance the state machine to `nextState`.
-   * Validates the transition is allowed, updates `stateMachine.states`,
-   * appends to `statusHistory`, and saves the record.
-   */
   async transition(
     nextState: LedgerState,
     actor: LedgerActor,

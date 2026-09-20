@@ -66,6 +66,8 @@ router.get(
   "/current-term",
   parentController.getCurrentTerm.bind(parentController),
 );
+// All academic sessions with nested terms — used by wizard session/term picker
+router.get("/sessions", parentController.getSessions.bind(parentController));
 router.put(
   "/profile",
   validate(completeProfileSchema),

@@ -8,8 +8,6 @@ import {
   CatalogClassLevelGroup,
 } from "../../services/parentService";
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
 interface ParentProfile {
   firstName: string;
   lastName: string;
@@ -77,8 +75,6 @@ interface StudentFormData {
   tuitionAmount: string;
   studentId: string;
 }
-
-// ── Icons ──────────────────────────────────────────────────────────────────
 
 const UserIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
@@ -193,8 +189,6 @@ const ChevronDownIcon: React.FC = () => (
   </svg>
 );
 
-// ── Shared primitives ──────────────────────────────────────────────────────
-
 const inputCls =
   "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 " +
   "placeholder-gray-400 outline-none transition-colors " +
@@ -250,8 +244,6 @@ const SelectField: React.FC<{
   </FormField>
 );
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function maskSensitive(val: string | null | undefined): string {
   if (!val) return "—";
   if (val.length <= 3) return "•".repeat(val.length);
@@ -263,8 +255,6 @@ const Spinner: React.FC<{ className?: string }> = ({ className }) => (
     className={`animate-spin rounded-full border-2 border-current border-t-transparent ${className ?? "h-4 w-4"}`}
   />
 );
-
-// ── Modal shell ────────────────────────────────────────────────────────────
 
 const Modal: React.FC<{
   title: string;
@@ -301,8 +291,6 @@ const Modal: React.FC<{
     </div>
   </div>
 );
-
-// ── Confirm modal ──────────────────────────────────────────────────────────
 
 const ConfirmModal: React.FC<{
   message: string;
@@ -346,8 +334,6 @@ const ConfirmModal: React.FC<{
   </div>
 );
 
-// ── Toast ──────────────────────────────────────────────────────────────────
-
 const Toast: React.FC<{ message: string; type: "success" | "error" }> = ({
   message,
   type,
@@ -359,8 +345,6 @@ const Toast: React.FC<{ message: string; type: "success" | "error" }> = ({
     {message}
   </div>
 );
-
-// ── Modal footer helpers ───────────────────────────────────────────────────
 
 const ModalFooter: React.FC<{
   saving: boolean;
@@ -388,8 +372,6 @@ const ModalFooter: React.FC<{
   </>
 );
 
-// ── EditButton (card top-right) ────────────────────────────────────────────
-
 const EditButton: React.FC<{ onClick: () => void; label?: string }> = ({
   onClick,
   label = "Edit",
@@ -404,8 +386,6 @@ const EditButton: React.FC<{ onClick: () => void; label?: string }> = ({
   </button>
 );
 
-// ── Skeleton rows ──────────────────────────────────────────────────────────
-
 const SkeletonRows: React.FC<{ count?: number }> = ({ count = 4 }) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
     {Array.from({ length: count }).map((_, i) => (
@@ -417,22 +397,15 @@ const SkeletonRows: React.FC<{ count?: number }> = ({ count = 4 }) => (
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Page
-// ─────────────────────────────────────────────────────────────────────────────
-
 const ParentSettingsPage: React.FC = () => {
   const { user } = useAuth();
   const photoInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Remote data ────────────────────────────────────────────
 
   const [profile, setProfile] = useState<ParentProfile | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingStudents, setLoadingStudents] = useState(true);
 
-  // Catalog data for student modal
   const [institutionTypes, setInstitutionTypes] = useState<
     CatalogInstitutionType[]
   >([]);
@@ -444,8 +417,6 @@ const ParentSettingsPage: React.FC = () => {
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [loadingClasses, setLoadingClasses] = useState(false);
 
-  // ── Modal visibility ───────────────────────────────────────
-
   const [showPersonalModal, setShowPersonalModal] = useState(false);
   const [showEmploymentModal, setShowEmploymentModal] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
@@ -453,8 +424,6 @@ const ParentSettingsPage: React.FC = () => {
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
   const [showDeleteStudentConfirm, setShowDeleteStudentConfirm] =
     useState(false);
-
-  // ── Form data ──────────────────────────────────────────────
 
   const [personalForm, setPersonalForm] = useState<PersonalFormData>({
     firstName: "",
@@ -468,13 +437,11 @@ const ParentSettingsPage: React.FC = () => {
     addressCountry: "",
   });
 
-  // Employment is stored locally (no backend field for it on the Parent model)
   const [employmentForm, setEmploymentForm] = useState<EmploymentFormData>({
     employmentStatus: "",
     employer: "",
     monthlyIncome: "",
   });
-  // Persisted employment display values (saved locally per-session after edit)
   const [savedEmployment, setSavedEmployment] = useState<EmploymentFormData>({
     employmentStatus: "",
     employer: "",
@@ -493,8 +460,6 @@ const ParentSettingsPage: React.FC = () => {
     studentId: "",
   });
 
-  // ── Operation states ───────────────────────────────────────
-
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [savingStudent, setSavingStudent] = useState(false);
   const [deletingStudentLoading, setDeletingStudentLoading] = useState(false);
@@ -504,8 +469,6 @@ const ParentSettingsPage: React.FC = () => {
     message: string;
     type: "success" | "error";
   } | null>(null);
-
-  // ── Helpers ────────────────────────────────────────────────
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
@@ -530,8 +493,6 @@ const ParentSettingsPage: React.FC = () => {
   const phone = profile?.user?.phoneNumber ?? user?.phoneNumber ?? "—";
   const photoUrl = profile?.profilePhotoUrl ?? null;
 
-  // ── On mount: fetch profile + students ────────────────────
-
   useEffect(() => {
     const fetchProfile = async () => {
       setLoadingProfile(true);
@@ -553,7 +514,6 @@ const ParentSettingsPage: React.FC = () => {
           addressCountry: p.addressCountry ?? "",
         });
       } catch {
-        // non-blocking – fall back to auth context values
       } finally {
         setLoadingProfile(false);
       }
@@ -573,7 +533,6 @@ const ParentSettingsPage: React.FC = () => {
       }
     };
 
-    // Load institution types once (for student modal)
     const fetchInstitutionTypes = async () => {
       setLoadingTypes(true);
       try {
@@ -590,8 +549,6 @@ const ParentSettingsPage: React.FC = () => {
     fetchStudents();
     fetchInstitutionTypes();
   }, []);
-
-  // ── Catalog cascade: institution type → schools ───────────
 
   const handleInstitutionTypeChange = async (id: string, name: string) => {
     setStudentForm((p) => ({
@@ -616,8 +573,6 @@ const ParentSettingsPage: React.FC = () => {
       setLoadingSchools(false);
     }
   };
-
-  // ── Catalog cascade: school → class levels ────────────────
 
   const handleSchoolChange = async (id: string, name: string) => {
     setStudentForm((p) => ({
@@ -644,8 +599,6 @@ const ParentSettingsPage: React.FC = () => {
   };
 
   const flatClasses = classLevelGroups.flatMap((g) => g.classes);
-
-  // ── Photo upload ───────────────────────────────────────────
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -680,8 +633,6 @@ const ParentSettingsPage: React.FC = () => {
     }
   };
 
-  // ── Save personal info ─────────────────────────────────────
-
   const handleSavePersonal = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingPersonal(true);
@@ -710,8 +661,6 @@ const ParentSettingsPage: React.FC = () => {
     }
   };
 
-  // ── Save employment info (local only — no backend field) ───
-
   const handleSaveEmployment = (e: React.FormEvent) => {
     e.preventDefault();
     setSavedEmployment({ ...employmentForm });
@@ -723,8 +672,6 @@ const ParentSettingsPage: React.FC = () => {
     setEmploymentForm({ ...savedEmployment });
     setShowEmploymentModal(true);
   };
-
-  // ── Open student modal ─────────────────────────────────────
 
   const openAddStudent = () => {
     setEditingStudent(null);
@@ -746,7 +693,6 @@ const ParentSettingsPage: React.FC = () => {
 
   const openEditStudent = async (s: Student) => {
     setEditingStudent(s);
-    // Pre-fill what we have
     setStudentForm({
       firstName: s.firstName,
       lastName: s.lastName,
@@ -762,9 +708,6 @@ const ParentSettingsPage: React.FC = () => {
     setClassLevelGroups([]);
     setShowStudentModal(true);
   };
-
-  // ── Save student ───────────────────────────────────────────
-
   const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingStudent(true);
@@ -803,8 +746,6 @@ const ParentSettingsPage: React.FC = () => {
     }
   };
 
-  // ── Delete student ─────────────────────────────────────────
-
   const handleDeleteStudent = async () => {
     if (!deletingStudent) return;
     setDeletingStudentLoading(true);
@@ -820,8 +761,6 @@ const ParentSettingsPage: React.FC = () => {
       setDeletingStudentLoading(false);
     }
   };
-
-  // ── Employment status labels ────────────────────────────────
 
   const EMPLOYMENT_OPTIONS = [
     { value: "employed_full", label: "Employed (Full-time)" },
@@ -842,16 +781,11 @@ const ParentSettingsPage: React.FC = () => {
     return "₦" + num.toLocaleString("en-NG", { minimumFractionDigits: 0 });
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
-
   return (
     <>
       {/* Toast */}
       {toast && <Toast message={toast.message} type={toast.type} />}
 
-      {/* ── Personal Info Modal ──────────────────────────────────── */}
       {showPersonalModal && (
         <Modal
           title="Edit Personal Information"
@@ -978,7 +912,6 @@ const ParentSettingsPage: React.FC = () => {
         </Modal>
       )}
 
-      {/* ── Employment Modal ─────────────────────────────────────── */}
       {showEmploymentModal && (
         <Modal
           title="Edit Employment Information"
@@ -1047,7 +980,6 @@ const ParentSettingsPage: React.FC = () => {
         </Modal>
       )}
 
-      {/* ── Student Add / Edit Modal ─────────────────────────────── */}
       {showStudentModal && (
         <Modal
           title={editingStudent ? "Edit Student" : "Add Student"}
@@ -1191,7 +1123,6 @@ const ParentSettingsPage: React.FC = () => {
         </Modal>
       )}
 
-      {/* ── Delete Student Confirm ───────────────────────────────── */}
       {showDeleteStudentConfirm && deletingStudent && (
         <ConfirmModal
           message={`Remove ${deletingStudent.firstName} ${deletingStudent.lastName} from your saved students? This won't affect existing applications.`}
@@ -1204,9 +1135,6 @@ const ParentSettingsPage: React.FC = () => {
         />
       )}
 
-      {/* ════════════════════════════════════════════════════════════
-          PAGE BODY
-          ════════════════════════════════════════════════════════════ */}
       <div className="flex flex-col gap-6 px-4 sm:px-6 py-8 w-full max-w-3xl mx-auto pb-16">
         {/* Page title */}
         <div>
@@ -1216,7 +1144,6 @@ const ParentSettingsPage: React.FC = () => {
           </p>
         </div>
 
-        {/* ── Profile Header Banner ───────────────────────────────── */}
         <div className="rounded-2xl overflow-hidden bg-[#8B1C53] shadow-sm">
           <div className="px-6 py-6 flex flex-wrap items-center gap-4">
             {/* Avatar / Photo */}
@@ -1227,7 +1154,7 @@ const ParentSettingsPage: React.FC = () => {
                   alt="Profile photo"
                   className="h-16 w-16 rounded-full object-cover border-2 border-white/40"
                   onError={(e) => {
-                    // If the image fails to load, hide it and fall back to icon
+
                     (e.currentTarget as HTMLImageElement).style.display =
                       "none";
                     const fallback = e.currentTarget
@@ -1237,7 +1164,6 @@ const ParentSettingsPage: React.FC = () => {
                 />
               ) : null}
 
-              {/* Default avatar — shown always when no photoUrl, or as hidden fallback */}
               <div
                 className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center text-white border-2 border-white/30"
                 style={{ display: photoUrl ? "none" : "flex" }}
@@ -1246,7 +1172,6 @@ const ParentSettingsPage: React.FC = () => {
                 <UserIcon className="w-8 h-8" />
               </div>
 
-              {/* Spinner overlay while uploading */}
               {photoLoading && (
                 <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
                   <Spinner className="h-5 w-5 border-white" />
@@ -1298,7 +1223,6 @@ const ParentSettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Personal Information Card ────────────────────────────── */}
         <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <h2 className="text-sm font-bold text-[#8B1C53]">
@@ -1331,7 +1255,6 @@ const ParentSettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Employment Information Card ──────────────────────────── */}
         <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <h2 className="text-sm font-bold text-[#8B1C53]">
@@ -1376,7 +1299,6 @@ const ParentSettingsPage: React.FC = () => {
           )}
         </div>
 
-        {/* ── My Students Card ─────────────────────────────────────── */}
         <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-6 pt-5 pb-4">
             <div>

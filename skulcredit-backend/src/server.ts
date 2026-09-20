@@ -11,6 +11,7 @@ import { startLoanBookingConsumer } from "./queues/loan.queue";
 import { runMigrations } from "./migrations/runner";
 import { seedCatalog } from "./seeders/catalogSeeder";
 import { seedSchoolTerms } from "./seeders/schoolTermSeeder";
+import { seedAcademicSessions } from "./seeders/academicSessionSeeder";
 
 // Load all models and wire up associations before syncing
 import "./models/index";
@@ -23,6 +24,7 @@ const start = async (): Promise<void> => {
 
     await seedCatalog();
     await seedSchoolTerms();
+    await seedAcademicSessions();
 
     await sequelize.sync({ alter: env.nodeEnv === "development" });
     logger.info("Database tables synced");

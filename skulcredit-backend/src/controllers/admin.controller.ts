@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+﻿import { Request, Response, NextFunction } from "express";
 import adminService from "../services/admin.service";
 import schoolTermService from "../services/schoolTerm.service";
 import { successResponse } from "../utils/response";
@@ -10,8 +10,12 @@ class AdminController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const result = await adminService.getDashboard();
-      successResponse(res, 200, "Admin dashboard data fetched", result);
+      successResponse(
+        res,
+        200,
+        "Admin dashboard data fetched",
+        await adminService.getDashboard(),
+      );
     } catch (error) {
       next(error);
     }
@@ -23,10 +27,12 @@ class AdminController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const result = await adminService.getSchools(
-        req.query.status as string | undefined,
+      successResponse(
+        res,
+        200,
+        "Schools fetched",
+        await adminService.getSchools(req.query.status as string | undefined),
       );
-      successResponse(res, 200, "Schools fetched", result);
     } catch (error) {
       next(error);
     }
@@ -38,8 +44,12 @@ class AdminController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const result = await adminService.approveSchool(String(req.params.id));
-      successResponse(res, 200, "School approved", result);
+      successResponse(
+        res,
+        200,
+        "School approved",
+        await adminService.approveSchool(String(req.params.id)),
+      );
     } catch (error) {
       next(error);
     }
@@ -51,8 +61,12 @@ class AdminController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const result = await adminService.rejectSchool(String(req.params.id));
-      successResponse(res, 200, "School rejected", result);
+      successResponse(
+        res,
+        200,
+        "School rejected",
+        await adminService.rejectSchool(String(req.params.id)),
+      );
     } catch (error) {
       next(error);
     }
@@ -64,8 +78,12 @@ class AdminController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const result = await adminService.getParents();
-      successResponse(res, 200, "Parents fetched", result);
+      successResponse(
+        res,
+        200,
+        "Parents fetched",
+        await adminService.getParents(),
+      );
     } catch (error) {
       next(error);
     }
@@ -77,14 +95,118 @@ class AdminController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const result = await adminService.getLoanApplications();
-      successResponse(res, 200, "Loan applications fetched", result);
+      successResponse(
+        res,
+        200,
+        "Loan applications fetched",
+        await adminService.getLoanApplications(),
+      );
     } catch (error) {
       next(error);
     }
   }
 
-  // ── School Terms ──────────────────────────────────────────────────────────
+  // ── Academic Sessions ─────────────────────────────────────────────────────
+
+  async listSessions(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      successResponse(
+        res,
+        200,
+        "Sessions fetched",
+        await schoolTermService.listSessions(),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getSession(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      successResponse(
+        res,
+        200,
+        "Session fetched",
+        await schoolTermService.getSession(String(req.params.id)),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createSession(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      successResponse(
+        res,
+        201,
+        "Session created",
+        await schoolTermService.createSession(req.body),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateSession(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      successResponse(
+        res,
+        200,
+        "Session updated",
+        await schoolTermService.updateSession(String(req.params.id), req.body),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteSession(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      await schoolTermService.deleteSession(String(req.params.id));
+      successResponse(res, 200, "Session deleted");
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async setCurrentSession(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      successResponse(
+        res,
+        200,
+        "Session set as current",
+        await schoolTermService.setCurrentSession(String(req.params.id)),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ── Academic Terms ────────────────────────────────────────────────────────
 
   async listTerms(
     req: Request,
@@ -95,8 +217,10 @@ class AdminController {
       successResponse(
         res,
         200,
-        "School terms fetched",
-        await schoolTermService.listTerms(),
+        "Terms fetched",
+        await schoolTermService.listTerms(
+          req.query.sessionId as string | undefined,
+        ),
       );
     } catch (error) {
       next(error);
@@ -112,7 +236,7 @@ class AdminController {
       successResponse(
         res,
         200,
-        "School term fetched",
+        "Term fetched",
         await schoolTermService.getTerm(String(req.params.id)),
       );
     } catch (error) {
@@ -129,8 +253,11 @@ class AdminController {
       successResponse(
         res,
         201,
-        "School term created",
-        await schoolTermService.createTerm(req.body),
+        "Term created",
+        await schoolTermService.createTerm(
+          String(req.params.sessionId),
+          req.body,
+        ),
       );
     } catch (error) {
       next(error);
@@ -146,7 +273,7 @@ class AdminController {
       successResponse(
         res,
         200,
-        "School term updated",
+        "Term updated",
         await schoolTermService.updateTerm(String(req.params.id), req.body),
       );
     } catch (error) {
@@ -161,7 +288,7 @@ class AdminController {
   ): Promise<void> {
     try {
       await schoolTermService.deleteTerm(String(req.params.id));
-      successResponse(res, 200, "School term deleted");
+      successResponse(res, 200, "Term deleted");
     } catch (error) {
       next(error);
     }
@@ -176,7 +303,7 @@ class AdminController {
       successResponse(
         res,
         200,
-        "School term activated",
+        "Term activated",
         await schoolTermService.activateTerm(String(req.params.id)),
       );
     } catch (error) {

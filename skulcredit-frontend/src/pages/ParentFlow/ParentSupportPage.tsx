@@ -10,7 +10,7 @@ import {
 
 import type { FaqItem, SupportMessage } from "../../components/types/supports";
 
-// Inline shield icon for the note hint
+
 const ShieldIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

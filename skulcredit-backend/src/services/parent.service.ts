@@ -848,8 +848,6 @@ class ParentService {
       where: { schoolName: catalogSchool.name, status: "approved" },
     });
 
-    // ── Term validation & duplicate guard ────────────────────────────────────
-    // 1. Look up the currently active school term from the DB
     const activeTerm = await schoolTermService.getActiveTerm();
 
     if (!activeTerm) {
@@ -859,13 +857,12 @@ class ParentService {
       );
     }
 
-    // 2. Block duplicate applications for the same student within this term window
     const existingApplication = await LoanApplication.findOne({
       where: {
         studentId: student.id,
         status: { [Op.notIn]: ["rejected", "cancelled"] },
         createdAt: {
-          [Op.gte]: new Date(activeTerm.portalOpenDate),
+          [Op.gte]: new Date(activeTerm.portalOpeningDate),
           [Op.lt]: new Date(
             new Date(activeTerm.portalCloseDate).getTime() +
               24 * 60 * 60 * 1000,
@@ -877,11 +874,10 @@ class ParentService {
     if (existingApplication) {
       throw new ApiError(
         409,
-        `You've already submitted an application for ${student.firstName} ${student.lastName} this term (${activeTerm.name} ${activeTerm.academicYear}). A student's fees can only be financed once per term.`,
+        `You've already submitted an application for ${student.firstName} ${student.lastName} this term (${activeTerm.termName} ${activeTerm.sessionName}). A student's fees can only be financed once per term.`,
       );
     }
 
-    // 3. Compute effective tenor based on how late in the term the parent is applying
     const effectiveTenor = schoolTermService.computeEffectiveTenor(activeTerm);
 
     const referenceNumber = `SKC-${Date.now()}-${Math.random()
@@ -896,14 +892,12 @@ class ParentService {
       catalogSchoolId: payload.schoolId,
       schoolId: partnerSchool?.id ?? null,
       amountRequested: payload.tuitionAmount,
-      tenor: effectiveTenor, // DB-computed — may be less than requested
+      tenor: effectiveTenor, 
       status: "pending",
       termsAccepted: true,
       termsAcceptedAt: new Date(),
     });
 
-    // ── Email notification ────────────────────────────────────────────────────
-    // Fire-and-forget — don't block the response if email fails
     UserRepository.findById(userId)
       .then((user) => {
         if (!user?.email) return;
@@ -1016,8 +1010,8 @@ class ParentService {
       application,
       referenceNumber,
       tenor: effectiveTenor,
-      termName: activeTerm.name,
-      termAcademicYear: activeTerm.academicYear,
+      termName: activeTerm.termName,
+      termAcademicYear: activeTerm.sessionName,
       ledgerId: ledger.id,
       queued: !!parent.bvn,
     };

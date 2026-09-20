@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+﻿import { Request, Response, NextFunction } from "express";
 import parentService from "../services/parent.service";
 import schoolTermService from "../services/schoolTerm.service";
 import { successResponse } from "../utils/response";
@@ -430,6 +430,20 @@ class ParentController {
    *  - Inform the wizard what the effective tenor ceiling is
    * Public within the parent role — no sensitive data exposed.
    */
+  async getSessions(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      // Return all sessions ordered by start_year, with their terms nested
+      const sessions = await schoolTermService.listSessions();
+      successResponse(res, 200, "Sessions fetched", sessions);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getCurrentTerm(
     req: Request,
     res: Response,
@@ -453,12 +467,15 @@ class ParentController {
         isOpen: true,
         term: {
           id: term.id,
-          name: term.name,
-          academicYear: term.academicYear,
-          portalOpenDate: term.portalOpenDate,
+          termId: term.termId,
+          name: term.termName,
+          termCode: term.termCode,
+          sessionName: term.sessionName,
+          portalOpenDate: term.portalOpeningDate,
           portalCloseDate: term.portalCloseDate,
-          maxTenorMonths: term.maxTenorMonths,
-          effectiveTenor, // what a new applicant would actually get today
+          maxTenorMonths: term.maxRepaymentMonths,
+          effectiveTenor,
+          applicationWindows: term.applicationWindows,
         },
       });
     } catch (error) {

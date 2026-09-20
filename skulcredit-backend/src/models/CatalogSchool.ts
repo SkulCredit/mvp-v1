@@ -5,9 +5,7 @@ export interface CatalogSchoolAttributes {
   id: string;
   name: string;
   isRegistered: boolean;
-  /** "1+", "1", "2", "3", "4" — null for non-registered schools */
   tier: string | null;
-  /** Stored as a decimal fraction, e.g. 0.10 = 10 %. null = use global default */
   serviceChargeRate: number | null;
   isActive: boolean;
   createdAt?: Date;
