@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import apiClient from "../../services/apiClient";
 import {
@@ -6,6 +6,8 @@ import {
   CatalogInstitutionType,
   CatalogSchool,
   CatalogClassLevelGroup,
+  AcademicSessionSummary,
+  AcademicTermSummary,
 } from "../../services/parentService";
 
 interface ParentProfile {
@@ -74,6 +76,9 @@ interface StudentFormData {
   gradeLevel: string;
   tuitionAmount: string;
   studentId: string;
+  academicSession: string; // e.g. "2026/2027"
+  termId: string; // academic_terms UUID
+  termName: string; // e.g. "First Term"
 }
 
 const UserIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -417,6 +422,10 @@ const ParentSettingsPage: React.FC = () => {
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [loadingClasses, setLoadingClasses] = useState(false);
 
+  // Academic sessions for the student modal session/term dropdowns
+  const [sessions, setSessions] = useState<AcademicSessionSummary[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+
   const [showPersonalModal, setShowPersonalModal] = useState(false);
   const [showEmploymentModal, setShowEmploymentModal] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
@@ -458,6 +467,9 @@ const ParentSettingsPage: React.FC = () => {
     gradeLevel: "",
     tuitionAmount: "",
     studentId: "",
+    academicSession: "",
+    termId: "",
+    termName: "",
   });
 
   const [savingPersonal, setSavingPersonal] = useState(false);
@@ -685,10 +697,37 @@ const ParentSettingsPage: React.FC = () => {
       gradeLevel: "",
       tuitionAmount: "",
       studentId: "",
+      academicSession: "",
+      termId: "",
+      termName: "",
     });
     setCatalogSchools([]);
     setClassLevelGroups([]);
     setShowStudentModal(true);
+    // Load sessions for the modal dropdowns
+    if (!sessions.length) {
+      setLoadingSessions(true);
+      catalogService
+        .getSessions()
+        .then((data) => {
+          setSessions(data);
+          // Auto-select current session + active term for new students
+          const current = data.find((s) => s.isCurrent);
+          if (current) {
+            const activeTerm = current.terms.find(
+              (t) => t.status === "ACTIVE_APPLICATION",
+            );
+            setStudentForm((prev) => ({
+              ...prev,
+              academicSession: current.sessionName,
+              termId: activeTerm?.id ?? "",
+              termName: activeTerm?.termName ?? "",
+            }));
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingSessions(false));
+    }
   };
 
   const openEditStudent = async (s: Student) => {
@@ -703,10 +742,86 @@ const ParentSettingsPage: React.FC = () => {
       gradeLevel: s.gradeLevel,
       tuitionAmount: String(s.tuitionAmount),
       studentId: s.studentId ?? "",
+      academicSession: "",
+      termId: "",
+      termName: "",
     });
     setCatalogSchools([]);
     setClassLevelGroups([]);
     setShowStudentModal(true);
+
+    // Load sessions for the dropdowns, auto-select current session + active term
+    if (!sessions.length) {
+      setLoadingSessions(true);
+      catalogService
+        .getSessions()
+        .then((data) => {
+          setSessions(data);
+          const current = data.find((d) => d.isCurrent);
+          if (current) {
+            const activeTerm = current.terms.find(
+              (t) => t.status === "ACTIVE_APPLICATION",
+            );
+            setStudentForm((prev) => ({
+              ...prev,
+              academicSession: current.sessionName,
+              termId: activeTerm?.id ?? "",
+              termName: activeTerm?.termName ?? "",
+            }));
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingSessions(false));
+    }
+
+    // Resolve institution type + schools + class levels from the student's schoolId
+    if (!s.schoolId) return;
+    try {
+      const types = institutionTypes.length
+        ? institutionTypes
+        : await catalogService
+            .getInstitutionTypes()
+            .catch(() => [] as typeof institutionTypes);
+      if (!institutionTypes.length && types.length) setInstitutionTypes(types);
+
+      let matchedTypeId = "";
+      let matchedTypeName = "";
+      let matchedSchools: typeof catalogSchools = [];
+
+      for (const t of types) {
+        setLoadingSchools(true);
+        const schools = await catalogService
+          .getSchools(t.id)
+          .catch(() => [] as typeof catalogSchools);
+        const found = schools.find((sc) => sc.id === s.schoolId);
+        if (found) {
+          matchedTypeId = t.id;
+          matchedTypeName = t.name;
+          matchedSchools = schools;
+          break;
+        }
+      }
+      setLoadingSchools(false);
+
+      if (!matchedTypeId) return;
+
+      setCatalogSchools(matchedSchools);
+      setStudentForm((prev) => ({
+        ...prev,
+        institutionTypeId: matchedTypeId,
+        institutionTypeName: matchedTypeName,
+      }));
+
+      setLoadingClasses(true);
+      const groups = await catalogService
+        .getClassLevels(s.schoolId, matchedTypeId)
+        .catch(() => [] as typeof classLevelGroups);
+      setLoadingClasses(false);
+      setClassLevelGroups(groups);
+    } catch {
+      setLoadingSchools(false);
+      setLoadingClasses(false);
+    }
   };
   const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1103,6 +1218,83 @@ const ParentSettingsPage: React.FC = () => {
               ))}
             </SelectField>
 
+            {/* ── Academic Session ── */}
+            <SelectField
+              label="Academic Session"
+              required
+              selectProps={{
+                value: studentForm.academicSession,
+                disabled: loadingSessions,
+                onChange: (e) => {
+                  setStudentForm((p) => ({
+                    ...p,
+                    academicSession: e.target.value,
+                    termId: "",
+                    termName: "",
+                  }));
+                },
+              }}
+            >
+              <option value="">
+                {loadingSessions ? "Loading sessions…" : "— Select session —"}
+              </option>
+              {sessions.map((s) => (
+                <option key={s.id} value={s.sessionName}>
+                  {s.sessionName}
+                  {s.isCurrent ? " (Current)" : ""}
+                </option>
+              ))}
+            </SelectField>
+
+            {/* ── Term ── */}
+            {(() => {
+              const activeSession = sessions.find(
+                (s) => s.sessionName === studentForm.academicSession,
+              );
+              const availableTerms: AcademicTermSummary[] =
+                activeSession?.terms ?? [];
+              return (
+                <SelectField
+                  label="Term"
+                  required
+                  selectProps={{
+                    value: studentForm.termId,
+                    disabled:
+                      !studentForm.academicSession ||
+                      availableTerms.length === 0,
+                    onChange: (e) => {
+                      const t = availableTerms.find(
+                        (x) => x.id === e.target.value,
+                      );
+                      setStudentForm((p) => ({
+                        ...p,
+                        termId: e.target.value,
+                        termName: t?.termName ?? "",
+                      }));
+                    },
+                  }}
+                >
+                  <option value="">
+                    {!studentForm.academicSession
+                      ? "Select a session first"
+                      : "— Select term —"}
+                  </option>
+                  {availableTerms.map((t) => {
+                    const isOpen = t.status === "ACTIVE_APPLICATION";
+                    const isClosed =
+                      t.status === "APPLICATION_CLOSED" ||
+                      t.status === "COMPLETED";
+                    return (
+                      <option key={t.id} value={t.id} disabled={isClosed}>
+                        {t.termName}
+                        {isOpen ? " ✓ Open" : isClosed ? " (Closed)" : ""}
+                      </option>
+                    );
+                  })}
+                </SelectField>
+              );
+            })()}
+
             {/* Student ID */}
             <FormField label="Student ID / Admission No.">
               <input
@@ -1154,7 +1346,6 @@ const ParentSettingsPage: React.FC = () => {
                   alt="Profile photo"
                   className="h-16 w-16 rounded-full object-cover border-2 border-white/40"
                   onError={(e) => {
-
                     (e.currentTarget as HTMLImageElement).style.display =
                       "none";
                     const fallback = e.currentTarget
