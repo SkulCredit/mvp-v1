@@ -1,12 +1,18 @@
-import React from 'react';
-import AppRouter from './routes/AppRouter';
-import { AuthProvider } from './context/AuthContext';
+import React from "react";
+import AppRouter from "./routes/AppRouter";
+import { AuthProvider } from "./context/AuthContext";
+import { SocketProvider } from "./context/SocketContext";
+import { NotificationProvider } from "./context/NotificationContext";
 
 const App: React.FC = () => (
   <AuthProvider>
-    <div className="app-container">
-      <AppRouter />
-    </div>
+    <SocketProvider>
+      <NotificationProvider>
+        <div className="app-container">
+          <AppRouter />
+        </div>
+      </NotificationProvider>
+    </SocketProvider>
   </AuthProvider>
 );
 

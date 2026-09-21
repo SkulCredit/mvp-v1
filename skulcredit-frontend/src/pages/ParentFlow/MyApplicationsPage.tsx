@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { parentService } from "../../services/parentService";
+import { resolveUploadUrl } from "../../utils/uploadUrl";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -188,7 +189,7 @@ function normalize(raw: RawApplication): Application {
     applicationId: raw.referenceNumber ?? raw.id.slice(0, 12).toUpperCase(),
     studentName,
     studentPhoto:
-      raw.student?.profilePhotoUrl ??
+      resolveUploadUrl(raw.student?.profilePhotoUrl) ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(studentName)}&background=881337&color=fff&size=44`,
     schoolName:
       raw.catalogSchool?.name ??
@@ -728,6 +729,16 @@ function buildTimeline(app: Application, events: RawEvent[]): TimelineStep[] {
     steps.push({ label: "Under Review", sub: "Pending", state: "pending" });
     steps.push({ label: "Decision", sub: "Pending", state: "pending" });
     steps.push({
+      label: "Pay Service Charge",
+      sub: "Pending",
+      state: "pending",
+    });
+    steps.push({
+      label: "Setup Repayment Plan",
+      sub: "Pending",
+      state: "pending",
+    });
+    steps.push({
       label: "Disbursed to school",
       sub: "Pending",
       state: "pending",
@@ -739,6 +750,16 @@ function buildTimeline(app: Application, events: RawEvent[]): TimelineStep[] {
       state: "active",
     });
     steps.push({ label: "Decision", sub: "Pending", state: "pending" });
+    steps.push({
+      label: "Pay Service Charge",
+      sub: "Pending",
+      state: "pending",
+    });
+    steps.push({
+      label: "Setup Repayment Plan",
+      sub: "Pending",
+      state: "pending",
+    });
     steps.push({
       label: "Disbursed to school",
       sub: "Pending",
@@ -752,9 +773,29 @@ function buildTimeline(app: Application, events: RawEvent[]): TimelineStep[] {
       state: "active",
     });
     steps.push({ label: "Decision", sub: "Pending", state: "pending" });
+    steps.push({
+      label: "Pay Service Charge",
+      sub: "Pending",
+      state: "pending",
+    });
+    steps.push({
+      label: "Setup Repayment Plan",
+      sub: "Pending",
+      state: "pending",
+    });
   } else if (status === "approved") {
     steps.push({ label: "Under Review", sub: app.lastUpdated, state: "done" });
     steps.push({ label: "Approved", sub: app.lastUpdated, state: "done" });
+    steps.push({
+      label: "Pay Service Charge",
+      sub: "Action required",
+      state: "active",
+    });
+    steps.push({
+      label: "Setup Repayment Plan",
+      sub: "Pending",
+      state: "pending",
+    });
     steps.push({
       label: "Disbursed to school",
       sub: "Pending",
@@ -763,6 +804,16 @@ function buildTimeline(app: Application, events: RawEvent[]): TimelineStep[] {
   } else if (status === "disbursed") {
     steps.push({ label: "Under Review", sub: app.lastUpdated, state: "done" });
     steps.push({ label: "Approved", sub: app.lastUpdated, state: "done" });
+    steps.push({
+      label: "Pay Service Charge",
+      sub: app.lastUpdated,
+      state: "done",
+    });
+    steps.push({
+      label: "Setup Repayment Plan",
+      sub: app.lastUpdated,
+      state: "done",
+    });
     steps.push({
       label: "Disbursed to school",
       sub: app.lastUpdated,
@@ -1145,6 +1196,12 @@ const ApplicationDetailView: React.FC<{
               <ol className="relative flex flex-col gap-0">
                 {timeline.map((step, idx) => {
                   const isLast = idx === timeline.length - 1;
+                  const isPayServiceCharge =
+                    step.label === "Pay Service Charge" &&
+                    step.state === "active";
+                  const isSetupRepayment =
+                    step.label === "Setup Repayment Plan" &&
+                    step.state === "active";
                   return (
                     <li key={idx} className="flex items-start gap-3 relative">
                       {/* Connector line */}
@@ -1176,6 +1233,22 @@ const ApplicationDetailView: React.FC<{
                         >
                           {step.sub}
                         </p>
+                        {isPayServiceCharge && (
+                          <a
+                            href={`/parent/service-charge?applicationId=${app.id}`}
+                            className="mt-2 inline-flex items-center gap-1.5 bg-brand text-white text-xs font-bold px-4 py-2 rounded-full hover:bg-brand-hover transition-colors shadow-sm"
+                          >
+                            Pay Service Charge →
+                          </a>
+                        )}
+                        {isSetupRepayment && (
+                          <a
+                            href={`/parent/repayment?applicationId=${app.id}`}
+                            className="mt-2 inline-flex items-center gap-1.5 bg-brand text-white text-xs font-bold px-4 py-2 rounded-full hover:bg-brand-hover transition-colors shadow-sm"
+                          >
+                            Setup Repayment Plan →
+                          </a>
+                        )}
                       </div>
                     </li>
                   );

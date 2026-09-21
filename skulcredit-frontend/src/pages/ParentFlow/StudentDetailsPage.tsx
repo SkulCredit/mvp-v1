@@ -9,6 +9,7 @@ import {
   AcademicSessionSummary,
   AcademicTermSummary,
 } from "../../services/parentService";
+import apiClient from "../../services/apiClient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -36,7 +37,7 @@ interface School {
 }
 
 interface RepaymentPlan {
-  id: "full" | "3month" | "6month";
+  id: "3month" | "4month";
   label: string;
   sub: string;
   total: number;
@@ -51,10 +52,12 @@ interface TuitionDetails {
   schoolName: string;
   gradeLevel: string;
   tuitionAmount: number;
-  repaymentPlanId: "full" | "3month" | "6month";
+  repaymentPlanId: "3month" | "4month";
   academicSession: string; // e.g. "2026/2027"
   term: string; // e.g. "First Term"
   termId: string; // academic_terms.id (UUID) — sent to backend
+  /** Set when the parent enters a school manually (not in catalog) */
+  isManualSchool?: boolean;
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -153,39 +156,29 @@ const fmt = (n: number) =>
   });
 
 function buildRepaymentPlans(tuitionAmount: number): RepaymentPlan[] {
-  const fee3 = Math.round(tuitionAmount * 0.04);
-  const fee6 = Math.round(tuitionAmount * 0.07);
   return [
-    {
-      id: "full",
-      label: "Full payment",
-      sub: "Pay once, no fees",
-      total: tuitionAmount,
-      serviceFeeRate: 0,
-    },
     {
       id: "3month",
       label: "3-month plan",
-      sub: `${fmt(Math.round((tuitionAmount + fee3) / 3))}/mo · 4% fee`,
-      total: tuitionAmount + fee3,
-      monthlyAmount: Math.round((tuitionAmount + fee3) / 3),
+      sub: `${fmt(Math.round(tuitionAmount / 3))}/mo · service charge paid upfront`,
+      total: tuitionAmount,
+      monthlyAmount: Math.round(tuitionAmount / 3),
       serviceFeeRate: 0.04,
     },
     {
-      id: "6month",
-      label: "6-month plan",
-      sub: `${fmt(Math.round((tuitionAmount + fee6) / 6))}/mo · 7% fee`,
-      total: tuitionAmount + fee6,
-      monthlyAmount: Math.round((tuitionAmount + fee6) / 6),
-      serviceFeeRate: 0.07,
+      id: "4month",
+      label: "4-month plan",
+      sub: `${fmt(Math.round(tuitionAmount / 4))}/mo · service charge paid upfront`,
+      total: tuitionAmount,
+      monthlyAmount: Math.round(tuitionAmount / 4),
+      serviceFeeRate: 0.055,
     },
   ];
 }
 
-function tenorFromPlanId(id: "full" | "3month" | "6month"): number {
-  if (id === "3month") return 3;
-  if (id === "6month") return 6;
-  return 1;
+function tenorFromPlanId(id: "3month" | "4month"): number {
+  if (id === "4month") return 4;
+  return 3;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -561,6 +554,17 @@ const StepSelectChild: React.FC<{
 // Step 2 — Select School
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Data collected when a parent manually enters a school not in the catalog */
+interface ManualSchoolData {
+  schoolName: string;
+  contact: string; // email or phone of a school person in charge
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
+  location: string;
+  gradeLevel: string;
+}
+
 const ChevronDown: React.FC = () => (
   <svg
     viewBox="0 0 24 24"
@@ -603,6 +607,9 @@ const StepSelectSchool: React.FC<{
   selectedTermId: string;
   onSessionChange: (sessionName: string) => void;
   onTermChange: (termId: string, termName: string) => void;
+  // ── manual school ────────────────────────────────────────
+  onManualSchoolSubmit: (data: ManualSchoolData) => void;
+  manualSchoolPending: boolean;
 }> = ({
   institutionTypes,
   catalogSchools,
@@ -622,12 +629,214 @@ const StepSelectSchool: React.FC<{
   selectedTermId,
   onSessionChange,
   onTermChange,
+  onManualSchoolSubmit,
+  manualSchoolPending,
 }) => {
   const flatClasses = classLevelGroups.flatMap((g) => g.classes);
   const activeSession = sessions.find(
     (s) => s.sessionName === selectedSessionName,
   );
   const availableTerms: AcademicTermSummary[] = activeSession?.terms ?? [];
+
+  // Manual school form state
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualName, setManualName] = useState("");
+  const [manualContact, setManualContact] = useState("");
+  const [manualBankName, setManualBankName] = useState("");
+  const [manualAccountNumber, setManualAccountNumber] = useState("");
+  const [manualAccountName, setManualAccountName] = useState("");
+  const [manualLocation, setManualLocation] = useState("");
+  const [manualGrade, setManualGrade] = useState("");
+  const [manualFormError, setManualFormError] = useState("");
+
+  const handleManualSubmit = () => {
+    setManualFormError("");
+    if (!manualName.trim()) {
+      setManualFormError("School name is required.");
+      return;
+    }
+    if (!manualContact.trim()) {
+      setManualFormError("School contact (email or phone) is required.");
+      return;
+    }
+    if (!manualLocation.trim()) {
+      setManualFormError("School location is required.");
+      return;
+    }
+    if (!manualGrade.trim()) {
+      setManualFormError("Class / level is required.");
+      return;
+    }
+    onManualSchoolSubmit({
+      schoolName: manualName.trim(),
+      contact: manualContact.trim(),
+      bankName: manualBankName.trim() || undefined,
+      accountNumber: manualAccountNumber.trim() || undefined,
+      accountName: manualAccountName.trim() || undefined,
+      location: manualLocation.trim(),
+      gradeLevel: manualGrade.trim(),
+    });
+  };
+
+  if (showManualForm) {
+    return (
+      <div className="space-y-5">
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowManualForm(false)}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#881337] mb-3 hover:underline"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-4 h-4"
+              aria-hidden="true"
+            >
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+            Back to school list
+          </button>
+          <h2 className="text-lg sm:text-2xl font-extrabold text-gray-900">
+            Add your child's school
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Provide the school details and a contact person. We'll reach out to
+            verify your application before disbursement.
+          </p>
+        </div>
+
+        {manualFormError && (
+          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
+            {manualFormError}
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {/* School name */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-gray-700">
+              School Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={manualName}
+              onChange={(e) => setManualName(e.target.value)}
+              placeholder="e.g. Greenfield Academy"
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/15 transition-colors"
+            />
+          </div>
+
+          {/* Contact */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-gray-700">
+              School Contact (Email or Phone){" "}
+              <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={manualContact}
+              onChange={(e) => setManualContact(e.target.value)}
+              placeholder="e.g. bursar@greenfield.edu or 08012345678"
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/15 transition-colors"
+            />
+            <p className="text-xs text-gray-400">
+              Must be an active contact person responsible for school fees.
+            </p>
+          </div>
+
+          {/* Location */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-gray-700">
+              School Location (Address) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={manualLocation}
+              onChange={(e) => setManualLocation(e.target.value)}
+              placeholder="e.g. 12 School Road, Ikeja, Lagos"
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/15 transition-colors"
+            />
+          </div>
+
+          {/* Grade level */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-gray-700">
+              Child's Class / Level <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={manualGrade}
+              onChange={(e) => setManualGrade(e.target.value)}
+              placeholder="e.g. JSS 2 or Primary 4"
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/15 transition-colors"
+            />
+          </div>
+
+          {/* Bank details — optional */}
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-4 space-y-3">
+            <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">
+              School Bank Account Details{" "}
+              <span className="font-normal text-gray-400">
+                (optional — speeds up disbursement)
+              </span>
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-gray-700">
+                Bank Name
+              </label>
+              <input
+                type="text"
+                value={manualBankName}
+                onChange={(e) => setManualBankName(e.target.value)}
+                placeholder="e.g. First Bank"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/15 transition-colors"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-gray-700">
+                Account Number
+              </label>
+              <input
+                type="text"
+                value={manualAccountNumber}
+                onChange={(e) => setManualAccountNumber(e.target.value)}
+                placeholder="10-digit account number"
+                maxLength={10}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/15 transition-colors"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-gray-700">
+                Account Name
+              </label>
+              <input
+                type="text"
+                value={manualAccountName}
+                onChange={(e) => setManualAccountName(e.target.value)}
+                placeholder="e.g. Greenfield Academy Ltd"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/15 transition-colors"
+              />
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleManualSubmit}
+          disabled={manualSchoolPending}
+          className="w-full bg-[#881337] text-white font-bold py-3 rounded-2xl hover:bg-[#4c0519] transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+        >
+          {manualSchoolPending ? "Saving…" : "Save School & Continue"}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -705,6 +914,16 @@ const StepSelectSchool: React.FC<{
           </select>
           <ChevronDown />
         </div>
+        {/* "School not listed?" link */}
+        {selectedInstitutionTypeId && !loadingSchools && (
+          <button
+            type="button"
+            onClick={() => setShowManualForm(true)}
+            className="mt-1 self-start text-xs font-semibold text-[#881337] hover:underline"
+          >
+            Can't find your school? Add it manually →
+          </button>
+        )}
       </div>
 
       {/* Class / Level */}
@@ -1000,17 +1219,13 @@ const StepSelectSessionTerm: React.FC<{
 const StepTuitionDetails: React.FC<{
   /** Actual tuition amount from the selected child's record */
   tuitionAmount: number;
-  selectedPlanId: "full" | "3month" | "6month" | null;
-  onSelectPlan: (id: "full" | "3month" | "6month") => void;
+  selectedPlanId: "3month" | "4month" | null;
+  onSelectPlan: (id: "3month" | "4month") => void;
 }> = ({ tuitionAmount, selectedPlanId, onSelectPlan }) => {
   // Use child's tuition amount, fall back to ₦450,000 for display when 0
   const amount = tuitionAmount > 0 ? tuitionAmount : FALLBACK_TUITION_AMOUNT;
   const plans = buildRepaymentPlans(amount);
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null;
-  const serviceFee = selectedPlan
-    ? Math.round(amount * selectedPlan.serviceFeeRate)
-    : 0;
-  const total = selectedPlan ? selectedPlan.total : amount;
 
   return (
     <div className="space-y-4">
@@ -1054,9 +1269,13 @@ const StepTuitionDetails: React.FC<{
                   {plan.sub}
                 </p>
               </div>
-              {/* Amount — never shrinks, wraps below on very small screens */}
+              {/* Amount — shows monthly repayment amount */}
               <span className="text-sm font-extrabold text-[#881337] shrink-0 text-right">
-                {fmt(plan.total)}
+                {fmt(
+                  plan.monthlyAmount ??
+                    Math.round(plan.total / tenorFromPlanId(plan.id)),
+                )}
+                <span className="text-xs font-semibold text-gray-400">/mo</span>
               </span>
             </button>
           );
@@ -1067,19 +1286,28 @@ const StepTuitionDetails: React.FC<{
       {selectedPlan && (
         <div className="rounded-2xl bg-[#FDF0F4] border border-[#F2C4D0] px-4 py-4 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Tuition amount</span>
+            <span className="text-gray-500">Tuition (school fees)</span>
             <span className="font-semibold text-gray-900">{fmt(amount)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Service fee</span>
+            <span className="text-gray-500">Monthly repayment</span>
             <span className="font-semibold text-gray-900">
-              {fmt(serviceFee)}
+              {fmt(
+                selectedPlan.monthlyAmount ??
+                  Math.round(amount / tenorFromPlanId(selectedPlan.id)),
+              )}
             </span>
           </div>
           <div className="border-t border-[#F2C4D0] pt-2 flex justify-between text-sm">
-            <span className="font-bold text-[#881337]">Total</span>
-            <span className="font-extrabold text-[#881337]">{fmt(total)}</span>
+            <span className="font-bold text-[#881337]">
+              You repay (principal only)
+            </span>
+            <span className="font-extrabold text-[#881337]">{fmt(amount)}</span>
           </div>
+          <p className="text-xs text-gray-400 pt-1">
+            Service charge is paid separately upfront before disbursement. No
+            interest applied.
+          </p>
         </div>
       )}
     </div>
@@ -1135,8 +1363,37 @@ const StepReview: React.FC<{
   const selectedPlan = plans.find(
     (p) => p.id === tuitionDetails.repaymentPlanId,
   );
-  const total = selectedPlan?.total ?? numAmount;
   const planLabel = selectedPlan?.label ?? tuitionDetails.repaymentPlanId;
+
+  // Fetch school tier + service charge rate from backend
+  const [schoolDetail, setSchoolDetail] = useState<{
+    tier: string | null;
+    serviceChargeRate: number | null;
+    serviceChargeDisplay: string | null;
+    isRegistered: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!tuitionDetails.schoolId || tuitionDetails.isManualSchool) return;
+    apiClient
+      .get(`/catalog/schools/${tuitionDetails.schoolId}`)
+      .then((res) => {
+        const d = res.data?.data;
+        if (d) setSchoolDetail(d);
+      })
+      .catch(() => {
+        /* non-critical — won't block submit */
+      });
+  }, [tuitionDetails.schoolId, tuitionDetails.isManualSchool]);
+
+  // Service charge from backend snapshot (if available), else fall back to plan fee rate
+  const backendServiceChargeRate = schoolDetail?.serviceChargeRate ?? null;
+  const displayServiceCharge =
+    backendServiceChargeRate !== null
+      ? Math.round(numAmount * backendServiceChargeRate)
+      : selectedPlan
+        ? Math.round(numAmount * selectedPlan.serviceFeeRate)
+        : 0;
 
   return (
     <div className="space-y-5">
@@ -1180,14 +1437,71 @@ const StepReview: React.FC<{
           onEdit={onEditTuition}
         />
 
+        {/* School tier & charges — from backend */}
+        {schoolDetail && !tuitionDetails.isManualSchool && (
+          <div className="mt-1 mb-2 rounded-xl bg-[#FDF4F7] border border-[#F2C4D0] px-4 py-3 space-y-1.5">
+            <p className="text-xs font-bold text-[#881337] uppercase tracking-wide mb-2">
+              School Charges &amp; Tier
+            </p>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">School Tier</span>
+              <span className="font-semibold text-gray-900">
+                {schoolDetail.tier ? `Tier ${schoolDetail.tier}` : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Service Charge Rate</span>
+              <span className="font-semibold text-gray-900">
+                {schoolDetail.serviceChargeDisplay ?? "—"}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Service Charge Amount</span>
+              <span className="font-semibold text-[#881337]">
+                {fmt(displayServiceCharge)}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">School Type</span>
+              <span
+                className={`font-semibold ${schoolDetail.isRegistered ? "text-green-700" : "text-amber-700"}`}
+              >
+                {schoolDetail.isRegistered
+                  ? "Registered Partner"
+                  : "Unregistered"}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {tuitionDetails.isManualSchool && (
+          <div className="mt-1 mb-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+            <p className="text-xs text-amber-700 leading-relaxed">
+              <span className="font-bold">Unregistered school:</span> Your
+              application will be sent to the school contact you provided for
+              verification before disbursement.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center justify-between pt-4 pb-2">
           <span className="text-sm font-bold text-[#881337]">
-            Total amount due
+            School fees to be financed
           </span>
           <span className="text-base font-extrabold text-[#881337]">
-            {fmt(total)}
+            {fmt(numAmount)}
           </span>
         </div>
+        {displayServiceCharge > 0 && (
+          <div className="flex items-center justify-between pb-3 border-t border-gray-100 pt-2">
+            <span className="text-xs text-gray-400">
+              Service charge (paid upfront, not added to repayment)
+            </span>
+            <span className="text-sm font-semibold text-gray-500">
+              {fmt(displayServiceCharge)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1211,11 +1525,6 @@ const StepConfirmation: React.FC<{
   onNewApplication,
 }) => {
   const numAmount = tuitionDetails.tuitionAmount;
-  const plans = buildRepaymentPlans(numAmount);
-  const selectedPlan = plans.find(
-    (p) => p.id === tuitionDetails.repaymentPlanId,
-  );
-  const total = selectedPlan?.total ?? numAmount;
 
   return (
     <div className="flex items-center justify-center min-h-[60vh] py-10 px-2 sm:px-4">
@@ -1268,9 +1577,9 @@ const StepConfirmation: React.FC<{
             </span>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-gray-500">Total amount</span>
+            <span className="text-sm text-gray-500">School fees financed</span>
             <span className="text-sm font-extrabold text-[#881337]">
-              {fmt(total)}
+              {fmt(numAmount)}
             </span>
           </div>
         </div>
@@ -1558,8 +1867,12 @@ const StudentDetailsPage: React.FC = () => {
 
   // ── Step 4: repayment plan + tuition amount ────────────────────────────────
   const [selectedPlanId, setSelectedPlanId] = useState<
-    "full" | "3month" | "6month" | null
+    "3month" | "4month" | null
   >(null);
+
+  // ── Manual school (Task 1) ─────────────────────────────────────────────────
+  const [isManualSchool, setIsManualSchool] = useState(false);
+  const [manualSchoolPending, setManualSchoolPending] = useState(false);
 
   // ── Step 5: result ─────────────────────────────────────────────────────────
   const [submittedRef, setSubmittedRef] = useState("");
@@ -1575,10 +1888,11 @@ const StudentDetailsPage: React.FC = () => {
     gradeLevel: selectedGradeLevel,
     tuitionAmount:
       childTuitionAmount > 0 ? childTuitionAmount : FALLBACK_TUITION_AMOUNT,
-    repaymentPlanId: selectedPlanId ?? "full",
+    repaymentPlanId: selectedPlanId ?? "3month",
     academicSession: selectedSessionName,
     term: selectedTermName,
     termId: selectedTermId,
+    isManualSchool,
   };
 
   // ── Navigation ─────────────────────────────────────────────────────────────
@@ -1592,6 +1906,40 @@ const StudentDetailsPage: React.FC = () => {
     }
   };
 
+  const handleManualSchoolSubmit = useCallback(
+    async (data: ManualSchoolData) => {
+      setManualSchoolPending(true);
+      try {
+        // Submit school request to backend
+        await parentService.requestSchool({
+          schoolName: data.schoolName,
+          schoolAddress: data.location,
+          contactPhone: data.contact.match(/^\+?[0-9]/)
+            ? data.contact
+            : undefined,
+          contactEmail: !data.contact.match(/^\+?[0-9]/)
+            ? data.contact
+            : undefined,
+          additionalNotes: data.bankName
+            ? `Bank: ${data.bankName}, Account: ${data.accountNumber ?? "N/A"}, Account Name: ${data.accountName ?? "N/A"}`
+            : undefined,
+        });
+        // Use a sentinel schoolId for manual schools, set grade from the form
+        setSelectedSchoolId("manual");
+        setSelectedSchoolName(data.schoolName);
+        setSelectedGradeLevel(data.gradeLevel);
+        setIsManualSchool(true);
+        // Advance to next step
+        setStep(3);
+      } catch {
+        showToast("Failed to save school details. Please try again.");
+      } finally {
+        setManualSchoolPending(false);
+      }
+    },
+    [showToast],
+  );
+
   const handleSubmitApplication = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -1604,8 +1952,8 @@ const StudentDetailsPage: React.FC = () => {
         gradeLevel: selectedGradeLevel,
         tuitionAmount:
           childTuitionAmount > 0 ? childTuitionAmount : FALLBACK_TUITION_AMOUNT,
-        repaymentPlanId: selectedPlanId ?? "full",
-        tenor: tenorFromPlanId(selectedPlanId ?? "full"),
+        repaymentPlanId: selectedPlanId ?? "3month",
+        tenor: tenorFromPlanId(selectedPlanId ?? "3month"),
         academicSession: selectedSessionName,
         term: selectedTermName,
       });
@@ -1686,8 +2034,7 @@ const StudentDetailsPage: React.FC = () => {
       (!selectedInstitutionTypeId ||
         !selectedSchoolId ||
         !selectedGradeLevel ||
-        !selectedSessionName ||
-        !selectedTermId)) ||
+        (!isManualSchool && (!selectedSessionName || !selectedTermId)))) ||
     (step === 3 && !selectedPlanId) ||
     (step === 4 && isSubmitting);
 
@@ -1779,11 +2126,13 @@ const StudentDetailsPage: React.FC = () => {
               setSelectedSchoolId("");
               setSelectedSchoolName("");
               setSelectedGradeLevel("");
+              setIsManualSchool(false);
             }}
             onSchoolChange={(id, name) => {
               setSelectedSchoolId(id);
               setSelectedSchoolName(name);
               setSelectedGradeLevel("");
+              setIsManualSchool(false);
             }}
             onGradeLevelChange={setSelectedGradeLevel}
             sessions={sessions}
@@ -1799,6 +2148,8 @@ const StudentDetailsPage: React.FC = () => {
               setSelectedTermId(id);
               setSelectedTermName(name);
             }}
+            onManualSchoolSubmit={handleManualSchoolSubmit}
+            manualSchoolPending={manualSchoolPending}
           />
         )}
 
@@ -1839,6 +2190,7 @@ const StudentDetailsPage: React.FC = () => {
               setSelectedTermName("");
               setSelectedPlanId(null);
               setSubmittedRef("");
+              setIsManualSchool(false);
             }}
           />
         )}

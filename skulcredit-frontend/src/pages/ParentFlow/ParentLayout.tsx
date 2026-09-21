@@ -5,55 +5,8 @@ import {
   DashboardTopBar,
   ParentSidebar,
   TopBarControls,
-  Notification,
 } from "../../components/layout";
 import Icon from "../../components/Icon";
-
-
-const NOTIFICATIONS: Notification[] = [
-  {
-    id: "1",
-    title: "Application Approved",
-    body: "Your loan application has been approved.",
-    time: "2m ago",
-    unread: true,
-  },
-  {
-    id: "2",
-    title: "Payment Reminder",
-    body: "Your repayment is due in 3 days.",
-    time: "1h ago",
-    unread: true,
-  },
-  {
-    id: "3",
-    title: "Profile Incomplete",
-    body: "Complete your KYC to proceed.",
-    time: "2h ago",
-    unread: false,
-  },
-  {
-    id: "4",
-    title: "Welcome to SkulCredit",
-    body: "Your account has been created.",
-    time: "1d ago",
-    unread: false,
-  },
-  {
-    id: "5",
-    title: "School Verified",
-    body: "Foster Prime Schools has been verified.",
-    time: "2d ago",
-    unread: false,
-  },
-  {
-    id: "6",
-    title: "Disbursement Processed",
-    body: "₦750,000 has been sent to your school.",
-    time: "3d ago",
-    unread: false,
-  },
-];
 
 const ParentLayout: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -87,7 +40,7 @@ const ParentLayout: React.FC = () => {
       header={
         <DashboardTopBar
           left={searchBar}
-          rightExtra={<TopBarControls notifications={NOTIFICATIONS} />}
+          rightExtra={<TopBarControls />}
           onMobileMenuOpen={() => setMobileNavOpen(true)}
           className="px-6 md:px-8"
         />

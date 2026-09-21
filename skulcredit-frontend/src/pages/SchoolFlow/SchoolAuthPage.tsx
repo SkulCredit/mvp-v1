@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Icon from "../../components/Icon";
 import apiClient from "../../services/apiClient";
@@ -121,6 +121,7 @@ const VerificationModal: React.FC<{ onStart: () => void }> = ({ onStart }) => (
 const SchoolAuthPage: React.FC = () => {
   const navigate = useNavigate();
   const { login, register } = useAuth();
+  const [searchParams] = useSearchParams();
 
   // ── view state ───────────────────────────────────────────────────────────
   const [view, setView] = useState<SchoolView>("login");
@@ -185,7 +186,10 @@ const SchoolAuthPage: React.FC = () => {
     setIsLoading(true);
     try {
       await login(loginEmail, loginPassword, "school");
-      navigate("/school/dashboard");
+      const next = searchParams.get("next");
+      navigate(next && next.startsWith("/") ? next : "/school/dashboard", {
+        replace: true,
+      });
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
       setLoginError(

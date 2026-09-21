@@ -8,6 +8,7 @@ import { initSocketIO } from "./config/socketio";
 import { initFirebase } from "./config/firebase";
 import { startRabbitMQListener } from "./notifications/rabbitmq.listener";
 import { startLoanBookingConsumer } from "./queues/loan.queue";
+import { startRepaymentReminderCron } from "./services/repaymentReminder.service";
 import { runMigrations } from "./migrations/runner";
 import { seedCatalog } from "./seeders/catalogSeeder";
 import { seedSchoolTerms } from "./seeders/schoolTermSeeder";
@@ -22,6 +23,12 @@ const start = async (): Promise<void> => {
   try {
     await connectDB();
 
+    // Create all core tables first (Sequelize model definitions),
+    // then run migrations (which only ALTER existing tables),
+    // then run seeders.
+    await sequelize.sync({ alter: env.nodeEnv === "development" });
+    logger.info("Database tables synced");
+
     await runMigrations();
 
     await seedCatalog();
@@ -30,14 +37,12 @@ const start = async (): Promise<void> => {
     await seedSchoolBankAccounts();
     await seedAdmin();
 
-    await sequelize.sync({ alter: env.nodeEnv === "development" });
-    logger.info("Database tables synced");
-
     initFirebase();
 
     await connectRabbitMQ();
     await startRabbitMQListener();
     await startLoanBookingConsumer();
+    startRepaymentReminderCron();
 
     const httpServer = http.createServer(app);
     initSocketIO(httpServer);

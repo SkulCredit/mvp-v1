@@ -1,7 +1,7 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import paystackService from '../integrations/paystack/paystack.service';
-import { protect } from '../middlewares/auth.middleware';
-import { successResponse } from '../utils/response';
+import { Router, Request, Response, NextFunction } from "express";
+import paystackService from "../integrations/paystack/paystack.service";
+import { protect } from "../middlewares/auth.middleware";
+import { successResponse } from "../utils/response";
 
 const router = Router();
 
@@ -30,15 +30,28 @@ const router = Router();
  *       200:
  *         description: Payment initialized — returns authorization_url
  */
-router.post('/initialize', protect, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { amount, metadata } = req.body;
-    const result = await paystackService.initializePayment({ email: req.user!.email, amount, metadata }) as { data: unknown };
-    successResponse(res, 200, 'Payment initialized', result.data);
-  } catch (error) {
-    next(error);
-  }
-});
+router.post(
+  "/initialize",
+  protect,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { amount, metadata, callbackUrl } = req.body as {
+        amount: number;
+        metadata?: Record<string, unknown>;
+        callbackUrl?: string;
+      };
+      const result = (await paystackService.initializePayment({
+        email: req.user!.email,
+        amount,
+        metadata,
+        callbackUrl,
+      })) as { data: unknown };
+      successResponse(res, 200, "Payment initialized", result.data);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 /**
  * @swagger
@@ -58,13 +71,19 @@ router.post('/initialize', protect, async (req: Request, res: Response, next: Ne
  *       200:
  *         description: Transaction verification result
  */
-router.get('/verify/:reference', protect, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const result = await paystackService.verifyPayment(String(req.params.reference)) as { data: unknown };
-    successResponse(res, 200, 'Payment verified', result.data);
-  } catch (error) {
-    next(error);
-  }
-});
+router.get(
+  "/verify/:reference",
+  protect,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = (await paystackService.verifyPayment(
+        String(req.params.reference),
+      )) as { data: unknown };
+      successResponse(res, 200, "Payment verified", result.data);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 export default router;

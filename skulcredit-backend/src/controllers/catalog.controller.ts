@@ -10,7 +10,12 @@ class CatalogController {
   ): Promise<void> {
     try {
       const data = await catalogService.getInstitutionTypes();
-      successResponse(res, 200, "Institution types retrieved successfully", data);
+      successResponse(
+        res,
+        200,
+        "Institution types retrieved successfully",
+        data,
+      );
     } catch (error) {
       next(error);
     }
@@ -32,10 +37,23 @@ class CatalogController {
         return;
       }
 
-      const data = await catalogService.getSchoolsByInstitutionType(
-        institutionTypeId,
-      );
+      const data =
+        await catalogService.getSchoolsByInstitutionType(institutionTypeId);
       successResponse(res, 200, "Schools retrieved successfully", data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getSchoolById(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const data = await catalogService.getSchoolById(id);
+      successResponse(res, 200, "School retrieved successfully", data);
     } catch (error) {
       next(error);
     }

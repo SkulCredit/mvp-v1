@@ -532,6 +532,44 @@ class ParentController {
       next(error);
     }
   }
+
+  async confirmServiceCharge(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const { paystackReference } = req.body as { paystackReference?: string };
+      const result = await parentService.confirmServiceCharge(
+        req.user!.userId,
+        id,
+        paystackReference,
+      );
+      successResponse(res, 200, "Service charge confirmed", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async setupRepayment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const { repaymentStartDate } = req.body as {
+        repaymentStartDate?: string;
+      };
+      const result = await parentService.setupRepayment(req.user!.userId, id, {
+        repaymentStartDate,
+      });
+      successResponse(res, 200, "Repayment plan set up successfully", result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new ParentController();

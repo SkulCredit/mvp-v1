@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { Navigate } from "react-router-dom";
 import { AxiosError } from "axios";
+import apiClient from "../services/apiClient";
 import authService, {
   AuthUser as ServiceAuthUser,
 } from "../services/authService";
@@ -29,6 +30,7 @@ export interface AuthUser {
   lastLogin?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  profilePhotoUrl?: string | null;
 }
 
 export type SessionState = "initializing" | "authenticated" | "unauthenticated";
@@ -78,6 +80,8 @@ function enrichUser(raw: ServiceAuthUser): AuthUser {
     lastLogin: raw.lastLogin,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
+    profilePhotoUrl:
+      (raw as { profilePhotoUrl?: string | null }).profilePhotoUrl ?? null,
     name: firstName
       ? `${firstName} ${lastName ?? ""}`.trim()
       : ((raw as { schoolName?: string }).schoolName ?? raw.email),
@@ -152,6 +156,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
             firstName: cachedUser?.firstName,
             lastName: cachedUser?.lastName,
             schoolName: cachedUser?.schoolName,
+            profilePhotoUrl: cachedUser?.profilePhotoUrl ?? null,
           };
           userStorage.set(freshUser);
           setUser(freshUser);
@@ -193,6 +198,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     window.addEventListener("auth:session-expired", handle);
     return () => window.removeEventListener("auth:session-expired", handle);
   }, []);
+
+  useEffect(() => {
+    if (sessionState !== "authenticated" || !user || user.role !== "parent")
+      return;
+    apiClient
+      .get<{ data: { profilePhotoUrl?: string | null } }>("/parents/profile")
+      .then(({ data }) => {
+        const photo = data.data.profilePhotoUrl ?? null;
+        if (photo === user.profilePhotoUrl) return;
+        setUser((prev) => {
+          if (!prev) return prev;
+          const updated = { ...prev, profilePhotoUrl: photo };
+          userStorage.set(updated);
+          return updated;
+        });
+      })
+      .catch(() => {});
+  }, [sessionState, user?.id]);
 
   const login = useCallback(
     async (

@@ -20,11 +20,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (sessionState === "unauthenticated") {
-    // Admin routes → admin login page; everything else → generic /auth
+    // Admin routes → admin login page; everything else → /auth
+    // Preserve the intended destination so login can redirect back
     const isAdminRoute = location.pathname.startsWith("/admin");
+    const isSchoolRoute =
+      location.pathname.startsWith("/school") ||
+      location.pathname.startsWith("/funding-partner");
+    const nextParam = `?next=${encodeURIComponent(location.pathname + location.search)}`;
     const loginPath = isAdminRoute
-      ? `/admin/auth/login?next=${encodeURIComponent(location.pathname)}`
-      : "/auth";
+      ? `/admin/auth/login${nextParam}`
+      : isSchoolRoute
+        ? `/auth/school${nextParam}`
+        : "/auth";
     return <Navigate to={loginPath} replace />;
   }
 

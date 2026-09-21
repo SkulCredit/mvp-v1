@@ -45,6 +45,7 @@ services:
       - monitoring_net
     volumes:
       - ./skulcredit-backend/logs:/app/logs
+      - ./skulcredit-backend/uploads:/app/uploads
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/health"]
       interval: 30s
@@ -173,7 +174,7 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./skulcredit-backend/docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     expose:
-      - "5672" # AMQP 
+      - "5672" # AMQP
       - "15672" # Management UI
     networks:
       - app_net
@@ -245,7 +246,7 @@ services:
       - monitoring_net
     depends_on:
       - loki
-      
+
   grafana:
     image: grafana/grafana:10.4.2
     container_name: skulcredit_grafana

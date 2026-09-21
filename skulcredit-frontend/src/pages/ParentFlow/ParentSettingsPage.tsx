@@ -9,6 +9,7 @@ import {
   AcademicSessionSummary,
   AcademicTermSummary,
 } from "../../services/parentService";
+import { resolveUploadUrl } from "../../utils/uploadUrl";
 
 interface ParentProfile {
   firstName: string;
@@ -1342,7 +1343,7 @@ const ParentSettingsPage: React.FC = () => {
             <div className="relative shrink-0 group">
               {photoUrl ? (
                 <img
-                  src={photoUrl}
+                  src={resolveUploadUrl(photoUrl)}
                   alt="Profile photo"
                   className="h-16 w-16 rounded-full object-cover border-2 border-white/40"
                   onError={(e) => {

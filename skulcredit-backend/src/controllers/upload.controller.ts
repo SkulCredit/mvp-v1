@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import path from "path";
-import env from "../config/env";
 import { successResponse } from "../utils/response";
 import ApiError from "../utils/apiError";
 
@@ -16,7 +15,7 @@ class UploadController {
         .relative(process.cwd(), req.file.path)
         .replace(/\\/g, "/");
 
-      const publicUrl = `${env.appUrl.replace(/\/$/, "")}/${relPath}`;
+      const publicUrl = `/${relPath}`;
 
       successResponse(res, 200, "File uploaded successfully", {
         url: publicUrl,

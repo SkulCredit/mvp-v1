@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Icon from "../../components/Icon";
 import apiClient from "../../services/apiClient";
@@ -200,6 +200,7 @@ const ParentAuthPage: React.FC = () => {
   // Shared
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
 
   const emailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -234,7 +235,10 @@ const ParentAuthPage: React.FC = () => {
     setIsLoading(true);
     try {
       await login(loginEmail, loginPassword, "parent");
-      navigate("/parent/dashboard");
+      const next = searchParams.get("next");
+      navigate(next && next.startsWith("/") ? next : "/parent/dashboard", {
+        replace: true,
+      });
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
       setLoginError(

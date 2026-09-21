@@ -13,8 +13,11 @@ import {
   ApplicationEvent,
   User,
   CatalogSchool,
+  RepaymentSchedule,
+  SchoolBankAccount,
 } from "../models/index";
 import ApiError from "../utils/apiError";
+import env from "../config/env";
 import identityService, {
   NinVerificationResponse,
 } from "../integrations/lendsqr/identity.service";
@@ -27,6 +30,7 @@ import { buildInitialStateMachine } from "../models/LoanLedger";
 import { publishLoanBooking } from "../queues/loan.queue";
 import type { BookLoanPayload } from "../integrations/lendsqr/application.service";
 import applicationService from "../integrations/lendsqr/application.service";
+import { NotificationPublisher } from "../notifications/rabbitmq.publisher";
 
 const LENDSQR_PRODUCT_ID = parseInt(process.env.LENDSQR_PRODUCT_ID ?? "74", 10);
 
@@ -64,7 +68,12 @@ class ParentService {
   async completeProfile(userId: string, profileData: Record<string, unknown>) {
     const parent = await ParentRepository.findOne({ userId });
     if (!parent) throw new ApiError(404, "Parent profile not found");
-    return parent.update(profileData);
+    const updated = await parent.update(profileData);
+    NotificationPublisher.accountAction(
+      userId,
+      "Your profile has been updated successfully.",
+    );
+    return updated;
   }
 
   async changePassword(
@@ -164,6 +173,11 @@ class ParentService {
         monthlyIncome: kycData.monthlyIncome,
       }),
     });
+    NotificationPublisher.accountAction(
+      userId,
+      "Your identity has been verified and KYC is complete. You can now apply for school fee financing.",
+    );
+    return parent;
   }
 
   async verifyNin(nin: string): Promise<NinVerificationResponse["data"]> {
@@ -334,11 +348,17 @@ class ParentService {
     if (!school.isActive)
       throw new ApiError(400, "School is not currently active");
 
-    return Student.create({
+    const student = await Student.create({
       parentId: parent.id,
       tuitionAmount: 0,
       ...studentData,
     } as never);
+    NotificationPublisher.general(
+      userId,
+      "Student Added",
+      `A new student has been added to your account successfully.`,
+    );
+    return student;
   }
 
   async getStudents(userId: string) {
@@ -704,7 +724,7 @@ class ParentService {
     if (payload.photo) {
       const file = payload.photo;
       const filePath = `uploads/photos/${file.filename}`;
-      const publicUrl = `${process.env.APP_URL?.replace(/\/$/, "") ?? ""}/${filePath}`;
+      const publicUrl = `/${filePath}`;
       const existingPhoto = await Document.findOne({
         where: { parentId: parent.id, category: "photo" },
       });
@@ -736,7 +756,7 @@ class ParentService {
 
     for (const doc of payload.kycDocuments) {
       const filePath = `uploads/kyc_docs/${doc.filename}`;
-      const publicUrl = `${process.env.APP_URL?.replace(/\/$/, "") ?? ""}/${filePath}`;
+      const publicUrl = `/${filePath}`;
 
       await Document.create({
         parentId: parent.id,
@@ -1024,6 +1044,8 @@ class ParentService {
         const planLabel =
           payload.tenor === 1 ? "Full payment" : `${payload.tenor}-month plan`;
         const amountFormatted = `₦${Number(payload.tuitionAmount).toLocaleString("en-NG")}`;
+
+        // 1. Confirm receipt to parent
         sendEmail({
           email: user.email,
           subject: `Application Received – ${application.referenceNumber}`,
@@ -1063,7 +1085,21 @@ class ParentService {
         `,
         }).catch((err) =>
           logger.warn(
-            `[parent.service] Email send failed: ${(err as Error).message}`,
+            `[parent.service] Parent confirmation email failed: ${(err as Error).message}`,
+          ),
+        );
+
+        // 2. Send school verification email
+        this._sendSchoolVerificationEmail({
+          application,
+          catalogSchool,
+          partnerSchool,
+          student,
+          parent,
+          parentEmail: user.email,
+        }).catch((err) =>
+          logger.warn(
+            `[parent.service] School verification email failed: ${(err as Error).message}`,
           ),
         );
       })
@@ -1135,6 +1171,544 @@ class ParentService {
       ledgerId: ledger.id,
       queued: !!parent.bvn,
     };
+  }
+  // ── Private helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Mark the service charge as paid for an application.
+   * Called after successful Paystack payment verification.
+   * Creates an event and notifies the parent in-app.
+   */
+  async confirmServiceCharge(
+    userId: string,
+    applicationId: string,
+    paystackReference?: string,
+  ): Promise<typeof LoanApplication.prototype> {
+    const parent = await ParentRepository.findOne({ userId });
+    if (!parent) throw new ApiError(404, "Parent profile not found");
+
+    const application = await LoanApplication.findOne({
+      where: { id: applicationId, parentId: parent.id },
+    });
+    if (!application) throw new ApiError(404, "Application not found");
+
+    if (application.serviceFeePaid) {
+      // Idempotent — already paid
+      return application;
+    }
+
+    await application.update({ serviceFeePaid: true });
+
+    await ApplicationEvent.create({
+      loanApplicationId: application.id,
+      actor: "parent",
+      actorId: parent.id,
+      status: "service_charge_paid",
+      note: paystackReference
+        ? `Service charge paid via Paystack (ref: ${paystackReference})`
+        : "Service charge confirmed",
+    });
+
+    NotificationPublisher.general(
+      userId,
+      "Service Charge Paid",
+      "Service charge paid — set up your repayment plan to complete the process.",
+    );
+
+    logger.info(
+      `[parent.service] Service charge confirmed | application=${application.id} | ref=${paystackReference ?? "manual"}`,
+    );
+
+    return application;
+  }
+
+  /**
+   * Called after the parent confirms their repayment plan setup.
+   *
+   * 1. Validates the application belongs to this parent and is in an approvable state.
+   * 2. Marks serviceFeePaid = true and status = 'approved'.
+   * 3. Generates RepaymentSchedule installment records.
+   * 4. Creates an ApplicationEvent.
+   * 5. Fires the funding-partner notification email (fire-and-forget).
+   */
+  async setupRepayment(
+    userId: string,
+    applicationId: string,
+    opts: { repaymentStartDate?: string } = {},
+  ): Promise<{
+    application: typeof LoanApplication.prototype;
+    schedule: (typeof RepaymentSchedule.prototype)[];
+  }> {
+    const parent = await ParentRepository.findOne({ userId });
+    if (!parent) throw new ApiError(404, "Parent profile not found");
+
+    const application = await LoanApplication.findOne({
+      where: { id: applicationId, parentId: parent.id },
+      include: [
+        { model: Student, as: "student" },
+        {
+          model: CatalogSchool,
+          as: "catalogSchool",
+          include: [{ model: SchoolBankAccount, as: "bankAccounts" }],
+        },
+        { model: School, as: "school" },
+      ],
+    });
+
+    if (!application) throw new ApiError(404, "Application not found");
+
+    // Must have paid the service charge before setting up repayment
+    if (!application.serviceFeePaid) {
+      throw new ApiError(
+        400,
+        "Service charge must be paid before setting up a repayment plan.",
+      );
+    }
+
+    const allowedStatuses: string[] = ["under_review", "approved"];
+    if (!allowedStatuses.includes(application.status)) {
+      throw new ApiError(
+        400,
+        `Cannot set up repayment: application is in '${application.status}' status.`,
+      );
+    }
+
+    // Check if schedule already exists
+    const existingSchedule = await RepaymentSchedule.findAll({
+      where: { loanApplicationId: application.id },
+    });
+    if (existingSchedule.length > 0) {
+      throw new ApiError(
+        409,
+        "Repayment schedule has already been set up for this application.",
+      );
+    }
+
+    const tenor = application.tenor; // number of months
+    const totalAmount = Number(
+      application.amountApproved ?? application.amountRequested,
+    );
+    const installmentAmount = Math.round(totalAmount / tenor);
+    const lastInstallmentAdjustment =
+      totalAmount - installmentAmount * (tenor - 1);
+
+    // Generate start date: either provided or today + 30 days
+    const startDate = opts.repaymentStartDate
+      ? new Date(opts.repaymentStartDate)
+      : (() => {
+          const d = new Date();
+          d.setMonth(d.getMonth() + 1);
+          d.setDate(1); // 1st of next month
+          return d;
+        })();
+
+    const scheduleRecords: (typeof RepaymentSchedule.prototype)[] = [];
+    let outstandingBalance = totalAmount;
+
+    for (let i = 1; i <= tenor; i++) {
+      const dueDate = new Date(startDate);
+      dueDate.setMonth(dueDate.getMonth() + (i - 1));
+      const isLast = i === tenor;
+      const amount = isLast ? lastInstallmentAdjustment : installmentAmount;
+      outstandingBalance -= amount;
+
+      const record = await RepaymentSchedule.create({
+        loanApplicationId: application.id,
+        parentId: parent.id,
+        installmentNumber: i,
+        dueDate: dueDate.toISOString().split("T")[0],
+        principalAmount: amount,
+        interestAmount: 0, // No interest per platform rules
+        totalAmount: amount,
+        outstandingBalance: Math.max(0, outstandingBalance),
+        status: "upcoming",
+      });
+
+      scheduleRecords.push(record);
+    }
+
+    // Advance application to 'approved' and mark repayment setup complete
+    await application.update({
+      status: "approved",
+      decidedAt: new Date(),
+      decidedBy: parent.id,
+    });
+
+    await ApplicationEvent.create({
+      loanApplicationId: application.id,
+      actor: "parent",
+      actorId: parent.id,
+      status: "approved",
+      note: `Repayment plan confirmed: ${tenor}-month schedule starting ${scheduleRecords[0]?.dueDate ?? "—"}`,
+    });
+
+    logger.info(
+      `[parent.service] Repayment schedule created | application=${application.id} | installments=${tenor}`,
+    );
+
+    // Fire funding partner notification (non-blocking)
+    this._notifyFundingPartner(application, parent).catch((err) =>
+      logger.warn(
+        `[parent.service] Funding partner email failed: ${(err as Error).message}`,
+      ),
+    );
+
+    const refreshed = await LoanApplication.findByPk(application.id);
+    return {
+      application: refreshed ?? application,
+      schedule: scheduleRecords,
+    };
+  }
+
+  /**
+   * Send the funding partner a rich email containing all application details
+   * and the disbursement-callback deep link.
+   */
+  private async _notifyFundingPartner(
+    application: typeof LoanApplication.prototype,
+    parent: { id: string; firstName: string; lastName: string },
+  ): Promise<void> {
+    const partnerEmail = env.fundingPartner.email;
+    if (!partnerEmail) {
+      logger.warn(
+        "[parent.service] FUNDING_PARTNER_EMAIL not configured — skipping email",
+      );
+      return;
+    }
+
+    // Hydrate includes if not already present
+    const app = await LoanApplication.findByPk(application.id, {
+      include: [
+        {
+          model: Student,
+          as: "student",
+          include: [{ model: CatalogSchool, as: "school" }],
+        },
+        {
+          model: CatalogSchool,
+          as: "catalogSchool",
+          include: [{ model: SchoolBankAccount, as: "bankAccounts" }],
+        },
+        { model: School, as: "school" },
+      ],
+    });
+    if (!app) return;
+
+    const frontendUrl = env.frontendUrl;
+    const disbursementUrl = `${frontendUrl}/funding-partner/disbursement/${app.id}`;
+    const loginThenDisbursement = `${frontendUrl}/auth?next=${encodeURIComponent(`/funding-partner/disbursement/${app.id}`)}`;
+
+    const student = (
+      app as unknown as {
+        student?: {
+          firstName?: string;
+          lastName?: string;
+          studentId?: string | null;
+          gradeLevel?: string;
+        };
+      }
+    ).student;
+    const catalogSchool = (
+      app as unknown as {
+        catalogSchool?: {
+          name?: string;
+          tier?: string | null;
+          bankAccounts?: {
+            bankName: string;
+            accountNumber: string;
+            accountName: string;
+            isPrimary: boolean;
+          }[];
+        };
+      }
+    ).catalogSchool;
+    const registeredSchool = (
+      app as unknown as {
+        school?: {
+          bankName?: string | null;
+          bankAccountName?: string | null;
+          bankAccountNumber?: string | null;
+          addressCity?: string | null;
+          addressState?: string | null;
+        };
+      }
+    ).school;
+
+    // Resolve bank details — prefer SchoolBankAccount (catalog-linked), then School flat fields
+    const primaryBankAccount =
+      catalogSchool?.bankAccounts?.find((b) => b.isPrimary) ??
+      catalogSchool?.bankAccounts?.[0];
+    const bankName =
+      primaryBankAccount?.bankName ?? registeredSchool?.bankName ?? "N/A";
+    const accountNumber =
+      primaryBankAccount?.accountNumber ??
+      registeredSchool?.bankAccountNumber ??
+      "N/A";
+    const accountName =
+      primaryBankAccount?.accountName ??
+      registeredSchool?.bankAccountName ??
+      "N/A";
+
+    const amountFmt = `₦${Number(app.amountRequested).toLocaleString("en-NG")}`;
+    const serviceChargeFmt = app.serviceChargeAmount
+      ? `₦${Number(app.serviceChargeAmount).toLocaleString("en-NG")}`
+      : "N/A";
+    const tenorLabel = `${app.tenor}-month plan`;
+
+    const schedule = await RepaymentSchedule.findAll({
+      where: { loanApplicationId: app.id },
+      order: [["installment_number", "ASC"]],
+    });
+
+    const scheduleRows = schedule
+      .map(
+        (s) =>
+          `<tr>
+            <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-size:13px">#${s.installmentNumber}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-size:13px">${s.dueDate}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-size:13px;font-weight:bold">₦${Number(s.totalAmount).toLocaleString("en-NG")}</td>
+          </tr>`,
+      )
+      .join("");
+
+    await sendEmail({
+      email: partnerEmail,
+      subject: `Funding Request – ${catalogSchool?.name ?? "School"} – ${app.referenceNumber}`,
+      message: `A tuition financing application is ready for funding. Please review the details and confirm disbursement.`,
+      html: `
+      <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;color:#333">
+        <div style="background:#881337;padding:28px 32px;border-radius:12px 12px 0 0">
+          <h1 style="color:#fff;margin:0;font-size:22px">Funding Request Ready for Disbursement</h1>
+          <p style="color:#fce7f3;margin:8px 0 0;font-size:14px">Application ${app.referenceNumber ?? app.id}</p>
+        </div>
+        <div style="background:#fff;padding:28px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 20px">Hello <strong>${env.fundingPartner.name}</strong>,</p>
+          <p style="margin:0 0 20px">
+            A tuition financing application has been fully processed and is ready for disbursement.
+            The parent has paid the service charge and confirmed their repayment plan.
+            Please review the details below and action the disbursement.
+          </p>
+
+          <h2 style="font-size:15px;color:#881337;border-bottom:2px solid #fce7f3;padding-bottom:8px;margin-bottom:12px">Application Summary</h2>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px;width:45%">Application ID</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${app.referenceNumber ?? app.id}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Parent Name</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${parent.firstName} ${parent.lastName}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Student Name</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${student?.firstName ?? "—"} ${student?.lastName ?? ""}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Admission Number</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${student?.studentId ?? "N/A"}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Grade / Level</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${student?.gradeLevel ?? "N/A"}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">School</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${catalogSchool?.name ?? "N/A"}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">School Tier</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${catalogSchool?.tier ? `Tier ${catalogSchool.tier}` : "N/A"}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Repayment Plan</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${tenorLabel}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Service Charge Paid</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${serviceChargeFmt}</td></tr>
+            <tr><td style="padding:10px 0;color:#881337;font-weight:bold;font-size:15px">Amount to Disburse</td>
+                <td style="padding:10px 0;color:#881337;font-weight:bold;font-size:15px">${amountFmt}</td></tr>
+          </table>
+
+          <h2 style="font-size:15px;color:#881337;border-bottom:2px solid #fce7f3;padding-bottom:8px;margin-bottom:12px">School Bank Account Details</h2>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px;width:45%">Bank Name</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${bankName}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Account Number</td>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${accountNumber}</td></tr>
+            <tr><td style="padding:10px 0;color:#6b7280;font-size:14px">Account Name</td>
+                <td style="padding:10px 0;font-weight:bold">${accountName}</td></tr>
+          </table>
+
+          ${
+            scheduleRows.length > 0
+              ? `
+          <h2 style="font-size:15px;color:#881337;border-bottom:2px solid #fce7f3;padding-bottom:8px;margin-bottom:12px">Parent Repayment Schedule</h2>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+            <thead>
+              <tr style="background:#fdf4f7">
+                <th style="padding:8px 12px;text-align:left;font-size:12px;color:#881337;text-transform:uppercase">Installment</th>
+                <th style="padding:8px 12px;text-align:left;font-size:12px;color:#881337;text-transform:uppercase">Due Date</th>
+                <th style="padding:8px 12px;text-align:left;font-size:12px;color:#881337;text-transform:uppercase">Amount</th>
+              </tr>
+            </thead>
+            <tbody>${scheduleRows}</tbody>
+          </table>`
+              : ""
+          }
+
+          <div style="background:#fdf4f7;border-left:4px solid #881337;border-radius:6px;padding:16px;margin-bottom:28px">
+            <p style="margin:0;font-size:13px;color:#881337">
+              <strong>Action Required:</strong> Transfer <strong>${amountFmt}</strong> to the school bank account above.
+              Then confirm disbursement using one of the buttons below.
+            </p>
+          </div>
+
+          <div style="text-align:center;margin-bottom:16px">
+            <a href="${disbursementUrl}"
+               style="display:inline-block;background:#16a34a;color:#fff;font-weight:bold;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:15px;margin-right:12px">
+              ✓ Disbursement Complete
+            </a>
+          </div>
+
+          <p style="font-size:12px;color:#6b7280;text-align:center;margin-bottom:24px">
+            Not logged in? <a href="${loginThenDisbursement}" style="color:#881337">Click here to log in</a> and you'll be redirected to this request automatically.
+          </p>
+
+          <hr style="border:none;border-top:1px solid #f3f4f6;margin-bottom:20px"/>
+          <p style="font-size:12px;color:#9ca3af;text-align:center;margin:0">
+            This email is for application <strong>${app.referenceNumber ?? app.id}</strong>.
+            If you have any questions, contact the SkulCredit operations team.
+          </p>
+        </div>
+      </div>`,
+    });
+
+    logger.info(
+      `[parent.service] Funding partner email sent to ${partnerEmail} for application ${app.id}`,
+    );
+  }
+
+  /**
+   * Send a verification email to the school after a parent submits an application.
+   * - Registered schools: email to their portal-registered email with a deep-link.
+   * - Non-registered schools: email to the contact from the SchoolRequest record.
+   */
+  private async _sendSchoolVerificationEmail(args: {
+    application: typeof LoanApplication.prototype;
+    catalogSchool: typeof CatalogSchool.prototype;
+    partnerSchool: typeof School.prototype | null;
+    student: typeof Student.prototype;
+    parent: { id: string; firstName: string; lastName: string };
+    parentEmail: string;
+  }): Promise<void> {
+    const { application, catalogSchool, partnerSchool, student, parent } = args;
+
+    const amountFormatted = `₦${Number(application.amountRequested).toLocaleString("en-NG")}`;
+    const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:3000";
+
+    const applicationDetailsHtml = `
+      <table style="width:100%;border-collapse:collapse;margin:16px 0">
+        <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Parent Request</td>
+            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">Requesting to pay child school fees</td></tr>
+        <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Parent Name</td>
+            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${parent.firstName} ${parent.lastName}</td></tr>
+        <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Student</td>
+            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${student.firstName} ${student.lastName}</td></tr>
+        <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Admission Number</td>
+            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${student.studentId ?? "N/A"}</td></tr>
+        <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">School Fees Amount</td>
+            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right;color:#881337">${amountFormatted}</td></tr>
+        <tr><td style="padding:10px 0;color:#6b7280;font-size:14px">Application ID</td>
+            <td style="padding:10px 0;font-weight:bold;text-align:right">${application.referenceNumber}</td></tr>
+      </table>
+    `;
+
+    if (catalogSchool.isRegistered && partnerSchool) {
+      // --- Registered school: email goes to their portal user email ---
+      const schoolUser = await User.findOne({
+        where: { id: partnerSchool.userId },
+        attributes: ["email"],
+      });
+      if (!schoolUser?.email) {
+        logger.warn(
+          `[parent.service] Registered school ${partnerSchool.id} has no user email`,
+        );
+        return;
+      }
+
+      const verifyLink = `${frontendUrl}/school/applications/${application.id}/verify?token=${application.id}`;
+      const loginThenVerifyLink = `${frontendUrl}/school/login?redirect=/school/applications/${application.id}/verify`;
+
+      await sendEmail({
+        email: schoolUser.email,
+        subject: `SkulCredit: Parent Application Verification Required – ${application.referenceNumber}`,
+        message: `A parent has applied to pay school fees for a student at your school. Please log in to verify.`,
+        html: `
+        <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#333">
+          <div style="background:#881337;padding:28px 32px;border-radius:12px 12px 0 0">
+            <h1 style="color:#fff;margin:0;font-size:22px">New Parent Application — Action Required</h1>
+          </div>
+          <div style="background:#fff;padding:28px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
+            <p style="margin:0 0 12px">Hello <strong>${catalogSchool.name}</strong>,</p>
+            <p style="margin:0 0 20px">
+              A parent has submitted a tuition financing application for a student at your school through <strong>SkulCredit</strong>.
+              Please review the details below and confirm or reject the application.
+            </p>
+            ${applicationDetailsHtml}
+            <div style="margin:24px 0;text-align:center">
+              <a href="${verifyLink}"
+                 style="display:inline-block;background:#881337;color:#fff;font-weight:bold;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:15px">
+                Review &amp; Verify Application
+              </a>
+            </div>
+            <p style="font-size:12px;color:#6b7280;margin:0 0 8px">
+              Not logged in? <a href="${loginThenVerifyLink}" style="color:#881337">Click here to log in</a> — after login you'll be redirected automatically to this application.
+            </p>
+            <p style="font-size:12px;color:#9ca3af;margin:0">
+              This link is specific to application <strong>${application.referenceNumber}</strong>. If you have questions, contact SkulCredit support.
+            </p>
+          </div>
+        </div>
+        `,
+      });
+
+      logger.info(
+        `[parent.service] School verification email sent to registered school ${partnerSchool.id} (${schoolUser.email})`,
+      );
+    } else {
+      // --- Non-registered school: find SchoolRequest for the parent and send to contact ---
+      const schoolRequest = await SchoolRequest.findOne({
+        where: { parentId: parent.id, schoolName: catalogSchool.name },
+        order: [["createdAt", "DESC"]],
+      });
+
+      const contactEmail = schoolRequest?.contactEmail;
+      if (!contactEmail) {
+        logger.warn(
+          `[parent.service] No contact email for non-registered school "${catalogSchool.name}" (parentId=${parent.id})`,
+        );
+        return;
+      }
+
+      await sendEmail({
+        email: contactEmail,
+        subject: `SkulCredit: Tuition Financing Application for a Student at Your School`,
+        message: `A parent has applied to pay school fees for a student at your school through SkulCredit.`,
+        html: `
+        <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#333">
+          <div style="background:#881337;padding:28px 32px;border-radius:12px 12px 0 0">
+            <h1 style="color:#fff;margin:0;font-size:22px">Tuition Financing Notification</h1>
+          </div>
+          <div style="background:#fff;padding:28px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
+            <p style="margin:0 0 12px">Hello,</p>
+            <p style="margin:0 0 20px">
+              A parent has applied to pay school fees for a student at <strong>${catalogSchool.name}</strong> through <strong>SkulCredit</strong>, a school fee financing platform.
+              The details of the application are below. Our team will be in touch to guide your school through the verification process.
+            </p>
+            ${applicationDetailsHtml}
+            <div style="background:#fdf4f7;border-left:4px solid #881337;border-radius:6px;padding:14px 16px;margin:24px 0">
+              <p style="margin:0;font-size:13px;color:#881337">
+                <strong>Next Steps:</strong><br>
+                A SkulCredit representative will contact you at this email to verify the student's enrollment and fee details before any funds are disbursed.
+              </p>
+            </div>
+            <p style="font-size:13px;color:#6b7280;margin:0">
+              For questions, please reply to this email or call the SkulCredit support line.<br><br>
+              The SkulCredit Team
+            </p>
+          </div>
+        </div>
+        `,
+      });
+
+      logger.info(
+        `[parent.service] School verification email sent to non-registered school contact ${contactEmail}`,
+      );
+    }
   }
 }
 
