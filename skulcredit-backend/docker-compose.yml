@@ -1,8 +1,4 @@
 version: "3.9"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Named volumes — all persistent data lives here
-# ─────────────────────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
   redis_data:
@@ -11,25 +7,18 @@ volumes:
   loki_data:
   grafana_data:
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Networks
-# ─────────────────────────────────────────────────────────────────────────────
 networks:
   app_net:
     driver: bridge
   monitoring_net:
     driver: bridge
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Services
-# ─────────────────────────────────────────────────────────────────────────────
-services:
 
-  # ── API ────────────────────────────────────────────────────────────────────
+services:
   api:
     build:
       context: .
-      target: ${BUILD_TARGET:-prod}   # override with BUILD_TARGET=dev for local
+      target: ${BUILD_TARGET:-prod}   
     container_name: skulcredit_api
     restart: unless-stopped
     env_file: .env
@@ -63,11 +52,9 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      # Promtail uses these labels to identify log streams
       logging: "promtail"
       logging_jobname: "skulcredit_api"
 
-  # ── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: skulcredit_postgres
@@ -92,7 +79,6 @@ services:
       logging: "promtail"
       logging_jobname: "postgres"
 
-  # ── Redis ──────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: skulcredit_redis
@@ -114,7 +100,6 @@ services:
       logging: "promtail"
       logging_jobname: "redis"
 
-  # ── RabbitMQ ───────────────────────────────────────────────────────────────
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     container_name: skulcredit_rabbitmq
@@ -141,7 +126,6 @@ services:
       logging: "promtail"
       logging_jobname: "rabbitmq"
 
-  # ── Prometheus ─────────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.51.2
     container_name: skulcredit_prometheus
@@ -167,7 +151,6 @@ services:
       logging: "promtail"
       logging_jobname: "prometheus"
 
-  # ── Loki ───────────────────────────────────────────────────────────────────
   loki:
     image: grafana/loki:2.9.6
     container_name: skulcredit_loki
@@ -186,7 +169,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Promtail ───────────────────────────────────────────────────────────────
   promtail:
     image: grafana/promtail:2.9.6
     container_name: skulcredit_promtail
@@ -194,17 +176,14 @@ services:
     command: -config.file=/etc/promtail/promtail.yml
     volumes:
       - ./docker/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
-      # Docker socket — reads container stdout/stderr
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      # App log files — reads ./logs/*.log written by Winston
       - ./logs:/app/logs:ro
     networks:
       - monitoring_net
     depends_on:
       - loki
 
-  # ── Grafana ────────────────────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:10.4.2
     container_name: skulcredit_grafana
@@ -215,7 +194,6 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
       GF_SERVER_ROOT_URL: http://localhost:3000
-      # Auto-install plugins on startup
       GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-piechart-panel
     volumes:
       - grafana_data:/var/lib/grafana

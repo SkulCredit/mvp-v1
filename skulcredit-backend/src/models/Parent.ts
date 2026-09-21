@@ -20,6 +20,11 @@ export interface ParentAttributes {
   bvn: string | null;
   nin: string | null;
   lendsqrCustomerId: string | null;
+  relationship: string | null;
+  employerType: string | null;
+  yearsInRole: string | null;
+  monthlyIncome: string | null;
+  eligibilityBlockedUntil: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -40,6 +45,11 @@ type ParentCreationAttributes = Optional<
   | "bvn"
   | "nin"
   | "lendsqrCustomerId"
+  | "relationship"
+  | "employerType"
+  | "yearsInRole"
+  | "monthlyIncome"
+  | "eligibilityBlockedUntil"
 >;
 
 export class ParentInstance
@@ -63,6 +73,11 @@ export class ParentInstance
   declare bvn: string | null;
   declare nin: string | null;
   declare lendsqrCustomerId: string | null;
+  declare relationship: string | null;
+  declare employerType: string | null;
+  declare yearsInRole: string | null;
+  declare monthlyIncome: string | null;
+  declare eligibilityBlockedUntil: string | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -99,6 +114,11 @@ ParentInstance.init(
     bvn: { type: DataTypes.STRING, allowNull: true },
     nin: { type: DataTypes.STRING, allowNull: true },
     lendsqrCustomerId: { type: DataTypes.STRING, allowNull: true },
+    relationship: { type: DataTypes.STRING, allowNull: true },
+    employerType: { type: DataTypes.STRING, allowNull: true },
+    yearsInRole: { type: DataTypes.STRING, allowNull: true },
+    monthlyIncome: { type: DataTypes.STRING, allowNull: true },
+    eligibilityBlockedUntil: { type: DataTypes.DATEONLY, allowNull: true },
   },
   {
     sequelize,

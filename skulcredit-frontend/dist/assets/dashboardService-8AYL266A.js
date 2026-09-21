@@ -1,0 +1,1 @@
+import{b as s}from"./index-CZ7w_isY.js";const e={getParentDashboard:async()=>{const a=await s.get("/parents/dashboard");return a.data.data??a.data},getSchoolDashboard:async()=>(await s.get("/schools/dashboard")).data.data};export{e as d};

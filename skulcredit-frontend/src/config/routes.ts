@@ -1,4 +1,3 @@
-
 export class RouteConfig {
   private routes: string[];
 
@@ -10,7 +9,7 @@ export class RouteConfig {
     return this.routes.some((route) => {
       if (route === pathname) return true;
       if (route.endsWith("/*")) {
-        const base = route.slice(0, -2); 
+        const base = route.slice(0, -2);
         return pathname === base || pathname.startsWith(base + "/");
       }
       return false;
@@ -29,12 +28,13 @@ export class RouteConfig {
 export class PublicRoutes extends RouteConfig {
   constructor(extra: string[] = []) {
     super([
-      "/",    
-      "/auth",  
+      "/",
+      "/auth",
       "/auth/parent",
-      "/auth/school",   
-      "/auth/admin",  
-      "/school/onboarding", 
+      "/auth/school",
+      "/auth/admin",
+      "/admin/auth/login",
+      "/school/onboarding",
       ...extra,
     ]);
   }
@@ -56,6 +56,24 @@ export class PrivateRoutes extends RouteConfig {
       "/school/settings/*",
       "/admin/dashboard",
       "/admin/dashboard/*",
+      "/admin/applications",
+      "/admin/applications/*",
+      "/admin/disbursements",
+      "/admin/disbursements/*",
+      "/admin/schools",
+      "/admin/schools/*",
+      "/admin/repayments",
+      "/admin/repayments/*",
+      "/admin/risk",
+      "/admin/risk/*",
+      "/admin/compliance",
+      "/admin/compliance/*",
+      "/admin/audit",
+      "/admin/audit/*",
+      "/admin/reports",
+      "/admin/reports/*",
+      "/admin/analytics",
+      "/admin/analytics/*",
       ...extra,
     ]);
   }
@@ -64,14 +82,14 @@ export class PrivateRoutes extends RouteConfig {
 export const ROLE_ROUTE_PREFIX: Record<string, string> = {
   parent: "/parent",
   school: "/school",
-  admin:  "/admin",
+  admin: "/admin",
 };
 
 export const ROLE_DASHBOARD: Record<string, string> = {
   parent: "/parent/dashboard",
   school: "/school/dashboard",
-  admin:  "/admin/dashboard",
+  admin: "/admin/dashboard",
 };
 
-export const publicRoutes  = new PublicRoutes();
+export const publicRoutes = new PublicRoutes();
 export const privateRoutes = new PrivateRoutes();

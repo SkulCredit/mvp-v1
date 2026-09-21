@@ -100,6 +100,10 @@ class ParentService {
       accountNumber?: string;
       bankCode?: string;
       documents?: Array<{ url: string; type_id: number; sub_type_id?: number }>;
+      relationship?: string;
+      employerType?: string;
+      yearsInRole?: string;
+      monthlyIncome?: string;
     },
   ) {
     const parent = await ParentRepository.findOne({ userId });
@@ -147,6 +151,18 @@ class ParentService {
       profilePhotoUrl: kycData.photoUrl ?? null,
       kycStatus: "approved",
       lendsqrCustomerId,
+      ...(kycData.relationship !== undefined && {
+        relationship: kycData.relationship,
+      }),
+      ...(kycData.employerType !== undefined && {
+        employerType: kycData.employerType,
+      }),
+      ...(kycData.yearsInRole !== undefined && {
+        yearsInRole: kycData.yearsInRole,
+      }),
+      ...(kycData.monthlyIncome !== undefined && {
+        monthlyIncome: kycData.monthlyIncome,
+      }),
     });
   }
 
@@ -197,9 +213,11 @@ class ParentService {
     const pass = dd?.pass ?? true;
 
     if (!pass) {
-      await user.update({ isActive: false });
+      const nextTerm = await schoolTermService.getNextTerm();
+      const blockedUntil = nextTerm?.portalOpeningDate ?? null;
+      await parent.update({ eligibilityBlockedUntil: blockedUntil });
       logger.warn(
-        `Loan score FAILED for userId=${userId} — decision="${dd?.decision}" — account deactivated.`,
+        `Loan score FAILED for userId=${userId} — decision="${dd?.decision}" — blocked until ${blockedUntil ?? "next term"}.`,
       );
     }
 
@@ -209,6 +227,102 @@ class ParentService {
       creditScore: scoreRes.data?.credit_score ?? "0%",
       advisoryAmount: dd?.advisory_amount ?? 0,
     };
+  }
+
+  async getEligibilityStatus(userId: string): Promise<{
+    kycStatus: string;
+    isBlocked: boolean;
+    blockedUntil: string | null;
+  }> {
+    const parent = await ParentRepository.findOne({ userId });
+    if (!parent) throw new ApiError(404, "Parent profile not found");
+
+    const today = new Date().toISOString().split("T")[0];
+    const isBlocked =
+      !!parent.eligibilityBlockedUntil &&
+      parent.eligibilityBlockedUntil > today;
+
+    return {
+      kycStatus: parent.kycStatus,
+      isBlocked,
+      blockedUntil: parent.eligibilityBlockedUntil,
+    };
+  }
+
+  async getEligibilityProfile(userId: string) {
+    const parent = await ParentRepository.findOne(
+      { userId },
+      {
+        include: [
+          {
+            model: User,
+            as: "user",
+            attributes: ["email", "phoneNumber"],
+          },
+        ],
+      },
+    );
+    if (!parent) throw new ApiError(404, "Parent profile not found");
+
+    return {
+      firstName: parent.firstName,
+      lastName: parent.lastName,
+      middleName: parent.middleName,
+      dob: parent.dob,
+      addressStreet: parent.addressStreet,
+      addressCity: parent.addressCity,
+      addressLga: parent.addressLga,
+      addressState: parent.addressState,
+      addressCountry: parent.addressCountry,
+      profilePhotoUrl: parent.profilePhotoUrl,
+      kycStatus: parent.kycStatus,
+      relationship: parent.relationship,
+      employerType: parent.employerType,
+      yearsInRole: parent.yearsInRole,
+      monthlyIncome: parent.monthlyIncome,
+      eligibilityBlockedUntil: parent.eligibilityBlockedUntil,
+      email:
+        (parent as unknown as { user?: { email: string } }).user?.email ?? "",
+      phoneNumber:
+        (parent as unknown as { user?: { phoneNumber: string } }).user
+          ?.phoneNumber ?? "",
+    };
+  }
+
+  async updateEligibilityProfile(
+    userId: string,
+    payload: {
+      photoUrl?: string;
+      phoneNumber?: string;
+      employerType?: string;
+      yearsInRole?: string;
+      monthlyIncome?: string;
+    },
+  ) {
+    const parent = await ParentRepository.findOne({ userId });
+    const user = await UserRepository.findById(userId);
+    if (!parent || !user) throw new ApiError(404, "Parent profile not found");
+
+    if (payload.phoneNumber !== undefined) {
+      await user.update({ phoneNumber: payload.phoneNumber });
+    }
+
+    await parent.update({
+      ...(payload.photoUrl !== undefined && {
+        profilePhotoUrl: payload.photoUrl,
+      }),
+      ...(payload.employerType !== undefined && {
+        employerType: payload.employerType,
+      }),
+      ...(payload.yearsInRole !== undefined && {
+        yearsInRole: payload.yearsInRole,
+      }),
+      ...(payload.monthlyIncome !== undefined && {
+        monthlyIncome: payload.monthlyIncome,
+      }),
+    });
+
+    return this.getEligibilityProfile(userId);
   }
 
   async addStudent(userId: string, studentData: Record<string, unknown>) {
@@ -897,9 +1011,10 @@ class ParentService {
       termsAccepted: true,
       termsAcceptedAt: new Date(),
       // Snapshot the service charge at submission time — rate may change later
-      serviceChargeRate:   Number(catalogSchool.serviceChargeRate ?? 0.235),
+      serviceChargeRate: Number(catalogSchool.serviceChargeRate ?? 0.235),
       serviceChargeAmount: Math.round(
-        payload.tuitionAmount * Number(catalogSchool.serviceChargeRate ?? 0.235),
+        payload.tuitionAmount *
+          Number(catalogSchool.serviceChargeRate ?? 0.235),
       ),
     });
 

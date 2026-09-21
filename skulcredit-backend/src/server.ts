@@ -13,6 +13,7 @@ import { seedCatalog } from "./seeders/catalogSeeder";
 import { seedSchoolTerms } from "./seeders/schoolTermSeeder";
 import { seedAcademicSessions } from "./seeders/academicSessionSeeder";
 import { seedSchoolBankAccounts } from "./seeders/schoolBankAccountSeeder";
+import { seedAdmin } from "./seeders/adminSeeder";
 
 // Load all models and wire up associations before syncing
 import "./models/index";
@@ -27,6 +28,7 @@ const start = async (): Promise<void> => {
     await seedSchoolTerms();
     await seedAcademicSessions();
     await seedSchoolBankAccounts();
+    await seedAdmin();
 
     await sequelize.sync({ alter: env.nodeEnv === "development" });
     logger.info("Database tables synced");

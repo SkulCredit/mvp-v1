@@ -395,6 +395,66 @@ class ParentController {
     }
   }
 
+  async getEligibilityStatus(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      successResponse(
+        res,
+        200,
+        "Eligibility status fetched",
+        await parentService.getEligibilityStatus(req.user!.userId),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getEligibilityProfile(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      successResponse(
+        res,
+        200,
+        "Eligibility profile fetched",
+        await parentService.getEligibilityProfile(req.user!.userId),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateEligibilityProfile(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      successResponse(
+        res,
+        200,
+        "Eligibility profile updated",
+        await parentService.updateEligibilityProfile(
+          req.user!.userId,
+          req.body as {
+            photoUrl?: string;
+            phoneNumber?: string;
+            employerType?: string;
+            yearsInRole?: string;
+            monthlyIncome?: string;
+          },
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async submitWizardApplicationJson(
     req: Request,
     res: Response,

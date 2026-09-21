@@ -2,21 +2,22 @@
  * AppRouter
  *
  * Public routes  → wrapped in <PublicRoute>
- *   /            – home / landing page
- *   /auth        – role-selector
- *   /auth/parent – parent login & register
- *   /auth/school – school login & register
- *   /auth/admin  – admin login
+ *   /                   – home / landing page
+ *   /auth               – role-selector
+ *   /auth/parent        – parent login & register
+ *   /auth/school        – school login & register
+ *   /admin/auth/login   – admin login  ← primary admin entry-point
  *
- * School onboarding is also public: a school needs to register before
- * they have credentials to log in.
+ * School onboarding is also public.
  *   /school/onboarding
  *
  * Protected routes → wrapped in <ProtectedRoute allowedRoles={[...]}>
  *
  *   PARENT  /parent/*   – single layout route (ParentLayout as outlet)
- *   SCHOOL  /school/*   – individually wrapped (no shared layout yet)
+ *   SCHOOL  /school/*   – individually wrapped
  *   ADMIN   /admin/*    – individually wrapped
+ *                         /admin          → redirect → /admin/dashboard
+ *                         unauthenticated → /admin/auth/login?next=…
  *
  * Any unknown path falls through to the catch-all → /
  */
@@ -43,11 +44,13 @@ const ParentAuthPage = React.lazy(() => import("../pages/Auth/ParentAuthPage"));
 const SchoolAuthPage = React.lazy(
   () => import("../pages/SchoolFlow/SchoolAuthPage"),
 );
-const AdminAuthPage = React.lazy(
-  () => import("../pages/AdminFlow/AdminAuthPage"),
-);
 const SchoolOnboardingPage = React.lazy(
   () => import("../pages/SchoolFlow/SchoolOnboardingPage"),
+);
+
+// Admin auth — new primary login page at /admin/auth/login
+const AdminLoginPage = React.lazy(
+  () => import("../pages/AdminFlow/AdminLoginPage"),
 );
 
 // Parent flow
@@ -112,6 +115,15 @@ const SchoolSettingsPage = React.lazy(
 const AdminDashboardPage = React.lazy(
   () => import("../pages/AdminFlow/AdminDashboardPage"),
 );
+const AdminApplicationsPage = React.lazy(
+  () => import("../pages/AdminFlow/AdminApplicationsPage"),
+);
+const AdminDisbursementsPage = React.lazy(
+  () => import("../pages/AdminFlow/AdminDisbursementsPage"),
+);
+const AdminSchoolsPage = React.lazy(
+  () => import("../pages/AdminFlow/AdminSchoolsPage"),
+);
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
@@ -119,6 +131,7 @@ const AppRouter: React.FC = () => (
   <Router>
     <Suspense fallback={<AuthSpinner />}>
       <Routes>
+        {/* ── PUBLIC ─────────────────────────────────────────────── */}
         <Route
           path="/"
           element={
@@ -127,7 +140,6 @@ const AppRouter: React.FC = () => (
             </PublicRoute>
           }
         />
-
         <Route
           path="/auth"
           element={
@@ -136,7 +148,6 @@ const AppRouter: React.FC = () => (
             </PublicRoute>
           }
         />
-
         <Route
           path="/auth/parent"
           element={
@@ -145,7 +156,6 @@ const AppRouter: React.FC = () => (
             </PublicRoute>
           }
         />
-
         <Route
           path="/auth/school"
           element={
@@ -154,17 +164,25 @@ const AppRouter: React.FC = () => (
             </PublicRoute>
           }
         />
+        <Route path="/school/onboarding" element={<SchoolOnboardingPage />} />
 
+        {/* ── ADMIN AUTH ─────────────────────────────────────────── */}
+        {/*  /admin/auth/login  – if already logged-in as admin, go straight to dashboard */}
         <Route
-          path="/auth/admin"
+          path="/admin/auth/login"
           element={
             <PublicRoute>
-              <AdminAuthPage />
+              <AdminLoginPage />
             </PublicRoute>
           }
         />
+        {/* legacy /auth/admin → redirect to new admin login */}
+        <Route
+          path="/auth/admin"
+          element={<Navigate to="/admin/auth/login" replace />}
+        />
 
-        <Route path="/school/onboarding" element={<SchoolOnboardingPage />} />
+        {/* ── PARENT ROUTES ──────────────────────────────────────── */}
         <Route
           element={
             <ProtectedRoute allowedRoles={["parent"]}>
@@ -196,10 +214,7 @@ const AppRouter: React.FC = () => (
           <Route path="/parent/payment" element={<PaymentConfirmationPage />} />
         </Route>
 
-        {/* ════════════════════════════════════════════════
-            SCHOOL ROUTES  (role: "school")
-            ════════════════════════════════════════════════ */}
-
+        {/* ── SCHOOL ROUTES ──────────────────────────────────────── */}
         <Route
           path="/school/dashboard"
           element={
@@ -257,9 +272,12 @@ const AppRouter: React.FC = () => (
           }
         />
 
-        {/* ════════════════════════════════════════════════
-            ADMIN ROUTES  (role: "admin")
-            ════════════════════════════════════════════════ */}
+        {/* ── ADMIN ROUTES ───────────────────────────────────────── */}
+        {/* bare /admin → redirect to dashboard (ProtectedRoute will catch unauthenticated) */}
+        <Route
+          path="/admin"
+          element={<Navigate to="/admin/dashboard" replace />}
+        />
 
         <Route
           path="/admin/dashboard"
@@ -269,11 +287,32 @@ const AppRouter: React.FC = () => (
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/applications"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminApplicationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/disbursements"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminDisbursementsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/schools"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminSchoolsPage />
+            </ProtectedRoute>
+          }
+        />
 
-        {/* ════════════════════════════════════════════════
-            CATCH-ALL  →  home
-            ════════════════════════════════════════════════ */}
-
+        {/* ── CATCH-ALL ──────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

@@ -164,8 +164,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           setUser(null);
           setSessionState("unauthenticated");
         } else {
-
-          if (cachedUser) {
+          // Network/timeout failure — can't verify the token.
+          // If a stale non-admin cached user is trying to access an admin
+          // path, wipe the session so the admin login page renders correctly.
+          const isAdminPath = window.location.pathname.startsWith("/admin");
+          if (cachedUser && isAdminPath && cachedUser.role !== "admin") {
+            wipeSession();
+            setUser(null);
+            setSessionState("unauthenticated");
+          } else if (cachedUser) {
             setSessionState("authenticated");
           } else {
             setSessionState("unauthenticated");
@@ -240,7 +247,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       setSessionState("unauthenticated");
     }
   }, []);
-
 
   const value = useMemo<AuthContextValue>(
     () => ({
