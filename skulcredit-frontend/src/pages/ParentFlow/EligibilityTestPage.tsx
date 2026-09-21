@@ -480,11 +480,32 @@ interface WizardState {
   applicationRef: string | null;
   isSubmitting: boolean;
   showSuccess: boolean;
-  /** true while the Lendsqr score check is running */
   isScoreChecking: boolean;
-  /** set true when the score check returns pass=false — shows the block modal */
   scoreBlocked: boolean;
 }
+
+interface EligibilityProfile {
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  dob: string | null;
+  addressStreet: string | null;
+  addressCity: string | null;
+  addressLga: string | null;
+  addressState: string | null;
+  addressCountry: string | null;
+  profilePhotoUrl: string | null;
+  kycStatus: string;
+  relationship: string | null;
+  employerType: string | null;
+  yearsInRole: string | null;
+  monthlyIncome: string | null;
+  eligibilityBlockedUntil: string | null;
+  email: string;
+  phoneNumber: string;
+}
+
+type PageMode = "loading" | "wizard" | "blocked" | "review";
 
 // ── Shared components ─────────────────────────────────────────────────────────
 
@@ -619,6 +640,129 @@ const EligibilityTestPage: React.FC = () => {
 
   const docFileInputRef = useRef<HTMLInputElement>(null);
   const photoFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [pageMode, setPageMode] = useState<PageMode>("loading");
+  const [eligibilityProfile, setEligibilityProfile] =
+    useState<EligibilityProfile | null>(null);
+
+  const [editPhone, setEditPhone] = useState("");
+  const [editPhoneCountry, setEditPhoneCountry] = useState<Country>(
+    "NG" as Country,
+  );
+  const [editEmployerType, setEditEmployerType] = useState("");
+  const [editYearsInRole, setEditYearsInRole] = useState("");
+  const [editMonthlyIncome, setEditMonthlyIncome] = useState("");
+  const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
+  const [editPhotoPreview, setEditPhotoPreview] = useState("");
+  const [editPhotoUrl, setEditPhotoUrl] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const editPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const statusRes = await apiClient.get<{
+          data: {
+            kycStatus: string;
+            isBlocked: boolean;
+            blockedUntil: string | null;
+          };
+        }>("/parents/eligibility-status");
+        const { kycStatus, isBlocked, blockedUntil } = statusRes.data.data;
+
+        if (isBlocked) {
+          setEligibilityProfile({
+            firstName: "",
+            lastName: "",
+            middleName: null,
+            dob: null,
+            addressStreet: null,
+            addressCity: null,
+            addressLga: null,
+            addressState: null,
+            addressCountry: null,
+            profilePhotoUrl: null,
+            kycStatus,
+            relationship: null,
+            employerType: null,
+            yearsInRole: null,
+            monthlyIncome: null,
+            eligibilityBlockedUntil: blockedUntil,
+            email: "",
+            phoneNumber: "",
+          });
+          setPageMode("blocked");
+          return;
+        }
+
+        if (kycStatus === "approved") {
+          const profileRes = await apiClient.get<{ data: EligibilityProfile }>(
+            "/parents/eligibility-profile",
+          );
+          const p = profileRes.data.data;
+          setEligibilityProfile(p);
+          setEditPhone(p.phoneNumber ?? "");
+          setEditEmployerType(p.employerType ?? "");
+          setEditYearsInRole(p.yearsInRole ?? "");
+          setEditMonthlyIncome(p.monthlyIncome ?? "");
+          setEditPhotoUrl(p.profilePhotoUrl ?? "");
+          setEditPhotoPreview(p.profilePhotoUrl ?? "");
+          setPageMode("review");
+          return;
+        }
+
+        setPageMode("wizard");
+      } catch {
+        setPageMode("wizard");
+      }
+    })();
+  }, []);
+
+  const handleEditPhotoSelect = (file: File) => {
+    if (editPhotoPreview && !editPhotoPreview.startsWith("http"))
+      URL.revokeObjectURL(editPhotoPreview);
+    setEditPhotoFile(file);
+    setEditPhotoPreview(URL.createObjectURL(file));
+    setEditPhotoUrl("");
+  };
+
+  const handleSaveEligibilityProfile = async () => {
+    setEditSaving(true);
+    try {
+      let photoUrl = editPhotoUrl;
+      if (editPhotoFile) {
+        const fd = new FormData();
+        fd.append("file", editPhotoFile);
+        const res = await apiClient.post<{ data: { url: string } }>(
+          "/upload/document",
+          fd,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          },
+        );
+        photoUrl = res.data.data.url;
+        setEditPhotoUrl(photoUrl);
+        setEditPhotoFile(null);
+      }
+      const updated = await apiClient.patch<{ data: EligibilityProfile }>(
+        "/parents/eligibility-profile",
+        {
+          phoneNumber: editPhone || undefined,
+          employerType: editEmployerType || undefined,
+          yearsInRole: editYearsInRole || undefined,
+          monthlyIncome: editMonthlyIncome || undefined,
+          photoUrl: photoUrl || undefined,
+        },
+      );
+      setEligibilityProfile(updated.data.data);
+      setEditPhotoPreview(updated.data.data.profilePhotoUrl ?? "");
+      showToast("Profile updated successfully.");
+    } catch (err) {
+      showToast((err as { message?: string }).message ?? "Update failed.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const [schools, setSchools] = useState<CatalogSchool[]>([]);
   const [loadingSchools, setLoadingSchools] = useState(false);
@@ -1021,6 +1165,10 @@ const EligibilityTestPage: React.FC = () => {
               address: state.step1.addressStreet,
               photoUrl: photoUrl || undefined,
               documents: uploadedDocUrls,
+              relationship: state.step1.relationship,
+              employerType: state.step1.employerType,
+              yearsInRole: state.step1.yearsInRole,
+              monthlyIncome: state.step1.monthlyIncome,
             }
           : {
               nin: state.step2.nin,
@@ -1031,6 +1179,10 @@ const EligibilityTestPage: React.FC = () => {
               address: state.step1.addressStreet,
               photoUrl: photoUrl || undefined,
               documents: uploadedDocUrls,
+              relationship: state.step1.relationship,
+              employerType: state.step1.employerType,
+              yearsInRole: state.step1.yearsInRole,
+              monthlyIncome: state.step1.monthlyIncome,
             };
 
       await parentService.verifyKYC(kycPayload);
@@ -1132,6 +1284,380 @@ const EligibilityTestPage: React.FC = () => {
   // The parent's account has been deactivated server-side; we show a clear
   // message and redirect them to the dashboard after they dismiss.
 
+  if (pageMode === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-10 h-10 border-4 border-[#8B1C53] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (pageMode === "blocked") {
+    const blockedUntil = eligibilityProfile?.eligibilityBlockedUntil;
+    const formattedDate = blockedUntil
+      ? new Date(blockedUntil).toLocaleDateString("en-NG", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : null;
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden border border-gray-100">
+          <div className="bg-[#8B1C53] px-6 py-8 text-white text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-8 h-8 text-white"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold leading-snug">
+              Credit Check Failed
+            </h2>
+            <p className="mt-1 text-sm text-white/80">
+              Your account is temporarily restricted
+            </p>
+          </div>
+          <div className="px-6 py-6 text-center">
+            <p className="text-sm text-gray-700 leading-relaxed">
+              Unfortunately, your credit score does not meet the minimum
+              requirement to use SkulCredit at this time.
+            </p>
+            {formattedDate && (
+              <p className="mt-3 text-sm font-semibold text-[#8B1C53]">
+                You can reapply from{" "}
+                <span className="underline">{formattedDate}</span>
+              </p>
+            )}
+            <p className="mt-2 text-sm text-gray-500 leading-relaxed">
+              This restriction lifts automatically at the start of the next
+              term. If you believe this is an error, please contact support.
+            </p>
+            <div className="mt-5 rounded-xl bg-[#fdf0f6] border border-[#f5c6d8] px-4 py-3 text-left">
+              <p className="text-xs font-semibold text-[#8B1C53] mb-1">
+                What happens next?
+              </p>
+              <ul className="text-xs text-[#8B1C53]/80 space-y-1 list-disc list-inside leading-relaxed">
+                <li>
+                  Your application portal access is restricted until the next
+                  term.
+                </li>
+                <li>You cannot submit new loan applications at this time.</li>
+                <li>Contact support if you have questions about your score.</li>
+              </ul>
+            </div>
+          </div>
+          <div className="px-6 pb-6">
+            <button
+              type="button"
+              onClick={() => navigate("/parent/dashboard")}
+              className="w-full rounded-full bg-[#8B1C53] py-3 text-sm font-bold text-white hover:bg-[#7a1848] transition-colors"
+            >
+              Return to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (pageMode === "review" && eligibilityProfile) {
+    const ep = eligibilityProfile;
+    const fullName = [ep.firstName, ep.middleName, ep.lastName]
+      .filter(Boolean)
+      .join(" ");
+    const displayPhoto = editPhotoPreview || ep.profilePhotoUrl;
+
+    return (
+      <div className="flex flex-col min-h-full animate-fade-in-up">
+        <Toast
+          message={toast.message}
+          visible={toast.visible}
+          onDismiss={dismissToast}
+        />
+        <div className="w-full max-w-2xl mx-auto rounded-2xl border border-gray-200 bg-white px-6 sm:px-10 py-8 mt-8 mb-12">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 shrink-0">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#16a34a"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-5 h-5"
+                aria-hidden="true"
+              >
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[#8B1C53]">
+                Eligibility Profile
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                KYC verified. You can update the editable fields below.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-6">
+            <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
+              <p className="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-2">
+                Personal Details
+              </p>
+
+              <div className="flex items-center gap-4">
+                <div className="relative h-20 w-20 rounded-full overflow-hidden border-2 border-[#8B1C53]/30 shrink-0 bg-gray-100 flex items-center justify-center">
+                  {displayPhoto ? (
+                    <img
+                      src={displayPhoto}
+                      alt="Profile"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="w-10 h-10 text-gray-300"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-gray-500">
+                    Profile Photo{" "}
+                    <span className="text-[#8B1C53] font-semibold">
+                      (editable)
+                    </span>
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => editPhotoInputRef.current?.click()}
+                      className="rounded-full border border-[#8B1C53] px-4 py-1.5 text-xs font-semibold text-[#8B1C53] hover:bg-[#8B1C53]/5 transition-colors"
+                    >
+                      Change Photo
+                    </button>
+                    {(editPhotoFile || editPhotoPreview) &&
+                      editPhotoPreview !== ep.profilePhotoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditPhotoFile(null);
+                            setEditPhotoPreview(ep.profilePhotoUrl ?? "");
+                            setEditPhotoUrl(ep.profilePhotoUrl ?? "");
+                          }}
+                          className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          Revert
+                        </button>
+                      )}
+                  </div>
+                  <input
+                    ref={editPhotoInputRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleEditPhotoSelect(f);
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">
+                    Full Name
+                  </label>
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                    {fullName || "—"}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">
+                    Email
+                  </label>
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                    {ep.email || "—"}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">
+                    Date of Birth
+                  </label>
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                    {ep.dob || "—"}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">
+                    Relationship to Student
+                  </label>
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                    {ep.relationship || "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-500 flex items-center gap-1">
+                  Phone Number{" "}
+                  <span className="text-[#8B1C53] font-semibold">
+                    (editable)
+                  </span>
+                </label>
+                <PhoneField
+                  value={editPhone}
+                  country={editPhoneCountry}
+                  placeholder="Enter your phone number"
+                  onChange={setEditPhone}
+                  onCountryChange={setEditPhoneCountry}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
+              <p className="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-2">
+                Address
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">
+                    Country
+                  </label>
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                    {ep.addressCountry || "—"}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">
+                    State
+                  </label>
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                    {ep.addressState || "—"}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">
+                    City
+                  </label>
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                    {ep.addressCity || "—"}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">
+                    LGA
+                  </label>
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                    {ep.addressLga || "—"}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 sm:col-span-2">
+                  <label className="text-xs font-medium text-gray-500">
+                    Street Address
+                  </label>
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                    {ep.addressStreet || "—"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
+              <p className="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-2">
+                Employment &amp; Income
+              </p>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-500 flex items-center gap-1">
+                  Employer / Business Type{" "}
+                  <span className="text-[#8B1C53] font-semibold">
+                    (editable)
+                  </span>
+                </label>
+                <SelectWithChevron
+                  value={editEmployerType}
+                  onChange={setEditEmployerType}
+                  placeholder="-Select your employment type-"
+                  options={EMPLOYER_TYPES}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-500 flex items-center gap-1">
+                  Years in Current Role{" "}
+                  <span className="text-[#8B1C53] font-semibold">
+                    (editable)
+                  </span>
+                </label>
+                <SelectWithChevron
+                  value={editYearsInRole}
+                  onChange={setEditYearsInRole}
+                  placeholder="-Select years of experience-"
+                  options={YEARS_OPTIONS}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-500 flex items-center gap-1">
+                  Monthly Income (₦){" "}
+                  <span className="text-[#8B1C53] font-semibold">
+                    (editable)
+                  </span>
+                </label>
+                <SelectWithChevron
+                  value={editMonthlyIncome}
+                  onChange={setEditMonthlyIncome}
+                  placeholder="-Select your income range-"
+                  options={INCOME_RANGES}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => navigate("/parent/dashboard")}
+                className="flex items-center gap-1.5 rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                <BackIcon /> Back to Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEligibilityProfile}
+                disabled={editSaving}
+                className="rounded-full bg-[#8B1C53] px-8 py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-60"
+              >
+                {editSaving ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (state.scoreBlocked) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
@@ -1199,8 +1725,6 @@ const EligibilityTestPage: React.FC = () => {
       </div>
     );
   }
-
-  // ── Success screen ────────────────────────────────────────────────────────
 
   if (state.showSuccess) {
     const NEXT_STEPS = [

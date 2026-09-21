@@ -4,8 +4,8 @@ import { useAuth } from "../../context/AuthContext";
 import Icon from "../../components/Icon";
 
 const AdminAuthPage: React.FC = () => {
-  const [email, setEmail] = useState("admin@skulcredit.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("akpeledavid@hotmail.com");
+  const [password, setPassword] = useState("SkulCreditAdmin@123");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ const AdminAuthPage: React.FC = () => {
       navigate("/admin/dashboard");
     } catch {
       setError(
-        "Invalid admin credentials. Try admin@skulcredit.com / admin123",
+        "Invalid admin credentials. Please check your email and password.",
       );
     } finally {
       setIsLoading(false);

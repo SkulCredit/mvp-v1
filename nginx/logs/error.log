@@ -1,0 +1,13 @@
+2026/09/21 06:31:27 [notice] 131#131: signal process started
+2026/09/21 06:32:03 [notice] 152#152: signal process started
+2026/09/21 06:33:18 [notice] 185#185: signal process started
+2026/09/21 06:34:02 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
+2026/09/21 06:34:03 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
+2026/09/21 06:34:04 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
+2026/09/21 06:34:05 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
+2026/09/21 06:34:06 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
+2026/09/21 06:34:08 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
+2026/09/21 06:34:11 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
+2026/09/21 06:34:18 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
+2026/09/21 06:34:31 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
+2026/09/21 06:34:57 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182

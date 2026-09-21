@@ -17,7 +17,6 @@ const SchoolTopBar: React.FC<SchoolTopBarProps> = ({
 
   const right = (
     <div className="flex items-center gap-4">
-      {/* Bell + label */}
       <button className="flex items-center gap-1.5 text-brand font-semibold text-sm relative">
         <svg
           viewBox="0 0 24 24"
@@ -39,8 +38,6 @@ const SchoolTopBar: React.FC<SchoolTopBarProps> = ({
           </span>
         )}
       </button>
-
-      {/* Avatar circle */}
       <div className="w-10 h-10 rounded-full bg-brand border-2 border-white shadow flex items-center justify-center text-white font-bold text-sm select-none">
         {initials}
       </div>

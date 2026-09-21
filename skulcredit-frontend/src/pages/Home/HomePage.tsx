@@ -162,15 +162,12 @@ const HomePage: React.FC = () => {
 
   return (
     <>
-      {/* ── Shared marketing nav ───────────────────────────── */}
       <PublicNav
         activeView={activeView}
         onSetView={setActiveView}
         onScrollTo={scrollToSection}
       />
-
       <main className="pb-0">
-        {/* ════════════════════════ HOME VIEW ════════════════════════ */}
         <div className={activeView === "home" ? "block" : "hidden"}>
           {/* Hero */}
           <section className="relative pt-32 pb-24 lg:pt-40 lg:pb-32 overflow-hidden">
@@ -562,7 +559,6 @@ const HomePage: React.FC = () => {
           </section>
         </div>
 
-        {/* ════════════════════════ SCHOOLS VIEW ════════════════════════ */}
         <div className={activeView === "schools" ? "block" : "hidden"}>
           <section className="bg-white pt-40 pb-48 text-center text-rose-900 relative z-0 overflow-hidden">
             <div className="container mx-auto px-4 md:px-6 max-w-7xl relative z-10 reveal">
@@ -748,7 +744,6 @@ const HomePage: React.FC = () => {
           </section>
         </div>
 
-        {/* ════════════════ FAQ (always visible) ════════════════ */}
         <section
           id="faq"
           className="py-32 bg-slate-50 relative overflow-hidden"
@@ -806,8 +801,6 @@ const HomePage: React.FC = () => {
             </div>
           </div>
         </section>
-
-        {/* ════════════════ Waitlist / Contact ════════════════ */}
         <section id="contact-us" className="bg-white py-12 md:py-20">
           <div className="max-w-7xl mx-auto px-4 md:px-6">
             <div className="bg-[#87144B] text-white rounded-2xl md:rounded-[2.5rem] p-6 md:p-10 lg:p-16 shadow-lg relative overflow-hidden">
@@ -954,12 +947,12 @@ const HomePage: React.FC = () => {
                   </button>
                   {waitlistStatus === "success" && (
                     <p className="text-green-300 text-xs">
-                      ✅ Submitted successfully! We will be in touch.
+                       Submitted successfully! We will be in touch.
                     </p>
                   )}
                   {waitlistStatus === "error" && (
                     <p className="text-rose-300 text-xs">
-                      ❌ An error occurred. Please try again.
+                      An error occurred. Please try again.
                     </p>
                   )}
                 </form>
@@ -967,8 +960,6 @@ const HomePage: React.FC = () => {
             </div>
           </div>
         </section>
-
-        {/* ── Shared marketing footer ─────────────────────── */}
         <PublicFooter />
       </main>
     </>

@@ -62,6 +62,27 @@ class SchoolTermService {
     };
   }
 
+  async getNextTerm(): Promise<ActiveTermResult | null> {
+    const today = new Date().toISOString().split("T")[0];
+    const term = await AcademicTerm.findOne({
+      where: {
+        portalOpeningDate: { [Op.gt]: today },
+        status: { [Op.in]: ["UPCOMING", "ACTIVE_APPLICATION"] },
+      },
+      include: [
+        { model: AcademicSession, as: "session", attributes: ["sessionName"] },
+      ],
+      order: [["portalOpeningDate", "ASC"]],
+    });
+
+    if (!term) return null;
+
+    const sessionName =
+      (term as AcademicTerm & { session?: { sessionName: string } }).session
+        ?.sessionName ?? "";
+    return this.toActiveTermResult(term, sessionName);
+  }
+
   async getActiveTerm(): Promise<ActiveTermResult | null> {
     const today = new Date().toISOString().split("T")[0];
     const byDate = await AcademicTerm.findOne({
@@ -176,7 +197,7 @@ class SchoolTermService {
   async deleteSession(id: string) {
     const session = await AcademicSession.findByPk(id);
     if (!session) throw new ApiError(404, "Academic session not found");
-    await session.destroy(); 
+    await session.destroy();
   }
 
   async setCurrentSession(id: string) {

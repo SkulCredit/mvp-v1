@@ -247,7 +247,6 @@ const ParentAuthPage: React.FC = () => {
     }
   };
 
-  // Debounced availability checks
   const scheduleCheck = (field: "email" | "phone", value: string) => {
     const ref = field === "email" ? emailTimer : phoneTimer;
     if (ref.current) clearTimeout(ref.current);

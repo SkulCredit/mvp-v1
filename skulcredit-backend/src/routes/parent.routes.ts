@@ -272,4 +272,19 @@ router.post(
   parentController.checkLoanScore.bind(parentController),
 );
 
+router.get(
+  "/eligibility-status",
+  parentController.getEligibilityStatus.bind(parentController),
+);
+
+router.get(
+  "/eligibility-profile",
+  parentController.getEligibilityProfile.bind(parentController),
+);
+
+router.patch(
+  "/eligibility-profile",
+  parentController.updateEligibilityProfile.bind(parentController),
+);
+
 export default router;
