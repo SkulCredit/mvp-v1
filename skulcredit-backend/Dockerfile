@@ -48,7 +48,7 @@ COPY --from=builder /app/dist         ./dist
 
 COPY package*.json ./
 
-RUN chown -R skulcredit:skulcredit /app
+RUN mkdir -p /app/uploads && chown -R skulcredit:skulcredit /app
 
 USER skulcredit
 

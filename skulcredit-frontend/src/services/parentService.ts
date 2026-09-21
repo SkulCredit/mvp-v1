@@ -234,6 +234,36 @@ export const parentService = {
   },
 
   /**
+   * Confirm service charge has been paid for an application.
+   * Called after successful Paystack payment.
+   */
+  confirmServiceCharge: async (
+    applicationId: string,
+    paystackReference?: string,
+  ): Promise<unknown> => {
+    const response = await apiClient.post(
+      `/parents/applications/${applicationId}/confirm-service-charge`,
+      paystackReference ? { paystackReference } : {},
+    );
+    return response.data.data;
+  },
+
+  /**
+   * Confirm repayment plan for an application.
+   * Generates installment records backend-side and triggers the funding partner handoff.
+   */
+  setupRepayment: async (
+    applicationId: string,
+    opts: { repaymentStartDate?: string } = {},
+  ): Promise<unknown> => {
+    const response = await apiClient.post(
+      `/parents/applications/${applicationId}/setup-repayment`,
+      opts,
+    );
+    return response.data.data;
+  },
+
+  /**
    * Submit the 4-step new-application wizard as a JSON request.
    * Backend: POST /parents/submit-application-json
    * (The multipart endpoint still exists for the KYC wizard; this one is
@@ -258,7 +288,7 @@ export const parentService = {
     institutionTypeName: string;
     gradeLevel: string;
     tuitionAmount: number;
-    repaymentPlanId: "full" | "3month" | "6month";
+    repaymentPlanId: "3month" | "4month";
     tenor: number;
     academicSession?: string;
     term?: string;
@@ -330,6 +360,7 @@ export interface CatalogSchool {
   name: string;
   isRegistered: boolean;
   tier: string | null;
+  serviceChargeRate: number | null;
   serviceChargeDisplay: string | null;
 }
 

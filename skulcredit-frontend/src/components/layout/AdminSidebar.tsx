@@ -181,20 +181,23 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
       }
       footer={
         <div className="p-4">
-          <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
             <div className="w-8 h-8 rounded-full bg-[#881337]/10 flex items-center justify-center text-[#881337] font-bold text-xs shrink-0">
               {initials}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-900 truncate">
-                {user?.name ?? "Fashanu Ayomide"}
+                {user?.name ?? "Admin"}
               </p>
-              <p className="text-xs text-slate-500">Operations Admin</p>
+              <p className="text-xs text-slate-500 truncate">
+                {user?.email ?? "admin"}
+              </p>
             </div>
             <button
               onClick={handleLogout}
               title="Logout"
-              className="ml-auto text-slate-400 hover:text-red-500 transition-colors"
+              aria-label="Logout"
+              className="ml-auto flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
             >
               <Icon name="log-out" className="w-4 h-4" />
             </button>

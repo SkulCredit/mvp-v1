@@ -22,6 +22,7 @@ import {
 } from "react-phone-number-input/input";
 import type { Country } from "react-phone-number-input";
 import en from "react-phone-number-input/locale/en.json";
+import { resolveUploadUrl } from "../../utils/uploadUrl";
 
 const ALL_COUNTRIES = getCountries();
 
@@ -1421,7 +1422,7 @@ const EligibilityTestPage: React.FC = () => {
                 <div className="relative h-20 w-20 rounded-full overflow-hidden border-2 border-[#8B1C53]/30 shrink-0 bg-gray-100 flex items-center justify-center">
                   {displayPhoto ? (
                     <img
-                      src={displayPhoto}
+                      src={resolveUploadUrl(displayPhoto)}
                       alt="Profile"
                       className="h-full w-full object-cover"
                     />
@@ -1912,7 +1913,7 @@ const EligibilityTestPage: React.FC = () => {
                 <div className="flex items-center gap-4">
                   <div className="relative h-20 w-20 rounded-full overflow-hidden border-2 border-[#8B1C53]/30 shrink-0">
                     <img
-                      src={state.step1.photoPreview}
+                      src={resolveUploadUrl(state.step1.photoPreview)}
                       alt="Profile preview"
                       className="h-full w-full object-cover"
                     />

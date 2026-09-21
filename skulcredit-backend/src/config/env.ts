@@ -59,6 +59,11 @@ const env = {
   socketio: {
     corsOrigin: process.env.SOCKETIO_CORS_ORIGIN ?? "*",
   },
+  frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:3000",
+  fundingPartner: {
+    email: process.env.FUNDING_PARTNER_EMAIL ?? "",
+    name: process.env.FUNDING_PARTNER_NAME ?? "SkulCredit Funding Partner",
+  },
 } as const;
 
 export type Env = typeof env;

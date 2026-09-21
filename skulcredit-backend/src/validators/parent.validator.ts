@@ -12,7 +12,10 @@ export const completeProfileSchema = z.object({
     addressCountry: z.string().optional(),
     profilePhotoUrl: z
       .string()
-      .url("profilePhotoUrl must be a valid URL")
+      .refine(
+        (v) => v.startsWith("/") || z.string().url().safeParse(v).success,
+        "profilePhotoUrl must be a valid URL or relative path",
+      )
       .optional(),
   }),
 });
@@ -35,13 +38,25 @@ export const verifyKycSchema = z.object({
       lga: z.string().optional(),
       city: z.string().optional(),
       address: z.string().optional(),
-      photoUrl: z.string().url("photoUrl must be a valid URL").optional(),
+      photoUrl: z
+        .string()
+        .refine(
+          (v) => v.startsWith("/") || z.string().url().safeParse(v).success,
+          "photoUrl must be a valid URL or relative path",
+        )
+        .optional(),
       accountNumber: z.string().optional(),
       bankCode: z.string().optional(),
       documents: z
         .array(
           z.object({
-            url: z.string().url(),
+            url: z
+              .string()
+              .refine(
+                (v) =>
+                  v.startsWith("/") || z.string().url().safeParse(v).success,
+                "document url must be a valid URL or relative path",
+              ),
             type_id: z.number(),
             sub_type_id: z.number().optional(),
           }),

@@ -123,6 +123,79 @@ router.get(
   parentController.getApplication.bind(parentController),
 );
 
+/**
+ * @swagger
+ * /parents/applications/{id}/confirm-service-charge:
+ *   post:
+ *     summary: Mark service charge as paid for an application
+ *     description: >
+ *       Called after successful Paystack verification. Marks serviceFeePaid=true
+ *       on the application so the parent can proceed to Setup Repayment Plan.
+ *     tags: [Parent]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               paystackReference:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Service charge confirmed
+ */
+router.post(
+  "/applications/:id/confirm-service-charge",
+  parentController.confirmServiceCharge.bind(parentController),
+);
+
+/**
+ * @swagger
+ * /parents/applications/{id}/setup-repayment:
+ *   post:
+ *     summary: Confirm repayment plan and trigger funding partner handoff
+ *     description: >
+ *       Called after the parent pays the service charge. Generates the repayment
+ *       schedule, marks the application as approved, and sends the funding request
+ *       email to the configured funding partner.
+ *     tags: [Parent]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               repaymentStartDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Optional ISO date for first installment (defaults to 1st of next month)
+ *     responses:
+ *       200:
+ *         description: Repayment schedule created, funding partner notified
+ *       400:
+ *         description: Service charge not yet paid, or invalid application state
+ *       409:
+ *         description: Repayment schedule already exists
+ */
+router.post(
+  "/applications/:id/setup-repayment",
+  parentController.setupRepayment.bind(parentController),
+);
+
 router.get(
   "/school-requests",
   parentController.getSchoolRequests.bind(parentController),

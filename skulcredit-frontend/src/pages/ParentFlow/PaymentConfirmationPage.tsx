@@ -1,12 +1,43 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Icon from "../../components/Icon";
 import { AppFlowHeader } from "../../components/layout";
+import { paymentService } from "../../services/paymentService";
+import { parentService } from "../../services/parentService";
 
 const PaymentConfirmationPage: React.FC = () => {
   const [stage, setStage] = useState<1 | 2>(1);
   const [processing, setProcessing] = useState(true);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Paystack redirects back with ?reference= and optionally ?applicationId=
+  const paystackRef =
+    searchParams.get("reference") ?? searchParams.get("trxref");
+  const applicationId = searchParams.get("applicationId");
+
+  // On mount: verify Paystack reference and confirm service charge
+  useEffect(() => {
+    if (!paystackRef) {
+      setProcessing(false);
+      return;
+    }
+    (async () => {
+      try {
+        // 1. Verify the payment with Paystack
+        await paymentService.verifyPayment(paystackRef);
+
+        // 2. If we have an applicationId, mark service charge as paid
+        if (applicationId) {
+          await parentService.confirmServiceCharge(applicationId, paystackRef);
+        }
+      } catch {
+        // Non-fatal — page still shows confirmation
+      } finally {
+        setProcessing(false);
+      }
+    })();
+  }, [paystackRef, applicationId]);
 
   useEffect(() => {
     if (stage !== 2) return;
@@ -225,7 +256,13 @@ const PaymentConfirmationPage: React.FC = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() => navigate("/parent/dashboard")}
+                    onClick={() =>
+                      navigate(
+                        applicationId
+                          ? `/parent/repayment?applicationId=${applicationId}`
+                          : "/parent/repayment",
+                      )
+                    }
                     className="w-full md:w-auto bg-brand hover:bg-brand-hover text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md whitespace-nowrap"
                   >
                     Setup Repayment Plan

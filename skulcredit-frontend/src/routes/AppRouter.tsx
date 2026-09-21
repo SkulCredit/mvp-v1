@@ -115,6 +115,11 @@ const SchoolSettingsPage = React.lazy(
 const AdminDashboardPage = React.lazy(
   () => import("../pages/AdminFlow/AdminDashboardPage"),
 );
+
+// Funding partner flow
+const FundingPartnerDisbursementPage = React.lazy(
+  () => import("../pages/FundingPartner/FundingPartnerDisbursementPage"),
+);
 const AdminApplicationsPage = React.lazy(
   () => import("../pages/AdminFlow/AdminApplicationsPage"),
 );
@@ -165,7 +170,6 @@ const AppRouter: React.FC = () => (
           }
         />
         <Route path="/school/onboarding" element={<SchoolOnboardingPage />} />
-
         {/* ── ADMIN AUTH ─────────────────────────────────────────── */}
         {/*  /admin/auth/login  – if already logged-in as admin, go straight to dashboard */}
         <Route
@@ -181,7 +185,6 @@ const AppRouter: React.FC = () => (
           path="/auth/admin"
           element={<Navigate to="/admin/auth/login" replace />}
         />
-
         {/* ── PARENT ROUTES ──────────────────────────────────────── */}
         <Route
           element={
@@ -213,7 +216,6 @@ const AppRouter: React.FC = () => (
           />
           <Route path="/parent/payment" element={<PaymentConfirmationPage />} />
         </Route>
-
         {/* ── SCHOOL ROUTES ──────────────────────────────────────── */}
         <Route
           path="/school/dashboard"
@@ -271,14 +273,12 @@ const AppRouter: React.FC = () => (
             </ProtectedRoute>
           }
         />
-
         {/* ── ADMIN ROUTES ───────────────────────────────────────── */}
         {/* bare /admin → redirect to dashboard (ProtectedRoute will catch unauthenticated) */}
         <Route
           path="/admin"
           element={<Navigate to="/admin/dashboard" replace />}
         />
-
         <Route
           path="/admin/dashboard"
           element={
@@ -311,9 +311,13 @@ const AppRouter: React.FC = () => (
             </ProtectedRoute>
           }
         />
-
+        {/* ── FUNDING PARTNER (public) ────────────────────────── */}
+        <Route
+          path="/funding-partner/disbursement/:id"
+          element={<FundingPartnerDisbursementPage />}
+        />
         {/* ── CATCH-ALL ──────────────────────────────────────────── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />{" "}
       </Routes>
     </Suspense>
   </Router>

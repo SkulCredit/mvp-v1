@@ -273,7 +273,7 @@ const ParentDashboardPage: React.FC = () => {
                            rounded-2xl transition-all flex items-center justify-center gap-3
                            border border-white/20 shadow-md hover:shadow-lg hover:-translate-y-0.5"
               >
-                Start Loan Application
+                Start Application
                 <span className="px-2 py-0.5 bg-brand-light text-white text-[10px] uppercase tracking-wider rounded-md font-extrabold shadow-sm">
                   Apply Now
                 </span>

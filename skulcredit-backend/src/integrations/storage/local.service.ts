@@ -1,9 +1,8 @@
-
-import fs from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import env from '../../config/env';
-import logger from '../../config/logger';
+import fs from "fs";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
+import env from "../../config/env";
+import logger from "../../config/logger";
 
 class LocalStorageService {
   private readonly uploadsDir: string;
@@ -29,23 +28,23 @@ class LocalStorageService {
   saveFile(
     buffer: Buffer,
     originalName: string,
-    folder = 'documents',
+    folder = "documents",
   ): { filePath: string; publicUrl: string } {
     const folderDir = path.join(this.uploadsDir, folder);
     this.ensureDir(folderDir);
 
-    const ext      = path.extname(originalName).toLowerCase();
+    const ext = path.extname(originalName).toLowerCase();
     const safeName = path
       .basename(originalName, ext)
-      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .replace(/[^a-zA-Z0-9_-]/g, "_")
       .slice(0, 60);
     const fileName = `${uuidv4()}-${safeName}${ext}`;
-    const absPath  = path.join(folderDir, fileName);
+    const absPath = path.join(folderDir, fileName);
 
     fs.writeFileSync(absPath, buffer);
     logger.debug(`File saved: ${absPath}`);
-    const filePath  = path.join('uploads', folder, fileName).replace(/\\/g, '/');
-    const publicUrl = `${env.appUrl.replace(/\/$/, '')}/${filePath}`;
+    const filePath = path.join("uploads", folder, fileName).replace(/\\/g, "/");
+    const publicUrl = `/${filePath}`;
 
     return { filePath, publicUrl };
   }
@@ -58,7 +57,9 @@ class LocalStorageService {
         logger.debug(`File deleted: ${absPath}`);
       }
     } catch (err) {
-      logger.warn(`Failed to delete file ${filePath}: ${(err as Error).message}`);
+      logger.warn(
+        `Failed to delete file ${filePath}: ${(err as Error).message}`,
+      );
     }
   }
 }

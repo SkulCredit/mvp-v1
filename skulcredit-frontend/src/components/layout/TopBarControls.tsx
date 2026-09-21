@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../Icon";
 import { useAuth } from "../../context/AuthContext";
+import { useNotifications } from "../../context/NotificationContext";
+import { resolveUploadUrl } from "../../utils/uploadUrl";
 
 export interface Notification {
   id: string;
@@ -28,13 +30,25 @@ function useClickOutside(
   }, [ref, onClose]);
 }
 
-const NotificationDropdown: React.FC<{
-  notifications: Notification[];
-  unreadCount: number;
-}> = ({ notifications, unreadCount }) => {
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+const NotificationDropdown: React.FC = () => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useClickOutside(ref, () => setOpen(false));
+
+  const { notifications, unreadCount, loading, markRead, markAllRead } =
+    useNotifications();
 
   return (
     <div ref={ref} className="relative">
@@ -62,22 +76,31 @@ const NotificationDropdown: React.FC<{
       {open && (
         <div
           className="absolute right-0 mt-2 w-[340px] bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)]
-                     border border-slate-100 z-50 overflow-hidden">
+                     border border-slate-100 z-50 overflow-hidden"
+        >
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
             <span className="text-sm font-bold text-slate-800">
               Notifications
             </span>
             {unreadCount > 0 && (
-              <span className="px-2.5 py-0.5 bg-brand/10 text-brand text-xs font-bold rounded-full">
-                {unreadCount} new
-              </span>
+              <button
+                onClick={markAllRead}
+                className="text-xs font-semibold text-brand hover:underline transition-colors"
+              >
+                Mark all read
+              </button>
             )}
           </div>
+
           <ul
             className="divide-y divide-slate-50 overflow-y-auto scrollbar-brand"
             style={{ maxHeight: "340px" }}
           >
-            {notifications.length === 0 ? (
+            {loading ? (
+              <li className="px-5 py-8 flex justify-center">
+                <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+              </li>
+            ) : notifications.length === 0 ? (
               <li className="px-5 py-8 text-center text-sm text-slate-400">
                 You're all caught up!
               </li>
@@ -85,26 +108,33 @@ const NotificationDropdown: React.FC<{
               notifications.map((n) => (
                 <li
                   key={n.id}
-                  className="flex items-start gap-3 px-5 py-4 hover:bg-slate-50 transition-colors cursor-pointer"
+                  onClick={() => {
+                    if (!n.isRead) markRead(n.id);
+                  }}
+                  className={`flex items-start gap-3 px-5 py-4 transition-colors cursor-pointer
+                    ${n.isRead ? "hover:bg-slate-50" : "bg-brand/5 hover:bg-brand/10"}`}
                 >
                   <span
-                    className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${n.unread ? "bg-brand" : "bg-transparent"}`}
+                    className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
+                      !n.isRead ? "bg-brand" : "bg-transparent"
+                    }`}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-800 leading-snug">
                       {n.title}
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                      {n.body}
+                      {n.message}
                     </p>
                   </div>
                   <span className="text-[11px] text-slate-400 shrink-0 mt-0.5 whitespace-nowrap">
-                    {n.time}
+                    {timeAgo(n.createdAt)}
                   </span>
                 </li>
               ))
             )}
           </ul>
+
           {notifications.length > 0 && (
             <div className="border-t border-slate-100 px-5 py-3 text-center">
               <button
@@ -131,6 +161,7 @@ const UserDropdown: React.FC = () => {
 
   const name = user?.name ?? user?.firstName ?? "User";
   const email = user?.email ?? "";
+  const photo = resolveUploadUrl(user?.profilePhotoUrl);
   const initials = name
     .split(" ")
     .slice(0, 2)
@@ -143,12 +174,7 @@ const UserDropdown: React.FC = () => {
     navigate("/auth");
   };
 
-  const MENU_ITEMS: {
-    icon: string;
-    label: string;
-    onClick?: () => void;
-    danger?: boolean;
-  }[] = [
+  const MENU_ITEMS = [
     { icon: "user", label: "View Profile" },
     { icon: "settings", label: "Settings" },
     { icon: "headphones", label: "Help & Support" },
@@ -163,11 +189,21 @@ const UserDropdown: React.FC = () => {
         className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2
                    focus-visible:ring-brand/40 rounded-full"
       >
-        <div
-          className="w-9 h-9 rounded-full bg-brand flex items-center justify-center
-                     text-white shrink-0 shadow-sm select-none"
-        >
-          <Icon name="user" className="w-5 h-5" />
+        <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 shadow-sm select-none bg-brand flex items-center justify-center">
+          {photo ? (
+            <img
+              src={photo}
+              alt={name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <span className="text-white text-sm font-bold leading-none">
+              {initials || <Icon name="user" className="w-5 h-5 text-white" />}
+            </span>
+          )}
         </div>
         <Icon
           name="chevron-down"
@@ -180,9 +216,24 @@ const UserDropdown: React.FC = () => {
           className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)]
                      border border-slate-100 z-50 overflow-hidden py-1"
         >
-          <div className="px-4 py-3 border-b border-slate-100">
-            <p className="text-sm font-bold text-slate-800 truncate">{name}</p>
-            <p className="text-xs text-slate-400 truncate mt-0.5">{email}</p>
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-brand flex items-center justify-center">
+              {photo ? (
+                <img
+                  src={photo}
+                  alt={name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-white text-xs font-bold">{initials}</span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-800 truncate">
+                {name}
+              </p>
+              <p className="text-xs text-slate-400 truncate mt-0.5">{email}</p>
+            </div>
           </div>
           <ul className="py-1">
             {MENU_ITEMS.map(({ icon, label }) => (
@@ -217,17 +268,10 @@ const UserDropdown: React.FC = () => {
   );
 };
 
-const TopBarControls: React.FC<TopBarControlsProps> = ({
-  notifications = [],
-}) => {
-  const unreadCount = notifications.filter((n) => n.unread).length;
-
+const TopBarControls: React.FC<TopBarControlsProps> = () => {
   return (
     <div className="flex items-center gap-3">
-      <NotificationDropdown
-        notifications={notifications}
-        unreadCount={unreadCount}
-      />
+      <NotificationDropdown />
       <UserDropdown />
     </div>
   );

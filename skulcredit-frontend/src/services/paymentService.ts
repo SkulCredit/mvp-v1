@@ -1,8 +1,9 @@
-import apiClient from './apiClient';
+import apiClient from "./apiClient";
 
 export interface PaymentInitPayload {
   amount: number;
   metadata?: Record<string, unknown>;
+  callbackUrl?: string;
 }
 
 export interface PaymentInitResult {
@@ -12,10 +13,15 @@ export interface PaymentInitResult {
 }
 
 export const paymentService = {
-  initiatePayment: async ({ amount, metadata }: PaymentInitPayload): Promise<PaymentInitResult> => {
+  initiatePayment: async ({
+    amount,
+    metadata,
+    callbackUrl,
+  }: PaymentInitPayload): Promise<PaymentInitResult> => {
     const payload: Record<string, unknown> = { amount: Number(amount) };
     if (metadata !== undefined) payload.metadata = metadata;
-    const response = await apiClient.post('/payments/initialize', payload);
+    if (callbackUrl !== undefined) payload.callbackUrl = callbackUrl;
+    const response = await apiClient.post("/payments/initialize", payload);
     return response.data.data as PaymentInitResult;
   },
 

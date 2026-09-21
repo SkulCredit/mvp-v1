@@ -87,9 +87,29 @@ router.get(
  *       404:
  *         description: Institution type not found
  */
+router.get("/schools", catalogController.getSchools.bind(catalogController));
+
+/**
+ * @swagger
+ * /catalog/schools/{id}:
+ *   get:
+ *     summary: Get a single catalog school by ID
+ *     tags: [Catalog]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: School retrieved successfully
+ *       404:
+ *         description: School not found
+ */
 router.get(
-  "/schools",
-  catalogController.getSchools.bind(catalogController),
+  "/schools/:id",
+  catalogController.getSchoolById.bind(catalogController),
 );
 
 /**

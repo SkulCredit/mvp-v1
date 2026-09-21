@@ -1,11 +1,8 @@
-
-
 import { Op } from "sequelize";
 import CatalogInstitutionType from "../models/CatalogInstitutionType";
 import CatalogSchool from "../models/CatalogSchool";
 import CatalogSchoolClassLevel from "../models/CatalogSchoolClassLevel";
 import ApiError from "../utils/apiError";
-
 
 export interface InstitutionTypeDTO {
   id: string;
@@ -18,7 +15,12 @@ export interface SchoolDTO {
   name: string;
   isRegistered: boolean;
   tier: string | null;
+  serviceChargeRate: number | null;
   serviceChargeDisplay: string | null;
+}
+
+export interface SchoolDetailDTO extends SchoolDTO {
+  // same as SchoolDTO, exposed separately for the /catalog/schools/:id endpoint
 }
 
 export interface ClassLevelGroup {
@@ -27,7 +29,6 @@ export interface ClassLevelGroup {
 }
 
 class CatalogService {
-
   async getInstitutionTypes(): Promise<InstitutionTypeDTO[]> {
     const types = await CatalogInstitutionType.findAll({
       order: [["sortOrder", "ASC"]],
@@ -42,7 +43,7 @@ class CatalogService {
   }
 
   /**
-   * @param institutionTypeId  
+   * @param institutionTypeId
    */
   async getSchoolsByInstitutionType(
     institutionTypeId: string,
@@ -79,6 +80,9 @@ class CatalogService {
       name: s.name,
       isRegistered: s.isRegistered,
       tier: s.tier,
+      serviceChargeRate: s.serviceChargeRate
+        ? Number(s.serviceChargeRate)
+        : null,
       serviceChargeDisplay: s.serviceChargeRate
         ? `${(Number(s.serviceChargeRate) * 100).toFixed(1)}%`
         : null,
@@ -149,6 +153,28 @@ class CatalogService {
     }
 
     return result;
+  }
+
+  async getSchoolById(schoolId: string): Promise<SchoolDetailDTO> {
+    const school = await CatalogSchool.findOne({
+      where: { id: schoolId, isActive: true },
+      attributes: ["id", "name", "isRegistered", "tier", "serviceChargeRate"],
+    });
+
+    if (!school) throw new ApiError(404, "School not found");
+
+    return {
+      id: school.id,
+      name: school.name,
+      isRegistered: school.isRegistered,
+      tier: school.tier,
+      serviceChargeRate: school.serviceChargeRate
+        ? Number(school.serviceChargeRate)
+        : null,
+      serviceChargeDisplay: school.serviceChargeRate
+        ? `${(Number(school.serviceChargeRate) * 100).toFixed(1)}%`
+        : null,
+    };
   }
 }
 
