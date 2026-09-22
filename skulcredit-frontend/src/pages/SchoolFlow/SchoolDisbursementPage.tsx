@@ -209,6 +209,7 @@ const DisbursementDetail: React.FC<{ row: DisbRow; onBack: () => void }> = ({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const SchoolDisbursementPage: React.FC = () => {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [detail, setDetail] = useState<DisbRow | null>(null);
@@ -224,11 +225,19 @@ const SchoolDisbursementPage: React.FC = () => {
   });
 
   return (
-    <DashboardLayout sidebar={<SchoolSidebar />} header={<SchoolTopBar />}>
+    <DashboardLayout
+      sidebar={
+        <SchoolSidebar
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
+        />
+      }
+      header={<SchoolTopBar onMobileMenuOpen={() => setMobileNavOpen(true)} />}
+    >
       {detail ? (
         <DisbursementDetail row={detail} onBack={() => setDetail(null)} />
       ) : (
-        <div className="max-w-3xl mx-auto pt-8 space-y-6 animate-fade-in-up">
+        <div className="pt-8 space-y-6 animate-fade-in-up w-[90%] mx-auto">
           {/* Summary card */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
             <h1 className="text-lg font-bold text-slate-900">Disbursement</h1>

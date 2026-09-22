@@ -141,7 +141,16 @@ export const schoolRequestSchema = z.object({
 export const submitWizardApplicationJsonSchema = z.object({
   body: z.object({
     childId: z.string().min(1, "childId is required"),
-    schoolId: z.string().uuid("schoolId must be a valid UUID"),
+    schoolId: z
+      .string()
+      .refine(
+        (v) =>
+          v === "manual" ||
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            v,
+          ),
+        { message: "schoolId must be a valid UUID or 'manual'" },
+      ),
     institutionTypeId: z
       .string()
       .uuid("institutionTypeId must be a valid UUID"),
@@ -151,7 +160,7 @@ export const submitWizardApplicationJsonSchema = z.object({
       (v) => (typeof v === "string" ? parseFloat(v) : v),
       z.number().nonnegative("Tuition amount must be 0 or greater"),
     ),
-    repaymentPlanId: z.enum(["full", "3month", "6month"]),
+    repaymentPlanId: z.enum(["full", "3month", "4month", "6month"]),
     tenor: z.preprocess(
       (v) => (typeof v === "string" ? parseInt(v as string, 10) : v),
       z.number().int().positive("Tenor must be a positive integer"),

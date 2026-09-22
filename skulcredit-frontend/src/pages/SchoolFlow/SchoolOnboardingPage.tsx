@@ -5,30 +5,22 @@ import { schoolService } from "../../services/schoolService";
 import apiClient from "../../services/apiClient";
 import { AxiosError } from "axios";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 interface FormData {
-  // School Information
   schoolName: string;
   yearFounded: string;
   population: string;
   schoolType: string;
-  // Location Details
   address: string;
   cityLga: string;
   state: string;
-  // Contact Information
   principalName: string;
   officialEmail: string;
   phoneNumber: string;
   altPhoneNumber: string;
-  // Government Approval & Accreditation
   regNumber: string;
   accreditationType: string;
   accreditationBody: string;
 }
-
-// ── Shared small components ───────────────────────────────────────────────────
 
 const inputCls =
   "w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 " +
@@ -59,8 +51,6 @@ const SectionCard: React.FC<{
     {children}
   </div>
 );
-
-// ── File upload component ─────────────────────────────────────────────────────
 
 interface FileUploadProps {
   label: string;
@@ -127,8 +117,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   );
 };
 
-// ── Success modal (shown after completeRegistration succeeds) ────────────────
-
 const SuccessModal: React.FC<{ onDashboard: () => void }> = ({
   onDashboard,
 }) => (
@@ -174,8 +162,6 @@ const SuccessModal: React.FC<{ onDashboard: () => void }> = ({
     </div>
   </div>
 );
-
-// ── Main page ─────────────────────────────────────────────────────────────────
 
 const SchoolOnboardingPage: React.FC = () => {
   const navigate = useNavigate();

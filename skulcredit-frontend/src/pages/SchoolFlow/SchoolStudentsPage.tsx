@@ -95,6 +95,7 @@ const STATUS_CLS: Record<StatusKey, string> = {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 const SchoolStudentsPage: React.FC = () => {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [level, setLevel] = useState<Level>("All");
 
@@ -111,8 +112,16 @@ const SchoolStudentsPage: React.FC = () => {
   });
 
   return (
-    <DashboardLayout sidebar={<SchoolSidebar />} header={<SchoolTopBar />}>
-      <div className="max-w-3xl mx-auto pt-8 space-y-6 animate-fade-in-up">
+    <DashboardLayout
+      sidebar={
+        <SchoolSidebar
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
+        />
+      }
+      header={<SchoolTopBar onMobileMenuOpen={() => setMobileNavOpen(true)} />}
+    >
+      <div className="pt-8 space-y-6 animate-fade-in-up w-[90%] mx-auto">
         {/* Filter + search card */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
           <div>

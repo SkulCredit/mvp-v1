@@ -20,8 +20,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (sessionState === "unauthenticated") {
-    // Admin routes → admin login page; everything else → /auth
-    // Preserve the intended destination so login can redirect back
     const isAdminRoute = location.pathname.startsWith("/admin");
     const isSchoolRoute =
       location.pathname.startsWith("/school") ||

@@ -11,10 +11,6 @@ import {
 } from "../../services/parentService";
 import apiClient from "../../services/apiClient";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
-
 interface Child {
   id: string;
   firstName: string;
@@ -23,7 +19,6 @@ interface Child {
   schoolName?: string;
   schoolId?: string;
   photo?: string;
-  /** Tuition amount from the student record — used to pre-fill repayment plans */
   tuitionAmount?: number;
 }
 
@@ -53,18 +48,13 @@ interface TuitionDetails {
   gradeLevel: string;
   tuitionAmount: number;
   repaymentPlanId: "3month" | "4month";
-  academicSession: string; // e.g. "2026/2027"
-  term: string; // e.g. "First Term"
-  termId: string; // academic_terms.id (UUID) — sent to backend
-  /** Set when the parent enters a school manually (not in catalog) */
+  academicSession: string; 
+  term: string; 
+  termId: string; 
   isManualSchool?: boolean;
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
 
 const MOCK_CHILDREN: Child[] = [
   {
@@ -133,7 +123,6 @@ const TERMS = [
   "Second Semester",
 ];
 
-// Fallback display amount when a child has no tuitionAmount on record yet
 const FALLBACK_TUITION_AMOUNT = 450_000;
 
 const STEPS: { label: string; short: string }[] = [
@@ -143,10 +132,6 @@ const STEPS: { label: string; short: string }[] = [
   { label: "Review", short: "Review" },
   { label: "Submit", short: "Submit" },
 ];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 const fmt = (n: number) =>
   "₦" +
@@ -180,10 +165,6 @@ function tenorFromPlanId(id: "3month" | "4month"): number {
   if (id === "4month") return 4;
   return 3;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Stepper — shows short labels on mobile, full labels on sm+
-// ─────────────────────────────────────────────────────────────────────────────
 
 const Stepper: React.FC<{ current: Step; completedChild?: Child | null }> = ({
   current,
@@ -237,7 +218,6 @@ const Stepper: React.FC<{ current: Step; completedChild?: Child | null }> = ({
                 num
               )}
             </div>
-            {/* Short label on mobile, full label on sm+ */}
             <span
               className={`text-[9px] sm:text-[11px] font-semibold text-center leading-tight w-full truncate ${
                 active
@@ -261,10 +241,6 @@ const Stepper: React.FC<{ current: Step; completedChild?: Child | null }> = ({
     })}
   </div>
 );
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NavBar — fixed bottom bar, stacks gracefully on small screens
-// ─────────────────────────────────────────────────────────────────────────────
 
 const NavBar: React.FC<{
   onBack: () => void;
@@ -360,10 +336,6 @@ const NavBar: React.FC<{
     </div>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 1 — Select Child
-// ─────────────────────────────────────────────────────────────────────────────
 
 const StepSelectChild: React.FC<{
   children: Child[];
@@ -550,14 +522,9 @@ const StepSelectChild: React.FC<{
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 2 — Select School
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Data collected when a parent manually enters a school not in the catalog */
 interface ManualSchoolData {
   schoolName: string;
-  contact: string; // email or phone of a school person in charge
+  contact: string; 
   bankName?: string;
   accountNumber?: string;
   accountName?: string;
@@ -600,14 +567,12 @@ const StepSelectSchool: React.FC<{
   onInstitutionTypeChange: (id: string, name: string) => void;
   onSchoolChange: (id: string, name: string) => void;
   onGradeLevelChange: (level: string) => void;
-  // ── session / term ───────────────────────────────────────
   sessions: AcademicSessionSummary[];
   loadingSessions: boolean;
   selectedSessionName: string;
   selectedTermId: string;
   onSessionChange: (sessionName: string) => void;
   onTermChange: (termId: string, termName: string) => void;
-  // ── manual school ────────────────────────────────────────
   onManualSchoolSubmit: (data: ManualSchoolData) => void;
   manualSchoolPending: boolean;
 }> = ({
@@ -638,7 +603,6 @@ const StepSelectSchool: React.FC<{
   );
   const availableTerms: AcademicTermSummary[] = activeSession?.terms ?? [];
 
-  // Manual school form state
   const [showManualForm, setShowManualForm] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualContact, setManualContact] = useState("");
@@ -1056,10 +1020,6 @@ const StepSelectSchool: React.FC<{
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 3 — Session / Term selection
-// ─────────────────────────────────────────────────────────────────────────────
-
 const sessionSelectCls =
   "w-full rounded-2xl border border-gray-200 bg-slate-50/50 px-4 py-3 text-sm text-gray-800 " +
   "outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/10 transition-all cursor-pointer " +
@@ -1212,17 +1172,11 @@ const StepSelectSessionTerm: React.FC<{
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 4 — Tuition Details (was Step 3)
-// ─────────────────────────────────────────────────────────────────────────────
-
 const StepTuitionDetails: React.FC<{
-  /** Actual tuition amount from the selected child's record */
   tuitionAmount: number;
   selectedPlanId: "3month" | "4month" | null;
   onSelectPlan: (id: "3month" | "4month") => void;
 }> = ({ tuitionAmount, selectedPlanId, onSelectPlan }) => {
-  // Use child's tuition amount, fall back to ₦450,000 for display when 0
   const amount = tuitionAmount > 0 ? tuitionAmount : FALLBACK_TUITION_AMOUNT;
   const plans = buildRepaymentPlans(amount);
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null;
@@ -1314,10 +1268,6 @@ const StepTuitionDetails: React.FC<{
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 4 — Review
-// ─────────────────────────────────────────────────────────────────────────────
-
 const ReviewRow: React.FC<{
   label: string;
   value: string;
@@ -1365,7 +1315,7 @@ const StepReview: React.FC<{
   );
   const planLabel = selectedPlan?.label ?? tuitionDetails.repaymentPlanId;
 
-  // Fetch school tier + service charge rate from backend
+
   const [schoolDetail, setSchoolDetail] = useState<{
     tier: string | null;
     serviceChargeRate: number | null;
@@ -1382,11 +1332,9 @@ const StepReview: React.FC<{
         if (d) setSchoolDetail(d);
       })
       .catch(() => {
-        /* non-critical — won't block submit */
       });
   }, [tuitionDetails.schoolId, tuitionDetails.isManualSchool]);
 
-  // Service charge from backend snapshot (if available), else fall back to plan fee rate
   const backendServiceChargeRate = schoolDetail?.serviceChargeRate ?? null;
   const displayServiceCharge =
     backendServiceChargeRate !== null
@@ -1507,10 +1455,6 @@ const StepReview: React.FC<{
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 5 — Confirmation
-// ─────────────────────────────────────────────────────────────────────────────
-
 const StepConfirmation: React.FC<{
   child: Child | null;
   tuitionDetails: TuitionDetails;
@@ -1584,7 +1528,6 @@ const StepConfirmation: React.FC<{
           </div>
         </div>
 
-        {/* CTA — stacks on very small screens */}
         <div className="flex flex-col xs:flex-row gap-2.5 sm:gap-3">
           <button
             type="button"
@@ -1605,10 +1548,6 @@ const StepConfirmation: React.FC<{
     </div>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Toast
-// ─────────────────────────────────────────────────────────────────────────────
 
 const Toast: React.FC<{
   message: string;
@@ -1666,10 +1605,6 @@ const Toast: React.FC<{
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Page
-// ─────────────────────────────────────────────────────────────────────────────
-
 const StudentDetailsPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -1687,15 +1622,12 @@ const StudentDetailsPage: React.FC = () => {
   }, []);
   const dismissToast = useCallback(() => setToastVisible(false), []);
 
-  // ── Step 1: child ──────────────────────────────────────────────────────────
   const [children, setChildren] = useState<Child[]>(MOCK_CHILDREN);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [blockedStudentIds, setBlockedStudentIds] = useState<Set<string>>(
     new Set(),
   );
 
-  // Compute which student IDs already have an active application this term
-  // Term window mirrors backend: Term1=Jan-Apr, Term2=May-Aug, Term3=Sep-Dec
   useEffect(() => {
     parentService
       .getApplications()
@@ -1724,7 +1656,6 @@ const StudentDetailsPage: React.FC = () => {
         setBlockedStudentIds(blocked);
       })
       .catch(() => {
-        /* silent — don't break the wizard if this fails */
       });
   }, []);
 
@@ -1735,8 +1666,6 @@ const StudentDetailsPage: React.FC = () => {
         const raw = Array.isArray(data) ? data : [];
         if (raw.length === 0) return;
 
-        // The API returns students with a nested `school` object.
-        // Normalize into the flat Child shape the component expects.
         const normalized: Child[] = (
           raw as Array<{
             id: string;
@@ -1755,19 +1684,17 @@ const StudentDetailsPage: React.FC = () => {
           tuitionAmount: s.tuitionAmount ?? 0,
           schoolId: s.school?.id ?? s.schoolId,
           schoolName: s.school?.schoolName,
-          photo: undefined, // Student model has no photo field
+          photo: undefined, 
         }));
 
         setChildren(normalized);
       })
       .catch(() => {
-        // Keep mock children as fallback so UI doesn't go blank
       });
   }, []);
 
   const selectedChild = children.find((c) => c.id === selectedChildId) ?? null;
 
-  // ── Step 2: school ─────────────────────────────────────────────────────────
   const [institutionTypes, setInstitutionTypes] = useState<
     CatalogInstitutionType[]
   >([]);
@@ -1787,8 +1714,6 @@ const StudentDetailsPage: React.FC = () => {
   >([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
   const [selectedGradeLevel, setSelectedGradeLevel] = useState("");
-
-  // Unused but kept to avoid breaking imports
   const [_schools] = useState<School[]>(MOCK_SCHOOLS);
   void _schools;
   void ACADEMIC_SESSIONS;
@@ -1832,14 +1757,12 @@ const StudentDetailsPage: React.FC = () => {
       .finally(() => setLoadingClasses(false));
   }, [selectedSchoolId, selectedInstitutionTypeId, showToast]);
 
-  // ── Step 3: session / term ─────────────────────────────────────────────────
   const [sessions, setSessions] = useState<AcademicSessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [selectedSessionName, setSelectedSessionName] = useState("");
   const [selectedTermId, setSelectedTermId] = useState("");
   const [selectedTermName, setSelectedTermName] = useState("");
 
-  // Load sessions when entering step 2 (they're now inline in StepSelectSchool)
   useEffect(() => {
     if (step !== 2) return;
     setLoadingSessions(true);
@@ -1847,11 +1770,9 @@ const StudentDetailsPage: React.FC = () => {
       .getSessions()
       .then((data) => {
         setSessions(data);
-        // Auto-select current session
         const current = data.find((s) => s.isCurrent);
         if (current && !selectedSessionName) {
           setSelectedSessionName(current.sessionName);
-          // Auto-select the active term if there is one
           const activeTerm = current.terms.find(
             (t) => t.status === "ACTIVE_APPLICATION",
           );
@@ -1863,21 +1784,15 @@ const StudentDetailsPage: React.FC = () => {
       })
       .catch(() => showToast("Failed to load academic sessions."))
       .finally(() => setLoadingSessions(false));
-  }, [step, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, showToast]); 
 
-  // ── Step 4: repayment plan + tuition amount ────────────────────────────────
   const [selectedPlanId, setSelectedPlanId] = useState<
     "3month" | "4month" | null
   >(null);
 
-  // ── Manual school (Task 1) ─────────────────────────────────────────────────
   const [isManualSchool, setIsManualSchool] = useState(false);
   const [manualSchoolPending, setManualSchoolPending] = useState(false);
-
-  // ── Step 5: result ─────────────────────────────────────────────────────────
   const [submittedRef, setSubmittedRef] = useState("");
-
-  // Tuition amount from the selected child — falls back to 0 (shown as ₦450,000 on cards)
   const childTuitionAmount = selectedChild?.tuitionAmount ?? 0;
 
   const tuitionDetails: TuitionDetails = {
@@ -1895,7 +1810,6 @@ const StudentDetailsPage: React.FC = () => {
     isManualSchool,
   };
 
-  // ── Navigation ─────────────────────────────────────────────────────────────
   const handleBack = (): void => {
     if (step > 1) {
       setStep((s) => (s - 1) as Step);
@@ -1910,7 +1824,6 @@ const StudentDetailsPage: React.FC = () => {
     async (data: ManualSchoolData) => {
       setManualSchoolPending(true);
       try {
-        // Submit school request to backend
         await parentService.requestSchool({
           schoolName: data.schoolName,
           schoolAddress: data.location,
@@ -1924,12 +1837,10 @@ const StudentDetailsPage: React.FC = () => {
             ? `Bank: ${data.bankName}, Account: ${data.accountNumber ?? "N/A"}, Account Name: ${data.accountName ?? "N/A"}`
             : undefined,
         });
-        // Use a sentinel schoolId for manual schools, set grade from the form
         setSelectedSchoolId("manual");
         setSelectedSchoolName(data.schoolName);
         setSelectedGradeLevel(data.gradeLevel);
         setIsManualSchool(true);
-        // Advance to next step
         setStep(3);
       } catch {
         showToast("Failed to save school details. Please try again.");
@@ -2000,7 +1911,7 @@ const StudentDetailsPage: React.FC = () => {
         showToast("Please select institution type, school, and class.");
         return;
       }
-      if (!selectedSessionName || !selectedTermId) {
+      if (!isManualSchool && (!selectedSessionName || !selectedTermId)) {
         showToast("Please select an academic session and term.");
         return;
       }
@@ -2041,7 +1952,6 @@ const StudentDetailsPage: React.FC = () => {
   const continueLabel = step === 4 ? "Submit Application" : "Continue";
 
   return (
-    /* Full-width on mobile, constrained + centered on desktop */
     <div className="pb-24 pt-4 sm:pt-6 animate-fade-in-up px-4 sm:px-6 w-full">
       <Toast
         message={toastMsg}

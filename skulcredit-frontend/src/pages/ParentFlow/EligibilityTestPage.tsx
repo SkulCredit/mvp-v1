@@ -442,7 +442,6 @@ interface Step2Data {
   ninStatus: "idle" | "verifying" | "verified" | "error";
   ninData: NinVerificationData | null;
   selectedDocType: string;
-  /** Visible when doc type is Bank Statement or Employment Letter */
   employerName: string;
   companyName: string;
   pendingFile: File | null;
@@ -450,11 +449,11 @@ interface Step2Data {
 }
 
 interface Step3Data {
-  institutionTypeId: string; // UUID from catalog API
-  institutionType: string; // display name
-  schoolId: string; // UUID from catalog API
-  schoolName: string; // display name
-  gradeLevel: string; // class name string (display value)
+  institutionTypeId: string; 
+  institutionType: string; 
+  schoolId: string; 
+  schoolName: string; 
+  gradeLevel: string; 
   repaymentPlan: string;
   academicSession: string;
   tuitionAmount: string;
@@ -507,8 +506,6 @@ interface EligibilityProfile {
 }
 
 type PageMode = "loading" | "wizard" | "blocked" | "review";
-
-// ── Shared components ─────────────────────────────────────────────────────────
 
 const Field: React.FC<{
   label: string;
@@ -769,7 +766,6 @@ const EligibilityTestPage: React.FC = () => {
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // ── Catalog state ─────────────────────────────────────────────────────────
   const [institutionTypes, setInstitutionTypes] = useState<
     CatalogInstitutionType[]
   >([]);
@@ -848,7 +844,6 @@ const EligibilityTestPage: React.FC = () => {
       return n;
     });
 
-  // ── Catalog: fetch institution types when entering step 3 ────────────────
   useEffect(() => {
     if (state.step !== 2) return;
     setLoadingTypes(true);
@@ -861,7 +856,6 @@ const EligibilityTestPage: React.FC = () => {
       .finally(() => setLoadingTypes(false));
   }, [state.step]);
 
-  // ── Catalog: fetch schools when an institution type is chosen ────────────
   useEffect(() => {
     if (!state.step3.institutionTypeId) {
       setSchools([]);
@@ -876,7 +870,6 @@ const EligibilityTestPage: React.FC = () => {
       .finally(() => setLoadingSchools(false));
   }, [state.step3.institutionTypeId]);
 
-  // ── Catalog: fetch class levels when a school is chosen ──────────────────
   useEffect(() => {
     if (!state.step3.schoolId || !state.step3.institutionTypeId) {
       setClassLevelGroups([]);
@@ -1043,17 +1036,11 @@ const EligibilityTestPage: React.FC = () => {
 
   const submitStep2 = async (): Promise<boolean> => {
     if (!validateStep2()) return false;
-
-    // ── Lendsqr loan-score / karma check ──────────────────────────────────
-    // Run before allowing the parent to proceed to school/student steps.
     const bvnToCheck =
       state.step2.bvnOrNin === "bvn"
         ? state.step2.bvn.trim()
         : ((state.step2.ninData as { bvn?: string } | null)?.bvn ?? "");
 
-    // If we have a BVN (either entered directly or returned from NIN lookup),
-    // run the score check.  If there is no BVN available (NIN-only flow where
-    // the Lendsqr NIN response didn't return a BVN) we skip and continue.
     if (bvnToCheck && /^\d{11}$/.test(bvnToCheck)) {
       patch("isScoreChecking", true);
       try {
@@ -1073,7 +1060,6 @@ const EligibilityTestPage: React.FC = () => {
         const { pass } = res.data.data;
 
         if (!pass) {
-          // Show the block modal — user cannot proceed
           setState((prev) => ({
             ...prev,
             isScoreChecking: false,
@@ -1082,9 +1068,7 @@ const EligibilityTestPage: React.FC = () => {
           return false;
         }
       } catch {
-        // Score endpoint error — non-fatal, allow the parent to continue
-        // (backend logs the failure; we don't block legitimate users due
-        // to a transient 3rd-party outage)
+
       } finally {
         patch("isScoreChecking", false);
       }
@@ -1122,12 +1106,9 @@ const EligibilityTestPage: React.FC = () => {
           step1: { ...prev.step1, photoUrl, photoUploading: false },
         }));
       }
-
-      // ── 2. Upload any staged documents and collect their URLs ─────────────
       const uploadedDocUrls: Array<{ url: string; type_id: number }> = [];
       for (const doc of state.step2.uploadedDocs) {
         if ((doc as unknown as { url?: string }).url) {
-          // already uploaded in a previous attempt
           uploadedDocUrls.push({
             url: (doc as unknown as { url: string }).url,
             type_id: 1,
@@ -1143,8 +1124,6 @@ const EligibilityTestPage: React.FC = () => {
           uploadedDocUrls.push({ url: docRes.data.data.url, type_id: 1 });
         }
       }
-
-      // ── 3. Save parent profile ────────────────────────────────────────────
       await apiClient.put("/parents/profile", {
         dob: state.step1.dob,
         addressStreet: state.step1.addressStreet,
@@ -1154,7 +1133,6 @@ const EligibilityTestPage: React.FC = () => {
         profilePhotoUrl: photoUrl || undefined,
       });
 
-      // ── 4. Submit KYC (BVN or NIN) ────────────────────────────────────────
       const kycPayload =
         state.step2.bvnOrNin === "bvn"
           ? {
@@ -1188,15 +1166,11 @@ const EligibilityTestPage: React.FC = () => {
 
       await parentService.verifyKYC(kycPayload);
 
-      // ── 5. Save each student from step 4 ─────────────────────────────────
-      // Students are saved with parentId (set server-side from the auth token)
-      // and the schoolId from step 3.  tuitionAmount defaults to 0 here —
-      // the parent will set the actual amount when applying via /parent/details.
       const tuitionAmountNum = parseFloat(state.step3.tuitionAmount) || 0;
       const studentSaveErrors: string[] = [];
 
       for (const st of state.step4.students) {
-        if (!st.fullName.trim()) continue; // skip blank rows
+        if (!st.fullName.trim()) continue; 
         const nameParts = st.fullName.trim().split(/\s+/);
         const firstName = nameParts[0] ?? "";
         const lastName = nameParts.slice(1).join(" ") || firstName;
@@ -1211,7 +1185,6 @@ const EligibilityTestPage: React.FC = () => {
             tuitionAmount: tuitionAmountNum,
           });
         } catch (err) {
-          // Log individual failures but don't abort — other students can still save
           studentSaveErrors.push(
             `${st.fullName}: ${(err as { message?: string }).message ?? "Save failed"}`,
           );
@@ -1219,7 +1192,6 @@ const EligibilityTestPage: React.FC = () => {
       }
 
       if (studentSaveErrors.length > 0) {
-        // Non-fatal — KYC succeeded, just warn about the student saves
         showToast(
           `KYC submitted. Some students could not be saved: ${studentSaveErrors.join("; ")}`,
         );
@@ -1279,11 +1251,6 @@ const EligibilityTestPage: React.FC = () => {
       ...state.step4,
       students: state.step4.students.filter((_, idx) => idx !== i),
     });
-
-  // ── Score-blocked modal ───────────────────────────────────────────────────
-  // Shown when the Lendsqr karma/score check returns pass=false.
-  // The parent's account has been deactivated server-side; we show a clear
-  // message and redirect them to the dashboard after they dismiss.
 
   if (pageMode === "loading") {
     return (
@@ -1663,7 +1630,6 @@ const EligibilityTestPage: React.FC = () => {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
         <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
-          {/* Red header band */}
           <div className="bg-[#8B1C53] px-6 py-6 text-white text-center">
             <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white/20">
               <svg
@@ -1685,8 +1651,6 @@ const EligibilityTestPage: React.FC = () => {
               Credit Score Too Low
             </h2>
           </div>
-
-          {/* Body */}
           <div className="px-6 py-6 text-center">
             <p className="text-sm text-gray-700 leading-relaxed">
               Unfortunately, your credit score does not meet the minimum
@@ -1711,8 +1675,6 @@ const EligibilityTestPage: React.FC = () => {
               </ul>
             </div>
           </div>
-
-          {/* Footer */}
           <div className="px-6 pb-6">
             <button
               type="button"
@@ -1778,7 +1740,6 @@ const EligibilityTestPage: React.FC = () => {
     );
   }
 
-  // ── Wizard render ─────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col min-h-full animate-fade-in-up">
@@ -1790,8 +1751,6 @@ const EligibilityTestPage: React.FC = () => {
 
       <div className="w-full max-w-2xl mx-auto rounded-2xl border border-gray-200 bg-white px-6 sm:px-10 py-8 mt-8 mb-12">
         <StepIndicator current={state.step} />
-
-        {/* ── STEP 1 — Parent/Guardian Information ── */}
         {state.step === 0 && (
           <div className="flex flex-col gap-6 animate-fade-in-up">
             <div>
@@ -1803,10 +1762,7 @@ const EligibilityTestPage: React.FC = () => {
                 Let's start with your parent/guardian details.
               </p>
             </div>
-
-            {/* ── Personal details ── */}
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
-              {/* Full Name (read-only) */}
               <Field
                 label="Full Name"
                 hint="Auto-filled from signup and cannot be edited"
@@ -1817,8 +1773,6 @@ const EligibilityTestPage: React.FC = () => {
                   className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500 cursor-not-allowed"
                 />
               </Field>
-
-              {/* Email (read-only) */}
               <Field
                 label="Email Address"
                 hint="We'll use this email to send you updates about your application."
@@ -1829,8 +1783,6 @@ const EligibilityTestPage: React.FC = () => {
                   className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500 cursor-not-allowed"
                 />
               </Field>
-
-              {/* Phone */}
               <Field
                 label="Phone Number"
                 required
@@ -1851,8 +1803,6 @@ const EligibilityTestPage: React.FC = () => {
                   }}
                 />
               </Field>
-
-              {/* Date of Birth */}
               <Field
                 label="Date of Birth"
                 required
@@ -1876,8 +1826,6 @@ const EligibilityTestPage: React.FC = () => {
                   className={inputCls(errors.dob)}
                 />
               </Field>
-
-              {/* Relationship to Student */}
               <Field
                 label="Relationship to Student"
                 required
@@ -1896,8 +1844,6 @@ const EligibilityTestPage: React.FC = () => {
                 />
               </Field>
             </div>
-
-            {/* ── Photo upload ── */}
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
               <div>
                 <p className="text-sm font-semibold text-gray-800">
@@ -1909,7 +1855,6 @@ const EligibilityTestPage: React.FC = () => {
               </div>
 
               {state.step1.photoPreview ? (
-                /* Preview — file selected locally, will upload on final submit */
                 <div className="flex items-center gap-4">
                   <div className="relative h-20 w-20 rounded-full overflow-hidden border-2 border-[#8B1C53]/30 shrink-0">
                     <img
@@ -1965,7 +1910,7 @@ const EligibilityTestPage: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                /* Drop zone */
+  
                 <div
                   className={`rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 py-8 cursor-pointer transition-colors border-gray-300 hover:border-[#8B1C53]/50 bg-white ${errors.photo ? "border-red-400 bg-red-50" : ""}`}
                   onClick={() => photoFileInputRef.current?.click()}
@@ -2162,8 +2107,6 @@ const EligibilityTestPage: React.FC = () => {
                   </p>
                 )}
               </Field>
-
-              {/* City */}
               <Field label="City / Town" required error={errors.addressCity}>
                 <div
                   className={`[&_.stdropdown-container]:w-full [&_.stdropdown-container]:!rounded-lg [&_.stdropdown-container]:!border [&_.stdropdown-container]:!border-gray-200 [&_.stdropdown-container]:!bg-white [&_.stdropdown-container:hover]:!border-gray-300 [&_.stdropdown-container:focus-within]:!border-[#8B1C53] [&_.stdropdown-container:focus-within]:!ring-2 [&_.stdropdown-container:focus-within]:!ring-[#8B1C53]/20 [&_.stdropdown-input]:!w-full [&_.stdropdown-input]:px-3 [&_.stdropdown-input]:py-2.5 [&_.stdropdown-input_input]:!w-full [&_.stdropdown-input_input]:!border-none [&_.stdropdown-input_input]:!rounded-none [&_.stdropdown-input_input]:!shadow-none [&_.stdropdown-input_input]:!outline-none [&_.stdropdown-input_input]:!ring-0 [&_.stdropdown-input_input]:!bg-transparent [&_.stdropdown-input_input]:!p-0 [&_.stdropdown-input_input]:text-sm ${errors.addressCity ? "[&_.stdropdown-container]:!border-red-400" : ""}`}
@@ -2196,8 +2139,6 @@ const EligibilityTestPage: React.FC = () => {
                   </p>
                 )}
               </Field>
-
-              {/* LGA — free text, relevant mainly for Nigeria */}
               <Field
                 label="Local Government Area (LGA)"
                 error={errors.addressLga}
@@ -2217,7 +2158,6 @@ const EligibilityTestPage: React.FC = () => {
                 />
               </Field>
 
-              {/* Street address */}
               <Field
                 label="Street Address"
                 required
@@ -2241,7 +2181,6 @@ const EligibilityTestPage: React.FC = () => {
           </div>
         )}
 
-        {/* ── STEP 2 — BVN/NIN & Credit Verification ── */}
         {state.step === 1 && (
           <div className="flex flex-col gap-6 animate-fade-in-up">
             <div>
@@ -2252,10 +2191,7 @@ const EligibilityTestPage: React.FC = () => {
                 Verify your identity and upload required documents
               </p>
             </div>
-
-            {/* Identity card */}
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
-              {/* Header */}
               <div className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200">
                   <svg
@@ -2278,8 +2214,6 @@ const EligibilityTestPage: React.FC = () => {
               <p className="text-xs text-gray-500 -mt-2">
                 Verify your identity using your BVN or NIN for faster processing
               </p>
-
-              {/* Tab toggle */}
               <div className="flex rounded-lg border border-gray-200 overflow-hidden">
                 {(["bvn", "nin"] as const).map((tab) => (
                   <button
@@ -2299,8 +2233,6 @@ const EligibilityTestPage: React.FC = () => {
                   </button>
                 ))}
               </div>
-
-              {/* ── BVN tab — no Verify button ── */}
               {state.step2.bvnOrNin === "bvn" && (
                 <Field
                   label="Bank Verification Number (BVN)"
@@ -2385,8 +2317,6 @@ const EligibilityTestPage: React.FC = () => {
                   )}
                 </Field>
               )}
-
-              {/* ── NIN tab — Verify button wired to backend ── */}
               {state.step2.bvnOrNin === "nin" && (
                 <Field
                   label="National Identification Number (NIN)"
@@ -2448,8 +2378,6 @@ const EligibilityTestPage: React.FC = () => {
                   <p className="text-xs text-gray-400 mt-1">
                     11-digit NIN from your NIMC slip or National ID card
                   </p>
-
-                  {/* NIN verified result card */}
                   {state.step2.ninStatus === "verified" &&
                     state.step2.ninData && (
                       <div className="mt-3 rounded-xl border border-green-200 bg-green-50 p-4 flex flex-col gap-2">
@@ -2509,8 +2437,6 @@ const EligibilityTestPage: React.FC = () => {
                         </div>
                       </div>
                     )}
-
-                  {/* NIN error state */}
                   {state.step2.ninStatus === "error" && (
                     <p className="text-xs text-red-500 mt-1">
                       Verification failed. Please check your NIN and try again.
@@ -2519,8 +2445,6 @@ const EligibilityTestPage: React.FC = () => {
                 </Field>
               )}
             </div>
-
-            {/* Upload documents card */}
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-gray-800">
@@ -2534,8 +2458,6 @@ const EligibilityTestPage: React.FC = () => {
                 Choose a document type, then upload the file. We accept PDF,
                 JPG, or PNG.
               </p>
-
-              {/* Document type dropdown */}
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1.5">
                   Document type
@@ -2546,7 +2468,6 @@ const EligibilityTestPage: React.FC = () => {
                     patch("step2", {
                       ...state.step2,
                       selectedDocType: v,
-                      // Clear employer fields when switching to Utility Bill
                       employerName:
                         v === "Utility Bill (Proof of Address"
                           ? ""
@@ -2561,8 +2482,6 @@ const EligibilityTestPage: React.FC = () => {
                   options={DOCUMENT_TYPES}
                 />
               </div>
-
-              {/* Employer fields — visible for Bank Statement or Employment Letter */}
               {(state.step2.selectedDocType ===
                 "Bank Statement (Last 3 Months)" ||
                 state.step2.selectedDocType ===
@@ -2606,8 +2525,6 @@ const EligibilityTestPage: React.FC = () => {
                   </div>
                 </div>
               )}
-
-              {/* Drop zone */}
               <div
                 className={`rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 py-10 ${
                   state.step2.selectedDocType
@@ -2675,8 +2592,6 @@ const EligibilityTestPage: React.FC = () => {
                 </p>
               )}
             </div>
-
-            {/* Uploaded documents table */}
             {state.step2.uploadedDocs.length > 0 && (
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-semibold text-gray-800">
@@ -2742,7 +2657,6 @@ const EligibilityTestPage: React.FC = () => {
           </div>
         )}
 
-        {/* ── STEP 3 — Select School & Tuition Plan ── */}
         {state.step === 2 && (
           <div className="flex flex-col gap-6 animate-fade-in-up">
             <div>
@@ -2756,7 +2670,6 @@ const EligibilityTestPage: React.FC = () => {
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-5">
-              {/* ── 1. Institution Type ── */}
               <Field
                 label="Institution Type"
                 required
@@ -2775,7 +2688,6 @@ const EligibilityTestPage: React.FC = () => {
                         ...state.step3,
                         institutionTypeId: e.target.value,
                         institutionType: selected?.name ?? "",
-                        // reset dependent fields
                         schoolId: "",
                         schoolName: "",
                         gradeLevel: "",
@@ -2810,8 +2722,6 @@ const EligibilityTestPage: React.FC = () => {
                   </svg>
                 </div>
               </Field>
-
-              {/* ── 2. Choose Student School ── */}
               <Field
                 label="Choose Student School"
                 required
@@ -2834,7 +2744,6 @@ const EligibilityTestPage: React.FC = () => {
                         ...state.step3,
                         schoolId: e.target.value,
                         schoolName: selected?.name ?? "",
-                        // reset class level
                         gradeLevel: "",
                       });
                       clearErr("schoolId");
@@ -2875,8 +2784,6 @@ const EligibilityTestPage: React.FC = () => {
                   </svg>
                 </div>
               </Field>
-
-              {/* ── 3. Class / Level ── */}
               <Field
                 label="Class/Level"
                 required
@@ -2914,7 +2821,7 @@ const EligibilityTestPage: React.FC = () => {
                     </option>
                     {classLevelGroups.map((group) =>
                       group.subLevelGroup ? (
-                        // Grouped — e.g. Junior Secondary / Senior Secondary
+
                         <optgroup
                           key={group.subLevelGroup}
                           label={group.subLevelGroup}
@@ -2926,7 +2833,6 @@ const EligibilityTestPage: React.FC = () => {
                           ))}
                         </optgroup>
                       ) : (
-                        // Flat — Nursery / Primary classes
                         group.classes.map((cls) => (
                           <option key={cls.id} value={cls.name}>
                             {cls.name}
@@ -3023,7 +2929,6 @@ const EligibilityTestPage: React.FC = () => {
           </div>
         )}
 
-        {/* ── STEP 4 — Student Information ── */}
         {state.step === 3 && (
           <div className="flex flex-col gap-6 animate-fade-in-up">
             <div>
@@ -3114,8 +3019,6 @@ const EligibilityTestPage: React.FC = () => {
             >
               <PlusCircleIcon /> Add Another Student
             </button>
-
-            {/* Application Summary */}
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <p className="text-sm font-semibold text-gray-800 mb-3">
                 Application Summary
@@ -3169,8 +3072,6 @@ const EligibilityTestPage: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Terms */}
             <label
               className={`flex items-start gap-2.5 cursor-pointer ${errors.terms ? "text-red-500" : "text-gray-600"}`}
             >

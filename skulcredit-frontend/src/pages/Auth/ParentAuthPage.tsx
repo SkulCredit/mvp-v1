@@ -167,13 +167,11 @@ type View = "login" | "signup" | "otp" | "forgot";
 const ParentAuthPage: React.FC = () => {
   const [view, setView] = useState<View>("login");
 
-  // Login state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [showLoginPw, setShowLoginPw] = useState(false);
 
-  // Register state
   const [reg, setReg] = useState<RegState>({
     firstName: "",
     lastName: "",
@@ -191,13 +189,12 @@ const ParentAuthPage: React.FC = () => {
     phone: false,
   });
 
-  // OTP state
+
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [otpValue, setOtpValue] = useState("");
   const [otpError, setOtpError] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Shared
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -228,7 +225,6 @@ const ParentAuthPage: React.FC = () => {
     }, 1000);
   };
 
-  // Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
@@ -275,7 +271,6 @@ const ParentAuthPage: React.FC = () => {
           }));
         }
       } catch {
-        /* silent */
       } finally {
         setChecking((p) => ({ ...p, [field]: false }));
       }
@@ -395,7 +390,6 @@ const ParentAuthPage: React.FC = () => {
       await apiClient.post("/auth/send-otp", { email: registeredEmail });
       startResendCooldown();
     } catch {
-      /* silent */
     }
   };
 
@@ -404,7 +398,6 @@ const ParentAuthPage: React.FC = () => {
 
   return (
     <>
-      {/* Background blobs */}
       <div className="fixed inset-0 w-full h-full pointer-events-none -z-10 overflow-hidden">
         <div className="absolute top-[10%] left-[15%] w-[400px] h-[400px] bg-rose-200/50 rounded-full mix-blend-multiply filter blur-[80px] animate-blob" />
         <div
@@ -419,7 +412,6 @@ const ParentAuthPage: React.FC = () => {
 
       <div className="min-h-screen w-full flex items-center justify-center px-4">
         <div className="w-full max-w-[520px] bg-white/80 backdrop-blur-xl rounded-[2.5rem] border border-white/60 p-8 md:p-10 shadow-[0_30px_60px_-15px_rgba(136,19,55,0.15),inset_0_0_0_1px_rgba(255,255,255,0.9)] relative z-10">
-          {/* ══ LOGIN ══ */}
           {view === "login" && (
             <div className="animate-fade-in-up">
               <div className="text-center mb-8">
@@ -531,8 +523,6 @@ const ParentAuthPage: React.FC = () => {
               </form>
             </div>
           )}
-
-          {/* ══ SIGN UP ══ */}
           {view === "signup" && (
             <div className="animate-fade-in-up">
               <div className="text-center mb-6">
@@ -808,7 +798,6 @@ const ParentAuthPage: React.FC = () => {
             </div>
           )}
 
-          {/* ══ OTP VERIFICATION ══ */}
           {view === "otp" && (
             <div className="animate-fade-in-up py-4">
               <div className="text-center mb-8">
@@ -892,8 +881,6 @@ const ParentAuthPage: React.FC = () => {
               </form>
             </div>
           )}
-
-          {/* ══ FORGOT PASSWORD ══ */}
           {view === "forgot" && (
             <div className="animate-fade-in-up py-6">
               <div className="text-center mb-8">
