@@ -338,9 +338,8 @@ const ParentDashboardHomePage: React.FC = () => {
             onClick={() => navigate("/parent/eligibility")}
             className="w-full md:w-auto bg-white/95 hover:bg-white text-brand font-bold py-4 px-8
                        rounded-2xl transition-all flex items-center justify-center gap-3
-                       border border-white/20 shadow-md hover:shadow-lg hover:-translate-y-0.5"
-          >
-            Start Loan Application
+                       border border-white/20 shadow-md hover:shadow-lg hover:-translate-y-0.5">
+            Start Application
             <span className="px-2 py-0.5 bg-brand-light text-white text-[10px] uppercase tracking-wider rounded-md font-extrabold shadow-sm">
               Apply Now
             </span>
