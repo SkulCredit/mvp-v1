@@ -86,8 +86,6 @@ const AdminSchoolsPage: React.FC = () => {
   return (
     <DashboardLayout sidebar={<AdminSidebar />} header={<AdminTopBar />}>
       <div className="max-w-[1280px] mx-auto py-8 px-2 space-y-7">
-
-        {/* title */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
@@ -105,8 +103,6 @@ const AdminSchoolsPage: React.FC = () => {
             </button>
           </div>
         </div>
-
-        {/* KPI row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: "Active Partner Schools",   value: "184",      sub: "+6 Zones Across 6 regional education zones", icon: "building-2", color: "text-[#881337]" },
@@ -127,8 +123,6 @@ const AdminSchoolsPage: React.FC = () => {
             </div>
           ))}
         </div>
-
-        {/* Compliance banner */}
         {showCompliance && (
           <div className="bg-white rounded-xl border border-amber-200 p-5">
             <div className="flex items-start justify-between gap-4">
@@ -164,10 +158,7 @@ const AdminSchoolsPage: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* table card */}
         <div className="bg-white rounded-xl border border-slate-200">
-          {/* filter tabs */}
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-slate-100">
             <div className="flex items-center gap-1">
               {(["All Institutions", "Fully Verified", "Pending Audit", "Under Review"] as SchoolFilterTab[]).map((t) => (
@@ -190,8 +181,6 @@ const AdminSchoolsPage: React.FC = () => {
               Active Tranche Drawdown Cycle: <span className="font-semibold text-slate-700">2024/2025 Term 2</span>
             </span>
           </div>
-
-          {/* search + filter row */}
           <div className="flex flex-wrap items-center gap-2 px-5 py-3 border-b border-slate-100">
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 flex-1 min-w-[200px] max-w-sm">
               <Icon name="search" className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -207,8 +196,6 @@ const AdminSchoolsPage: React.FC = () => {
               <Icon name="x" className="w-3.5 h-3.5 text-slate-400" />
             </button>
           </div>
-
-          {/* table */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -260,8 +247,6 @@ const AdminSchoolsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
-
-          {/* pagination */}
           <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
             <span className="text-xs text-slate-400">Showing 1–6 of 184 institutions &nbsp; Rows per page: 10</span>
             <div className="flex items-center gap-1">

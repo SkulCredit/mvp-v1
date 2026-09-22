@@ -47,15 +47,11 @@ const AdminLoginPage: React.FC = () => {
         <span className="absolute top-[-80px] left-[-80px] w-[320px] h-[320px] rounded-full bg-[#f5c6d8]/60" />
         <span className="absolute bottom-[120px] left-[-60px] w-[200px] h-[200px] rounded-full bg-[#f5c6d8]/50" />
         <span className="absolute bottom-[-40px] left-[80px] w-[260px] h-[260px] rotate-12 bg-[#f5c6d8]/40 rounded-3xl" />
-
-        {/* logo */}
         <div className="relative z-10 p-10">
           <Link to="/" className="inline-flex items-center gap-2">
             <img src="/logo_nav.png" alt="SkulCredit" className="h-9 w-auto" />
           </Link>
         </div>
-
-        {/* hero copy */}
         <div className="relative z-10 flex-1 flex flex-col justify-center px-12 pb-20">
           <h1 className="text-4xl font-bold text-slate-900 leading-tight mb-4">
             Smarter education<br />
@@ -77,7 +73,6 @@ const AdminLoginPage: React.FC = () => {
       </div>
 
       <div className="flex-1 flex flex-col bg-white">
-        {/* top nav */}
         <div className="flex items-center justify-end gap-3 px-8 py-5 border-b border-slate-100">
           <button className="text-sm font-semibold text-slate-700 px-5 py-2 rounded-lg border border-[#881337] text-[#881337] hover:bg-rose-50 transition-colors">
             Sign in
@@ -86,8 +81,6 @@ const AdminLoginPage: React.FC = () => {
             Create an Account
           </button>
         </div>
-
-        {/* form area */}
         <div className="flex-1 flex items-center justify-center px-8 py-12">
           <div className="w-full max-w-[420px]">
             <p className="text-slate-500 text-base mb-1">Welcome to</p>
@@ -103,8 +96,6 @@ const AdminLoginPage: React.FC = () => {
                   {error}
                 </div>
               )}
-
-              {/* email */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                   Email address or username
@@ -120,8 +111,6 @@ const AdminLoginPage: React.FC = () => {
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/10 transition-all"
                 />
               </div>
-
-              {/* password */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                   Password
@@ -146,8 +135,6 @@ const AdminLoginPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-
-              {/* remember + forgot */}
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
@@ -165,8 +152,6 @@ const AdminLoginPage: React.FC = () => {
                   Forgot Password?
                 </button>
               </div>
-
-              {/* submit */}
               <button
                 type="submit"
                 disabled={isLoading}

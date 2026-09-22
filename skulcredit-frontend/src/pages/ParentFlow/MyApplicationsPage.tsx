@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { parentService } from "../../services/parentService";
 import { resolveUploadUrl } from "../../utils/uploadUrl";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type ApplicationStatus =
   | "draft"
   | "submitted"
@@ -24,13 +22,11 @@ interface Application {
   status: ApplicationStatus;
   totalAmount: number;
   submittedOn: string;
-  submittedOnRaw: string; // ISO string — used for date-range filtering
+  submittedOnRaw: string;
   lastUpdated: string;
   tenor?: number;
   raw?: RawApplication;
 }
-
-// ── Raw API shapes ────────────────────────────────────────────────────────────
 
 interface RawEvent {
   id?: string;
@@ -63,27 +59,23 @@ interface RawApplication {
   events?: RawEvent[];
 }
 
-// ── Status helpers ────────────────────────────────────────────────────────────
-
 function mapStatus(raw: string): ApplicationStatus {
   switch (raw) {
     case "pending":
+    case "school_verification":
       return "submitted";
     case "under_review":
       return "under_review";
     case "info_requested":
       return "info_requested";
-    case "school_verification":
-      return "under_review";
     case "approved":
       return "approved";
     case "disbursed":
+    case "repaid":
       return "disbursed";
     case "rejected":
     case "cancelled":
       return "rejected";
-    case "repaid":
-      return "disbursed";
     default:
       return "submitted";
   }
@@ -178,8 +170,6 @@ const TAB_LABELS: Record<"all" | ApplicationStatus, string> = {
   rejected: "Rejected",
 };
 
-// ── Normalize list item ───────────────────────────────────────────────────────
-
 function normalize(raw: RawApplication): Application {
   const firstName = raw.student?.firstName ?? "";
   const lastName = raw.student?.lastName ?? "";
@@ -218,8 +208,6 @@ function normalize(raw: RawApplication): Application {
     raw,
   };
 }
-
-// ── Small shared icons ────────────────────────────────────────────────────────
 
 const IconSend = () => (
   <svg
@@ -356,8 +344,6 @@ function StatusIcon({
   }
 }
 
-// ── Status Badge ──────────────────────────────────────────────────────────────
-
 const StatusBadge: React.FC<{
   status: ApplicationStatus;
   size?: "sm" | "md";
@@ -372,8 +358,6 @@ const StatusBadge: React.FC<{
     </span>
   );
 };
-
-// ── Applications list table ───────────────────────────────────────────────────
 
 const ApplicationsTable: React.FC<{
   apps: Application[];
@@ -402,7 +386,6 @@ const ApplicationsTable: React.FC<{
             onClick={() => onRowClick(app)}
             className="group cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            {/* Student */}
             <td className="px-5 py-4 whitespace-nowrap">
               <div className="flex items-center gap-3">
                 <img
@@ -458,7 +441,6 @@ const ApplicationsTable: React.FC<{
                 </div>
               </div>
             </td>
-            {/* App ID */}
             <td className="px-5 py-4 whitespace-nowrap">
               <p className="text-xs text-gray-400 mb-0.5">Application ID</p>
               <p className="font-bold text-gray-900">{app.applicationId}</p>
@@ -467,7 +449,6 @@ const ApplicationsTable: React.FC<{
                 <span className="text-gray-600">{app.submittedOn}</span>
               </p>
             </td>
-            {/* Status */}
             <td className="px-5 py-4 whitespace-nowrap">
               <p className="text-xs text-gray-400 mb-1.5">Status</p>
               <StatusBadge status={app.status} />
@@ -476,7 +457,6 @@ const ApplicationsTable: React.FC<{
                 <span className="text-gray-600">{app.lastUpdated}</span>
               </p>
             </td>
-            {/* Amount */}
             <td className="px-5 py-4 whitespace-nowrap text-right">
               <p className="text-xs text-gray-400 mb-1">Total Amount</p>
               <p className="font-bold text-gray-900">
@@ -486,7 +466,6 @@ const ApplicationsTable: React.FC<{
                 })}
               </p>
             </td>
-            {/* Chevron */}
             <td className="pr-4 py-4 whitespace-nowrap">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -508,8 +487,6 @@ const ApplicationsTable: React.FC<{
     </table>
   </div>
 );
-
-// ── Date range dropdown ───────────────────────────────────────────────────────
 
 interface DateRange {
   from: string;
@@ -683,154 +660,117 @@ const DateRangeDropdown: React.FC<{
   );
 };
 
-// ── Timeline helpers ──────────────────────────────────────────────────────────
-
 interface TimelineStep {
   label: string;
   sub: string;
-  state: "done" | "active" | "pending";
+  state: "done" | "active" | "pending" | "rejected";
+  variant?: "rejected";
 }
 
-function buildTimeline(app: Application, events: RawEvent[]): TimelineStep[] {
+function buildTimeline(app: Application, _events: RawEvent[]): TimelineStep[] {
   const status = app.status;
 
-  // If we have backend events, build from them
-  if (events.length > 0) {
-    return events.map((ev) => {
-      const evStatus = mapStatus(ev.status ?? "pending");
-      const cfg = STATUS_CFG[evStatus];
-      const isDone = status !== evStatus;
-      const isActive = status === evStatus;
-      const date = ev.createdAt
-        ? new Date(ev.createdAt).toLocaleDateString("en-NG", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })
-        : "";
-      return {
-        label: ev.note ?? cfg.label,
-        sub: date || "Pending",
-        state: isActive ? "active" : isDone ? "done" : "pending",
-      };
-    });
+  const step = (
+    label: string,
+    sub: string,
+    state: TimelineStep["state"],
+    variant?: "rejected",
+  ): TimelineStep => ({ label, sub, state, variant }) as TimelineStep;
+
+  const done = (label: string, sub: string) => step(label, sub, "done");
+  const active = (label: string, sub: string) => step(label, sub, "active");
+  const pending = (label: string) => step(label, "Pending", "pending");
+  const rejected = (label: string, sub: string) => step(label, sub, "rejected");
+
+  const submitted = done("Application Submitted", app.submittedOn);
+  const underReview = (s: TimelineStep["state"], sub = "Pending") =>
+    step("Under Review", sub, s);
+  const decision = (
+    s: TimelineStep["state"],
+    sub = "Pending",
+    variant?: "rejected",
+  ) => step("Decision", sub, s, variant);
+  const serviceFee = (s: TimelineStep["state"], sub = "Pending") =>
+    step("Pay Service Charge", sub, s);
+  const repayment = (s: TimelineStep["state"], sub = "Pending") =>
+    step("Setup Repayment Plan", sub, s);
+  const disburse = (s: TimelineStep["state"], sub = "Pending") =>
+    step("Disbursed to School", sub, s);
+
+  switch (status) {
+    case "submitted":
+      return [
+        submitted,
+        underReview("pending"),
+        decision("pending"),
+        serviceFee("pending"),
+        repayment("pending"),
+        disburse("pending"),
+      ];
+
+    case "under_review":
+      return [
+        submitted,
+        done("Under Review", app.lastUpdated),
+        done("Decision", app.lastUpdated),
+        active("Pay Service Charge", "Action required"),
+        pending("Setup Repayment Plan"),
+        pending("Disbursed to School"),
+      ];
+
+    case "info_requested":
+      return [
+        submitted,
+        done("Under Review", app.lastUpdated),
+        done("Decision", app.lastUpdated),
+        active("Pay Service Charge", "Action required"),
+        pending("Setup Repayment Plan"),
+        pending("Disbursed to School"),
+      ];
+
+    case "approved":
+      return [
+        submitted,
+        done("Under Review", app.lastUpdated),
+        done("Decision", app.lastUpdated),
+        active("Pay Service Charge", "Action required"),
+        pending("Setup Repayment Plan"),
+        pending("Disbursed to School"),
+      ];
+
+    case "disbursed":
+      return [
+        submitted,
+        done("Under Review", app.lastUpdated),
+        done("Decision", app.lastUpdated),
+        done("Pay Service Charge", app.lastUpdated),
+        done("Setup Repayment Plan", app.lastUpdated),
+        done("Disbursed to School", app.lastUpdated),
+      ];
+
+    case "rejected":
+      return [
+        submitted,
+        done("Under Review", app.lastUpdated),
+        rejected("Decision", app.lastUpdated),
+        pending("Pay Service Charge"),
+        pending("Setup Repayment Plan"),
+        pending("Disbursed to School"),
+      ];
+
+    case "draft":
+      return [active("Application Submitted", app.submittedOn)];
+
+    default:
+      return [
+        submitted,
+        underReview("pending"),
+        decision("pending"),
+        serviceFee("pending"),
+        repayment("pending"),
+        disburse("pending"),
+      ];
   }
-
-  // Fallback: synthetic steps based on current status
-  const steps: TimelineStep[] = [
-    {
-      label: "Application submitted",
-      sub: app.submittedOn,
-      state: "done",
-    },
-  ];
-
-  if (status === "submitted") {
-    steps.push({ label: "Under Review", sub: "Pending", state: "pending" });
-    steps.push({ label: "Decision", sub: "Pending", state: "pending" });
-    steps.push({
-      label: "Pay Service Charge",
-      sub: "Pending",
-      state: "pending",
-    });
-    steps.push({
-      label: "Setup Repayment Plan",
-      sub: "Pending",
-      state: "pending",
-    });
-    steps.push({
-      label: "Disbursed to school",
-      sub: "Pending",
-      state: "pending",
-    });
-  } else if (status === "under_review") {
-    steps.push({
-      label: "Under Review",
-      sub: app.lastUpdated,
-      state: "active",
-    });
-    steps.push({ label: "Decision", sub: "Pending", state: "pending" });
-    steps.push({
-      label: "Pay Service Charge",
-      sub: "Pending",
-      state: "pending",
-    });
-    steps.push({
-      label: "Setup Repayment Plan",
-      sub: "Pending",
-      state: "pending",
-    });
-    steps.push({
-      label: "Disbursed to school",
-      sub: "Pending",
-      state: "pending",
-    });
-  } else if (status === "info_requested") {
-    steps.push({ label: "Under Review", sub: app.lastUpdated, state: "done" });
-    steps.push({
-      label: "Documents requested",
-      sub: app.lastUpdated,
-      state: "active",
-    });
-    steps.push({ label: "Decision", sub: "Pending", state: "pending" });
-    steps.push({
-      label: "Pay Service Charge",
-      sub: "Pending",
-      state: "pending",
-    });
-    steps.push({
-      label: "Setup Repayment Plan",
-      sub: "Pending",
-      state: "pending",
-    });
-  } else if (status === "approved") {
-    steps.push({ label: "Under Review", sub: app.lastUpdated, state: "done" });
-    steps.push({ label: "Approved", sub: app.lastUpdated, state: "done" });
-    steps.push({
-      label: "Pay Service Charge",
-      sub: "Action required",
-      state: "active",
-    });
-    steps.push({
-      label: "Setup Repayment Plan",
-      sub: "Pending",
-      state: "pending",
-    });
-    steps.push({
-      label: "Disbursed to school",
-      sub: "Pending",
-      state: "pending",
-    });
-  } else if (status === "disbursed") {
-    steps.push({ label: "Under Review", sub: app.lastUpdated, state: "done" });
-    steps.push({ label: "Approved", sub: app.lastUpdated, state: "done" });
-    steps.push({
-      label: "Pay Service Charge",
-      sub: app.lastUpdated,
-      state: "done",
-    });
-    steps.push({
-      label: "Setup Repayment Plan",
-      sub: app.lastUpdated,
-      state: "done",
-    });
-    steps.push({
-      label: "Disbursed to school",
-      sub: app.lastUpdated,
-      state: "done",
-    });
-  } else if (status === "rejected") {
-    steps.push({ label: "Under Review", sub: app.lastUpdated, state: "done" });
-    steps.push({ label: "Rejected", sub: app.lastUpdated, state: "active" });
-  } else if (status === "draft") {
-    steps[0] = {
-      label: "Draft created",
-      sub: app.submittedOn,
-      state: "active",
-    };
-  }
-
-  return steps;
 }
 
 const TimelineDot: React.FC<{ state: TimelineStep["state"] }> = ({ state }) => {
@@ -850,6 +790,23 @@ const TimelineDot: React.FC<{ state: TimelineStep["state"] }> = ({ state }) => {
         </svg>
       </div>
     );
+  if (state === "rejected")
+    return (
+      <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center shrink-0 shadow-sm">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-3.5 h-3.5"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </div>
+    );
   if (state === "active")
     return (
       <div className="w-7 h-7 rounded-full bg-brand flex items-center justify-center shrink-0 shadow-sm ring-4 ring-brand/20">
@@ -863,15 +820,11 @@ const TimelineDot: React.FC<{ state: TimelineStep["state"] }> = ({ state }) => {
   );
 };
 
-// ── Repayment plan label ──────────────────────────────────────────────────────
-
 function repaymentLabel(tenor?: number | null): string {
   if (!tenor) return "\u2014";
   if (tenor === 1) return "Full payment";
   return `${tenor}-month plan`;
 }
-
-// ── Application Detail View ───────────────────────────────────────────────────
 
 interface DetailState {
   loading: boolean;
@@ -927,15 +880,12 @@ const ApplicationDetailView: React.FC<{
   const amount = Number(detail?.amountRequested ?? app.totalAmount);
   const tenor = detail?.tenor ?? app.tenor;
   const rejectionReason = detail?.rejectionReason ?? detail?.adminNote;
-
-  // Action banners by status
   const showInfoRequestedBanner = app.status === "info_requested";
   const showRejectedBanner = app.status === "rejected";
   const showDraftBanner = app.status === "draft";
 
   return (
     <div className="flex flex-col gap-0 animate-fade-in-up w-[90%] mx-auto pt-6 pb-16">
-      {/* Back link */}
       <button
         onClick={onBack}
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:text-brand-hover transition-colors mb-6 self-start group"
@@ -956,8 +906,6 @@ const ApplicationDetailView: React.FC<{
         </svg>
         Back to Applications
       </button>
-
-      {/* Student header */}
       <div className="flex flex-wrap items-center gap-4 mb-5">
         <img
           src={app.studentPhoto}
@@ -978,15 +926,11 @@ const ApplicationDetailView: React.FC<{
               .join(" \u00B7 ")}
           </p>
         </div>
-        {/* Status badge top-right */}
         <div className="shrink-0">
           <StatusBadge status={app.status} size="md" />
         </div>
       </div>
 
-      {/* ── Action banners ── */}
-
-      {/* Info requested */}
       {showInfoRequestedBanner && (
         <div className="mb-5 rounded-2xl border border-orange-200 bg-orange-50 px-5 py-4">
           <div className="flex items-start gap-3">
@@ -1029,7 +973,6 @@ const ApplicationDetailView: React.FC<{
         </div>
       )}
 
-      {/* Rejected */}
       {showRejectedBanner && (
         <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 flex flex-wrap items-center gap-4">
           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -1053,7 +996,6 @@ const ApplicationDetailView: React.FC<{
         </div>
       )}
 
-      {/* Draft */}
       {showDraftBanner && (
         <div className="mb-5 rounded-2xl border border-orange-200 bg-orange-50 px-5 py-4 flex flex-wrap items-center gap-4">
           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -1077,7 +1019,6 @@ const ApplicationDetailView: React.FC<{
         </div>
       )}
 
-      {/* Loading skeleton */}
       {ds.loading && (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
           <div className="rounded-2xl border border-gray-100 bg-white p-6 space-y-5 animate-pulse">
@@ -1102,7 +1043,6 @@ const ApplicationDetailView: React.FC<{
         </div>
       )}
 
-      {/* Error */}
       {!ds.loading && ds.error && (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-6 py-5 flex items-center gap-4">
           <p className="text-sm text-red-700 font-medium">{ds.error}</p>
@@ -1115,10 +1055,8 @@ const ApplicationDetailView: React.FC<{
         </div>
       )}
 
-      {/* Main body */}
       {!ds.loading && !ds.error && (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
-          {/* ── Application details card ── */}
           <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
               <svg
@@ -1159,7 +1097,6 @@ const ApplicationDetailView: React.FC<{
                 </div>
               ))}
 
-              {/* Total amount — highlighted */}
               <div className="flex items-center justify-between py-4">
                 <span className="text-sm font-bold text-brand">
                   Total amount
@@ -1171,8 +1108,6 @@ const ApplicationDetailView: React.FC<{
               </div>
             </div>
           </div>
-
-          {/* ── Timeline card ── */}
           <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
               <svg
@@ -1202,12 +1137,17 @@ const ApplicationDetailView: React.FC<{
                   const isSetupRepayment =
                     step.label === "Setup Repayment Plan" &&
                     step.state === "active";
+                  const connectorColor =
+                    step.state === "done"
+                      ? "bg-green-200"
+                      : step.state === "rejected"
+                        ? "bg-red-200"
+                        : "bg-gray-100";
                   return (
                     <li key={idx} className="flex items-start gap-3 relative">
-                      {/* Connector line */}
                       {!isLast && (
                         <div
-                          className="absolute left-[13px] top-7 bottom-0 w-[2px] bg-gray-100 z-0"
+                          className={`absolute left-[13px] top-7 bottom-0 w-[2px] z-0 ${connectorColor}`}
                           aria-hidden="true"
                         />
                       )}
@@ -1217,18 +1157,22 @@ const ApplicationDetailView: React.FC<{
                       <div className={`flex-1 pb-5 ${isLast ? "pb-0" : ""}`}>
                         <p
                           className={`text-sm font-semibold leading-snug ${
-                            step.state === "pending"
-                              ? "text-gray-400"
-                              : "text-gray-900"
+                            step.state === "rejected"
+                              ? "text-red-600"
+                              : step.state === "pending"
+                                ? "text-gray-400"
+                                : "text-gray-900"
                           }`}
                         >
                           {step.label}
                         </p>
                         <p
                           className={`text-xs mt-0.5 ${
-                            step.state === "pending"
-                              ? "text-gray-300"
-                              : "text-gray-400"
+                            step.state === "rejected"
+                              ? "text-red-400"
+                              : step.state === "pending"
+                                ? "text-gray-300"
+                                : "text-gray-400"
                           }`}
                         >
                           {step.sub}
@@ -1262,17 +1206,11 @@ const ApplicationDetailView: React.FC<{
   );
 };
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
-
 const MyApplicationsPage: React.FC = () => {
   const navigate = useNavigate();
-
-  // Data
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-
-  // Detail view — when set, hides the list
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
 
   useEffect(() => {
@@ -1301,7 +1239,6 @@ const MyApplicationsPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  // Filters (list view only)
   const [activeFilter, setActiveFilter] = useState<"all" | ApplicationStatus>(
     "all",
   );
@@ -1329,7 +1266,7 @@ const MyApplicationsPage: React.FC = () => {
           a.applicationId.toLowerCase().includes(q),
       );
     }
-    // Date range filter — compare against the preserved ISO createdAt string
+
     if (dateRange.from || dateRange.to) {
       list = list.filter((a) => {
         if (!a.submittedOnRaw) return true;
@@ -1348,8 +1285,6 @@ const MyApplicationsPage: React.FC = () => {
     ? [dateRange.from, dateRange.to].filter(Boolean).join(" \u2192 ")
     : "Sort by Date";
 
-  // ── Detail view ───────────────────────────────────────────────────────────
-
   if (selectedApp) {
     return (
       <ApplicationDetailView
@@ -1360,11 +1295,8 @@ const MyApplicationsPage: React.FC = () => {
     );
   }
 
-  // ── List view ─────────────────────────────────────────────────────────────
-
   return (
     <div className="flex flex-col gap-5 pt-8 pb-12 animate-fade-in-up w-[90%] mx-auto">
-      {/* Heading */}
       <div>
         <h2 className="text-xl font-extrabold text-gray-900">
           My Applications
@@ -1373,8 +1305,6 @@ const MyApplicationsPage: React.FC = () => {
           Track and manage all your tuition applications
         </p>
       </div>
-
-      {/* Loading skeleton */}
       {loading && (
         <div className="rounded-2xl border border-gray-100 bg-white p-6 space-y-4">
           {[1, 2, 3].map((i) => (
@@ -1390,7 +1320,6 @@ const MyApplicationsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Fetch error */}
       {!loading && fetchError && (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-6 py-5 flex items-center gap-4">
           <svg
@@ -1416,10 +1345,8 @@ const MyApplicationsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Main content */}
       {!loading && !fetchError && (
         <>
-          {/* Filter toolbar */}
           <div className="rounded-2xl bg-brand px-5 pt-4 pb-5 space-y-3">
             <div className="flex flex-wrap gap-2">
               {(["all", ...TAB_ORDER] as const).map((s) => {
@@ -1447,7 +1374,6 @@ const MyApplicationsPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Search */}
               <div className="relative">
                 <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-white/50">
                   <svg
@@ -1474,8 +1400,6 @@ const MyApplicationsPage: React.FC = () => {
                   className="w-full rounded-full border border-white/30 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white placeholder:text-white/40 outline-none focus:border-white focus:ring-2 focus:ring-white/20 transition-colors"
                 />
               </div>
-
-              {/* Date range */}
               <div className="relative">
                 <button
                   onClick={() => setDateDropOpen((o) => !o)}
@@ -1563,8 +1487,6 @@ const MyApplicationsPage: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Applications table card */}
           <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-gray-800 shrink-0">
@@ -1636,8 +1558,6 @@ const MyApplicationsPage: React.FC = () => {
               <ApplicationsTable apps={filtered} onRowClick={handleRowClick} />
             )}
           </div>
-
-          {/* New application banner */}
           <div className="rounded-2xl border border-pink-200 bg-[#FFF5F8] px-6 py-5 flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-extrabold text-brand">

@@ -95,6 +95,9 @@ const SchoolDashboardPage = React.lazy(
 const SchoolApplicationsPage = React.lazy(
   () => import("../pages/SchoolFlow/SchoolApplicationsPage"),
 );
+const SchoolApplicationDetailPage = React.lazy(
+  () => import("../pages/SchoolFlow/SchoolApplicationDetailPage"),
+);
 const SchoolStudentsPage = React.lazy(
   () => import("../pages/SchoolFlow/SchoolStudentsPage"),
 );
@@ -230,6 +233,14 @@ const AppRouter: React.FC = () => (
           element={
             <ProtectedRoute allowedRoles={["school"]}>
               <SchoolApplicationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/school/applications/:id"
+          element={
+            <ProtectedRoute allowedRoles={["school"]}>
+              <SchoolApplicationDetailPage />
             </ProtectedRoute>
           }
         />

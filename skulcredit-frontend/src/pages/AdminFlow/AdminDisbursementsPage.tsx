@@ -96,8 +96,6 @@ const AdminDisbursementsPage: React.FC = () => {
   return (
     <DashboardLayout sidebar={<AdminSidebar />} header={<AdminTopBar />}>
       <div className="max-w-[1280px] mx-auto py-8 px-2 space-y-8">
-
-        {/* title */}
         <div>
           <p className="text-xs text-slate-400 mb-1">Operations &rsaquo; <span className="text-slate-600">Disbursements</span></p>
           <div className="flex items-start justify-between gap-4">
@@ -115,8 +113,6 @@ const AdminDisbursementsPage: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* KPI row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: "Ready For Disbursement",  value: "₦34,250,000", sub: "28 applications queued for payout",     icon: "inbox",          color: "text-[#881337]" },
@@ -134,11 +130,8 @@ const AdminDisbursementsPage: React.FC = () => {
             </div>
           ))}
         </div>
-
-        {/* filters + search */}
         <div className="bg-white rounded-xl border border-slate-200">
           <div className="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-slate-100">
-            {/* tab pills */}
             <div className="flex items-center gap-1">
               {(["All Batches", "Queued", "Processing", "Completed"] as FilterTab[]).map((t) => (
                 <button
@@ -168,14 +161,10 @@ const AdminDisbursementsPage: React.FC = () => {
               </button>
             </div>
           </div>
-
-          {/* sub-info row */}
           <div className="flex items-center justify-between px-5 py-2.5 bg-slate-50/60 border-b border-slate-100">
             <span className="text-xs text-slate-500">Showing 5 of 45 active batch runs &nbsp;|&nbsp; Tranche Volume: ₦21,350,000</span>
             <button className="text-xs text-[#881337] font-semibold hover:underline">Select All Filtered · Batch Schedule Rules</button>
           </div>
-
-          {/* table */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -254,8 +243,6 @@ const AdminDisbursementsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
-
-          {/* pagination */}
           <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
             <span className="text-xs text-slate-400">Rows per page: 10 &nbsp; 1–5 of 45 items</span>
             <div className="flex items-center gap-1">

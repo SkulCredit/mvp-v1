@@ -16,8 +16,6 @@ import { useParams } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 import { AxiosError } from "axios";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 interface ApplicationDetail {
   id: string;
   referenceNumber: string | null;
@@ -71,8 +69,6 @@ interface BankAccount {
   isVerified: boolean;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 const fmt = (n: number | string) =>
   "₦" + Number(n).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -87,8 +83,6 @@ function resolveBank(detail: ApplicationDetail) {
   };
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
 const DetailRow: React.FC<{ label: string; value: React.ReactNode; highlight?: boolean }> = ({
   label,
   value,
@@ -102,21 +96,15 @@ const DetailRow: React.FC<{ label: string; value: React.ReactNode; highlight?: b
   </div>
 );
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
-
 const FundingPartnerDisbursementPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
   const [detail, setDetail] = useState<ApplicationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-
-  // Action state
   type ActionState = "idle" | "submitting" | "done_disbursed" | "done_rejected" | "error";
   const [actionState, setActionState] = useState<ActionState>("idle");
   const [actionError, setActionError] = useState("");
-
-  // Rejection reason modal
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectReasonError, setRejectReasonError] = useState("");
@@ -190,7 +178,6 @@ const FundingPartnerDisbursementPage: React.FC = () => {
     }
   };
 
-  // ── Reject modal ────────────────────────────────────────────────────────
   const RejectModal = () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="reject-modal-title">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowRejectModal(false)} />
@@ -232,7 +219,6 @@ const FundingPartnerDisbursementPage: React.FC = () => {
     </div>
   );
 
-  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
@@ -267,7 +253,6 @@ const FundingPartnerDisbursementPage: React.FC = () => {
     actionState === "done_disbursed" ||
     actionState === "done_rejected";
 
-  // ── Done states ───────────────────────────────────────────────────────────
   if (actionState === "done_disbursed") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4">
@@ -305,7 +290,6 @@ const FundingPartnerDisbursementPage: React.FC = () => {
     );
   }
 
-  // Already processed by a prior action
   if (detail.disbursementStatus === "successful") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4">
@@ -333,7 +317,6 @@ const FundingPartnerDisbursementPage: React.FC = () => {
       {showRejectModal && <RejectModal />}
 
       <div className="max-w-2xl mx-auto space-y-6">
-        {/* Header */}
         <div className="flex items-center gap-4">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">
@@ -351,7 +334,6 @@ const FundingPartnerDisbursementPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Application details */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-2">
           <p className="text-xs font-bold text-[#881337] uppercase tracking-wide py-3 border-b border-gray-50">
             Application Details
@@ -370,8 +352,6 @@ const FundingPartnerDisbursementPage: React.FC = () => {
             value={detail.serviceFeePaid ? (detail.serviceChargeAmount ? fmt(detail.serviceChargeAmount) : "Paid") : "Not paid"} />
           <DetailRow label="Amount to Disburse" value={fmt(amountToDisburse)} highlight />
         </div>
-
-        {/* School bank account */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-2">
           <div className="flex items-center justify-between py-3 border-b border-gray-50">
             <p className="text-xs font-bold text-[#881337] uppercase tracking-wide">School Bank Account</p>
@@ -385,8 +365,6 @@ const FundingPartnerDisbursementPage: React.FC = () => {
           <DetailRow label="Account Number" value={bank.accountNumber} highlight />
           <DetailRow label="Account Name" value={bank.accountName} />
         </div>
-
-        {/* Repayment schedule */}
         {(detail.schedule?.length ?? 0) > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <p className="text-xs font-bold text-[#881337] uppercase tracking-wide px-6 py-3 border-b border-gray-50">
@@ -415,14 +393,11 @@ const FundingPartnerDisbursementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Error */}
         {actionState === "error" && actionError && (
           <div className="rounded-xl bg-red-50 border border-red-200 px-5 py-3 text-sm text-red-700 font-medium">
             {actionError}
           </div>
         )}
-
-        {/* Action Buttons */}
         {!alreadyProcessed && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-6 space-y-4">
             <p className="text-sm font-bold text-gray-800">

@@ -16,7 +16,6 @@ const DisbursementChart: React.FC = () => {
 
   return (
     <svg viewBox={`0 0 ${padL + months.length * gap} ${chartH + padB}`} className="w-full h-auto">
-      {/* grid */}
       {[25, 50, 75, 100].map((v) => {
         const y = chartH - (v / maxVal) * chartH;
         return (
@@ -31,19 +30,17 @@ const DisbursementChart: React.FC = () => {
         const tH = (target[i] / maxVal) * chartH;
         return (
           <g key={m}>
-            {/* target bar */}
             <rect
               x={cx - barW / 2 - 1} y={chartH - tH}
               width={barW} height={tH}
               rx="3" fill="#e2e8f0"
             />
-            {/* actual bar */}
             <rect
               x={cx + 2} y={chartH - aH}
               width={barW} height={aH}
               rx="3" fill="#881337"
             />
-            {/* label */}
+
             <text x={cx + 1} y={chartH + padB - 6} textAnchor="middle" fontSize="11" fill="#94a3b8">{m}</text>
           </g>
         );

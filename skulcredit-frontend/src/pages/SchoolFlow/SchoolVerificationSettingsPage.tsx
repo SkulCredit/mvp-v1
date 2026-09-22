@@ -44,13 +44,22 @@ const DOCS = [
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 const SchoolVerificationSettingsPage: React.FC = () => {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { user } = useAuth();
   const schoolName =
     user?.schoolName ?? user?.name ?? "Springfield High School";
 
   return (
-    <DashboardLayout sidebar={<SchoolSidebar />} header={<SchoolTopBar />}>
-      <div className="max-w-2xl mx-auto pt-8 space-y-5 animate-fade-in-up">
+    <DashboardLayout
+      sidebar={
+        <SchoolSidebar
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
+        />
+      }
+      header={<SchoolTopBar onMobileMenuOpen={() => setMobileNavOpen(true)} />}
+    >
+      <div className="pt-8 space-y-5 animate-fade-in-up w-[90%] mx-auto">
         {/* Page header */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex items-start justify-between">
           <div className="flex-1">

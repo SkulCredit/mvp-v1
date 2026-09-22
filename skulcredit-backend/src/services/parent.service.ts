@@ -552,11 +552,27 @@ class ParentService {
         status: { [Op.in]: ["pending", "in_progress"] },
       },
     });
+
     if (existing) {
-      throw new ApiError(
-        400,
-        "You already have a pending request for a school with this name",
-      );
+      return existing.update({
+        schoolAddress:
+          (data.schoolAddress as string | undefined) ?? existing.schoolAddress,
+        schoolCity:
+          (data.schoolCity as string | undefined) ?? existing.schoolCity,
+        schoolState:
+          (data.schoolState as string | undefined) ?? existing.schoolState,
+        contactPerson:
+          (data.contactPerson as string | undefined) ?? existing.contactPerson,
+        contactPhone:
+          (data.contactPhone as string | undefined) ?? existing.contactPhone,
+        contactEmail:
+          (data.contactEmail as string | undefined) ?? existing.contactEmail,
+        additionalNotes:
+          (data.additionalNotes as string | undefined) ??
+          existing.additionalNotes,
+        documentUrl:
+          (data.documentUrl as string | undefined) ?? existing.documentUrl,
+      });
     }
 
     return SchoolRequest.create({ parentId: parent.id, ...data } as never);
@@ -716,7 +732,7 @@ class ParentService {
       throw new ApiError(400, "School is not currently active");
 
     const partnerSchoolForWizard = await School.findOne({
-      where: { schoolName: catalogSchoolForWizard.name, status: "approved" },
+      where: { schoolName: catalogSchoolForWizard.name },
     });
 
     let photoUrl: string | null = parent.profilePhotoUrl ?? null;
@@ -973,14 +989,47 @@ class ParentService {
     });
     if (!student) throw new ApiError(404, "Student not found");
 
-    const catalogSchool = await CatalogSchool.findByPk(payload.schoolId);
-    if (!catalogSchool) throw new ApiError(404, "School not found");
-    if (!catalogSchool.isActive)
-      throw new ApiError(400, "School is not currently active");
+    const isManualSchool = payload.schoolId === "manual";
 
-    const partnerSchool = await School.findOne({
-      where: { schoolName: catalogSchool.name, status: "approved" },
-    });
+    let catalogSchool: InstanceType<typeof CatalogSchool> | null = null;
+    let manualSchoolName: string | null = null;
+
+    if (isManualSchool) {
+      const schoolRequest = await SchoolRequest.findOne({
+        where: { parentId: parent.id },
+        order: [["createdAt", "DESC"]],
+      });
+      if (!schoolRequest) {
+        throw new ApiError(
+          400,
+          "No school request found. Please complete the manual school form first.",
+        );
+      }
+      manualSchoolName = schoolRequest.schoolName;
+
+      const [manualCatalogSchool] = await CatalogSchool.findOrCreate({
+        where: { name: schoolRequest.schoolName },
+        defaults: {
+          name: schoolRequest.schoolName,
+          isRegistered: false,
+          tier: null,
+          serviceChargeRate: 0.235,
+          isActive: true,
+        },
+      });
+      catalogSchool = manualCatalogSchool;
+    } else {
+      catalogSchool = await CatalogSchool.findByPk(payload.schoolId);
+      if (!catalogSchool) throw new ApiError(404, "School not found");
+      if (!catalogSchool.isActive)
+        throw new ApiError(400, "School is not currently active");
+    }
+
+    const partnerSchool = catalogSchool
+      ? await School.findOne({
+          where: { schoolName: catalogSchool.name },
+        })
+      : null;
 
     const activeTerm = await schoolTermService.getActiveTerm();
 
@@ -1023,19 +1072,27 @@ class ParentService {
       referenceNumber,
       parentId: parent.id,
       studentId: student.id,
-      catalogSchoolId: payload.schoolId,
+      catalogSchoolId: catalogSchool!.id,
       schoolId: partnerSchool?.id ?? null,
       amountRequested: payload.tuitionAmount,
       tenor: effectiveTenor,
-      status: "pending",
+      status: partnerSchool ? "school_verification" : "pending",
       termsAccepted: true,
       termsAcceptedAt: new Date(),
-      // Snapshot the service charge at submission time — rate may change later
-      serviceChargeRate: Number(catalogSchool.serviceChargeRate ?? 0.235),
+      serviceChargeRate: Number(catalogSchool!.serviceChargeRate ?? 0.235),
       serviceChargeAmount: Math.round(
         payload.tuitionAmount *
-          Number(catalogSchool.serviceChargeRate ?? 0.235),
+          Number(catalogSchool!.serviceChargeRate ?? 0.235),
       ),
+      adminNote: isManualSchool ? `Manual school: ${manualSchoolName}` : null,
+    });
+
+    await ApplicationEvent.create({
+      loanApplicationId: application.id,
+      actor: "parent",
+      actorId: parent.id,
+      status: application.status,
+      note: null,
     });
 
     UserRepository.findById(userId)
@@ -1045,7 +1102,6 @@ class ParentService {
           payload.tenor === 1 ? "Full payment" : `${payload.tenor}-month plan`;
         const amountFormatted = `₦${Number(payload.tuitionAmount).toLocaleString("en-NG")}`;
 
-        // 1. Confirm receipt to parent
         sendEmail({
           email: user.email,
           subject: `Application Received – ${application.referenceNumber}`,
@@ -1064,7 +1120,7 @@ class ParentService {
                 <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Student</td>
                     <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${student.firstName} ${student.lastName}</td></tr>
                 <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">School</td>
-                    <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${catalogSchool.name}</td></tr>
+                    <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${catalogSchool?.name ?? manualSchoolName ?? "—"}</td></tr>
                 <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Repayment Plan</td>
                     <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${planLabel}</td></tr>
                 <tr><td style="padding:10px 0;color:#881337;font-weight:bold;font-size:15px">Total Amount</td>
@@ -1089,19 +1145,20 @@ class ParentService {
           ),
         );
 
-        // 2. Send school verification email
-        this._sendSchoolVerificationEmail({
-          application,
-          catalogSchool,
-          partnerSchool,
-          student,
-          parent,
-          parentEmail: user.email,
-        }).catch((err) =>
-          logger.warn(
-            `[parent.service] School verification email failed: ${(err as Error).message}`,
-          ),
-        );
+        if (!isManualSchool && catalogSchool) {
+          this._sendSchoolVerificationEmail({
+            application,
+            catalogSchool,
+            partnerSchool,
+            student,
+            parent,
+            parentEmail: user.email,
+          }).catch((err) =>
+            logger.warn(
+              `[parent.service] School verification email failed: ${(err as Error).message}`,
+            ),
+          );
+        }
       })
       .catch(() => {
         /* silent */
@@ -1172,13 +1229,7 @@ class ParentService {
       queued: !!parent.bvn,
     };
   }
-  // ── Private helpers ────────────────────────────────────────────────────────
 
-  /**
-   * Mark the service charge as paid for an application.
-   * Called after successful Paystack payment verification.
-   * Creates an event and notifies the parent in-app.
-   */
   async confirmServiceCharge(
     userId: string,
     applicationId: string,
@@ -1193,7 +1244,6 @@ class ParentService {
     if (!application) throw new ApiError(404, "Application not found");
 
     if (application.serviceFeePaid) {
-      // Idempotent — already paid
       return application;
     }
 
@@ -1222,15 +1272,6 @@ class ParentService {
     return application;
   }
 
-  /**
-   * Called after the parent confirms their repayment plan setup.
-   *
-   * 1. Validates the application belongs to this parent and is in an approvable state.
-   * 2. Marks serviceFeePaid = true and status = 'approved'.
-   * 3. Generates RepaymentSchedule installment records.
-   * 4. Creates an ApplicationEvent.
-   * 5. Fires the funding-partner notification email (fire-and-forget).
-   */
   async setupRepayment(
     userId: string,
     applicationId: string,
@@ -1257,7 +1298,6 @@ class ParentService {
 
     if (!application) throw new ApiError(404, "Application not found");
 
-    // Must have paid the service charge before setting up repayment
     if (!application.serviceFeePaid) {
       throw new ApiError(
         400,
@@ -1273,7 +1313,6 @@ class ParentService {
       );
     }
 
-    // Check if schedule already exists
     const existingSchedule = await RepaymentSchedule.findAll({
       where: { loanApplicationId: application.id },
     });
@@ -1284,21 +1323,19 @@ class ParentService {
       );
     }
 
-    const tenor = application.tenor; // number of months
+    const tenor = application.tenor;
     const totalAmount = Number(
       application.amountApproved ?? application.amountRequested,
     );
     const installmentAmount = Math.round(totalAmount / tenor);
     const lastInstallmentAdjustment =
       totalAmount - installmentAmount * (tenor - 1);
-
-    // Generate start date: either provided or today + 30 days
     const startDate = opts.repaymentStartDate
       ? new Date(opts.repaymentStartDate)
       : (() => {
           const d = new Date();
           d.setMonth(d.getMonth() + 1);
-          d.setDate(1); // 1st of next month
+          d.setDate(1);
           return d;
         })();
 
@@ -1318,7 +1355,7 @@ class ParentService {
         installmentNumber: i,
         dueDate: dueDate.toISOString().split("T")[0],
         principalAmount: amount,
-        interestAmount: 0, // No interest per platform rules
+        interestAmount: 0,
         totalAmount: amount,
         outstandingBalance: Math.max(0, outstandingBalance),
         status: "upcoming",
@@ -1327,7 +1364,6 @@ class ParentService {
       scheduleRecords.push(record);
     }
 
-    // Advance application to 'approved' and mark repayment setup complete
     await application.update({
       status: "approved",
       decidedAt: new Date(),
@@ -1346,7 +1382,6 @@ class ParentService {
       `[parent.service] Repayment schedule created | application=${application.id} | installments=${tenor}`,
     );
 
-    // Fire funding partner notification (non-blocking)
     this._notifyFundingPartner(application, parent).catch((err) =>
       logger.warn(
         `[parent.service] Funding partner email failed: ${(err as Error).message}`,
@@ -1360,10 +1395,6 @@ class ParentService {
     };
   }
 
-  /**
-   * Send the funding partner a rich email containing all application details
-   * and the disbursement-callback deep link.
-   */
   private async _notifyFundingPartner(
     application: typeof LoanApplication.prototype,
     parent: { id: string; firstName: string; lastName: string },
@@ -1376,7 +1407,6 @@ class ParentService {
       return;
     }
 
-    // Hydrate includes if not already present
     const app = await LoanApplication.findByPk(application.id, {
       include: [
         {
@@ -1434,7 +1464,6 @@ class ParentService {
       }
     ).school;
 
-    // Resolve bank details — prefer SchoolBankAccount (catalog-linked), then School flat fields
     const primaryBankAccount =
       catalogSchool?.bankAccounts?.find((b) => b.isPrimary) ??
       catalogSchool?.bankAccounts?.[0];
@@ -1572,11 +1601,6 @@ class ParentService {
     );
   }
 
-  /**
-   * Send a verification email to the school after a parent submits an application.
-   * - Registered schools: email to their portal-registered email with a deep-link.
-   * - Non-registered schools: email to the contact from the SchoolRequest record.
-   */
   private async _sendSchoolVerificationEmail(args: {
     application: typeof LoanApplication.prototype;
     catalogSchool: typeof CatalogSchool.prototype;
@@ -1607,21 +1631,20 @@ class ParentService {
       </table>
     `;
 
-    if (catalogSchool.isRegistered && partnerSchool) {
-      // --- Registered school: email goes to their portal user email ---
+    if (partnerSchool) {
       const schoolUser = await User.findOne({
         where: { id: partnerSchool.userId },
         attributes: ["email"],
       });
       if (!schoolUser?.email) {
         logger.warn(
-          `[parent.service] Registered school ${partnerSchool.id} has no user email`,
+          `[parent.service] School user ${partnerSchool.userId} has no email for school ${partnerSchool.id}`,
         );
         return;
       }
 
-      const verifyLink = `${frontendUrl}/school/applications/${application.id}/verify?token=${application.id}`;
-      const loginThenVerifyLink = `${frontendUrl}/school/login?redirect=/school/applications/${application.id}/verify`;
+      const verifyLink = `${frontendUrl}/school/applications?highlight=${application.id}`;
+      const loginThenVerifyLink = `${frontendUrl}/auth/school?next=${encodeURIComponent("/school/applications")}`;
 
       await sendEmail({
         email: schoolUser.email,
@@ -1659,8 +1682,15 @@ class ParentService {
       logger.info(
         `[parent.service] School verification email sent to registered school ${partnerSchool.id} (${schoolUser.email})`,
       );
+
+      NotificationPublisher.newApplicationForSchool(
+        partnerSchool.userId,
+        application.id,
+        `${parent.firstName} ${parent.lastName}`,
+        `${student.firstName} ${student.lastName}`,
+        Number(application.amountRequested),
+      );
     } else {
-      // --- Non-registered school: find SchoolRequest for the parent and send to contact ---
       const schoolRequest = await SchoolRequest.findOne({
         where: { parentId: parent.id, schoolName: catalogSchool.name },
         order: [["createdAt", "DESC"]],

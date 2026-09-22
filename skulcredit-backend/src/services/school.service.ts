@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import { SchoolRepository } from "../repositories";
 import {
   Student,
@@ -100,7 +101,19 @@ class SchoolService {
     const school = await SchoolRepository.findOne({ userId });
     if (!school) throw new ApiError(404, "School profile not found");
 
-    const where: Record<string, unknown> = { schoolId: school.id };
+    const catalogSchool = await CatalogSchool.findOne({
+      where: { name: school.schoolName },
+      attributes: ["id"],
+    });
+
+    const whereConditions: import("sequelize").WhereOptions[] = [
+      { schoolId: school.id },
+    ];
+    if (catalogSchool) {
+      whereConditions.push({ catalogSchoolId: catalogSchool.id });
+    }
+
+    const where: Record<string, unknown> = { [Op.or]: whereConditions };
     if (status) where.status = status;
 
     const offset = (parseInt(String(page)) - 1) * parseInt(String(limit));
@@ -146,8 +159,19 @@ class SchoolService {
     const school = await SchoolRepository.findOne({ userId });
     if (!school) throw new ApiError(404, "School profile not found");
 
+    const catalogSchool = await CatalogSchool.findOne({
+      where: { name: school.schoolName },
+      attributes: ["id"],
+    });
+
     const application = await LoanApplication.findOne({
-      where: { id: applicationId, schoolId: school.id },
+      where: {
+        id: applicationId,
+        [Op.or]: [
+          { schoolId: school.id },
+          ...(catalogSchool ? [{ catalogSchoolId: catalogSchool.id }] : []),
+        ],
+      },
       include: [
         {
           model: Student,
@@ -165,7 +189,40 @@ class SchoolService {
               model: Parent,
               as: "parent",
               attributes: ["id", "firstName", "lastName"],
+              include: [
+                {
+                  model: User,
+                  as: "user",
+                  attributes: ["email", "phoneNumber"],
+                },
+              ],
             },
+          ],
+        },
+        {
+          model: CatalogSchool,
+          as: "catalogSchool",
+          attributes: [
+            "id",
+            "name",
+            "tier",
+            "serviceChargeRate",
+            "isRegistered",
+          ],
+        },
+        {
+          model: School,
+          as: "school",
+          attributes: [
+            "id",
+            "schoolName",
+            "contactPerson",
+            "addressStreet",
+            "addressCity",
+            "addressState",
+            "bankName",
+            "bankAccountName",
+            "bankAccountNumber",
           ],
         },
         {
@@ -188,16 +245,31 @@ class SchoolService {
     const school = await SchoolRepository.findOne({ userId });
     if (!school) throw new ApiError(404, "School profile not found");
 
+    const catalogSchool = await CatalogSchool.findOne({
+      where: { name: school.schoolName },
+      attributes: ["id"],
+    });
+
     const application = await LoanApplication.findOne({
-      where: { id: applicationId, schoolId: school.id },
+      where: {
+        id: applicationId,
+        [Op.or]: [
+          { schoolId: school.id },
+          ...(catalogSchool ? [{ catalogSchoolId: catalogSchool.id }] : []),
+        ],
+      },
     });
     if (!application) throw new ApiError(404, "Application not found");
 
-    if (application.status !== "school_verification") {
+    if (!["school_verification", "pending"].includes(application.status)) {
       throw new ApiError(
         400,
         `Application is in '${application.status}' status and is not awaiting school verification`,
       );
+    }
+
+    if (!application.schoolId && school.id) {
+      await application.update({ schoolId: school.id });
     }
 
     if (action === "confirm") {
@@ -218,14 +290,12 @@ class SchoolService {
         note: note ?? "Enrollment and fee amount confirmed by school",
       });
 
-      // Notify parent: application accepted — prompt them to pay service charge
       this._sendParentServiceChargeEmail(application.id).catch((err) =>
         logger.warn(
           `[school.service] Parent service-charge email failed: ${(err as Error).message}`,
         ),
       );
 
-      // In-app notification to parent
       NotificationPublisher.applicationApproved(
         application.parentId,
         application.id,
@@ -247,11 +317,19 @@ class SchoolService {
         note: note ?? "Enrollment rejected by school",
       });
 
-      // In-app notification to parent
       NotificationPublisher.applicationRejected(
         application.parentId,
         application.id,
         note,
+      );
+
+      this._sendParentRejectionEmail(
+        application.id,
+        note ?? "Enrollment could not be confirmed by the school",
+      ).catch((err) =>
+        logger.warn(
+          `[school.service] Parent rejection email failed: ${(err as Error).message}`,
+        ),
       );
     }
 
@@ -262,6 +340,20 @@ class SchoolService {
     const school = await SchoolRepository.findOne({ userId });
     if (!school) throw new ApiError(404, "School profile not found");
 
+    const catalogSchool = await CatalogSchool.findOne({
+      where: { name: school.schoolName },
+      attributes: ["id"],
+    });
+
+    const schoolWhere = catalogSchool
+      ? {
+          [Op.or]: [
+            { schoolId: school.id },
+            { catalogSchoolId: catalogSchool.id },
+          ],
+        }
+      : { schoolId: school.id };
+
     const [
       totalStudents,
       totalApplications,
@@ -269,12 +361,15 @@ class SchoolService {
       recentApplications,
     ] = await Promise.all([
       Student.count({ where: { schoolId: school.id } }),
-      LoanApplication.count({ where: { schoolId: school.id } }),
+      LoanApplication.count({ where: schoolWhere }),
       LoanApplication.count({
-        where: { schoolId: school.id, status: "school_verification" },
+        where: {
+          ...schoolWhere,
+          status: { [Op.in]: ["school_verification", "pending"] },
+        },
       }),
       LoanApplication.findAll({
-        where: { schoolId: school.id },
+        where: schoolWhere,
         include: [
           {
             model: Student,
@@ -294,12 +389,6 @@ class SchoolService {
     };
   }
 
-  // ── Funding-partner disbursement callback ─────────────────────────────────
-
-  /**
-   * Public read: returns all data the funding partner needs to review a
-   * funding request before confirming disbursement.
-   */
   async getDisbursementDetails(applicationId: string) {
     const application = await LoanApplication.findByPk(applicationId, {
       include: [
@@ -368,7 +457,6 @@ class SchoolService {
 
     if (!application) throw new ApiError(404, "Funding request not found");
 
-    // Also fetch the parent profile for name
     const parentProfile = await ParentRepository.findOne({
       id: application.parentId,
     });
@@ -415,7 +503,6 @@ class SchoolService {
         Number(application.amountRequested),
       );
 
-      // Email parent with disbursement confirmation
       const parentUser = await this._getParentUser(application.parentId);
       if (parentUser?.email) {
         const amountFmt = `₦${Number(application.amountRequested).toLocaleString("en-NG")}`;
@@ -438,9 +525,7 @@ class SchoolService {
               <p style="font-size:13px;color:#6b7280;margin:0">The SkulCredit Team</p>
             </div>
           </div>`,
-        }).catch(() => {
-          /* silent */
-        });
+        }).catch(() => {});
       }
     } else {
       await application.update({
@@ -462,7 +547,6 @@ class SchoolService {
         application.id,
       );
 
-      // Email parent about the rejection
       const parentUserForRejection = await this._getParentUser(
         application.parentId,
       );
@@ -488,16 +572,66 @@ class SchoolService {
               <p style="font-size:13px;color:#6b7280;margin:0">The SkulCredit Team</p>
             </div>
           </div>`,
-        }).catch(() => {
-          /* silent */
-        });
+        }).catch(() => {});
       }
     }
 
     return LoanApplication.findByPk(applicationId);
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
+  private async _sendParentRejectionEmail(
+    applicationId: string,
+    reason: string,
+  ): Promise<void> {
+    const application = await LoanApplication.findByPk(applicationId, {
+      include: [
+        { model: Student, as: "student" },
+        { model: CatalogSchool, as: "catalogSchool" },
+      ],
+    });
+    if (!application) return;
+
+    const parentUser = await this._getParentUser(application.parentId);
+    if (!parentUser?.email) return;
+
+    const parent = await ParentRepository.findOne({ id: application.parentId });
+    if (!parent) return;
+
+    const frontendUrl = process.env.FRONTEND_URL ?? env.frontendUrl;
+    const student = (
+      application as unknown as {
+        student?: { firstName?: string; lastName?: string };
+      }
+    ).student;
+    const catalogSchool = (
+      application as unknown as { catalogSchool?: { name?: string } }
+    ).catalogSchool;
+
+    await sendEmail({
+      email: parentUser.email,
+      subject: `Application Update – ${application.referenceNumber}`,
+      message: `Your application for ${student?.firstName ?? ""} ${student?.lastName ?? ""} could not be accepted.`,
+      html: `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#333">
+        <div style="background:#b91c1c;padding:28px 32px;border-radius:12px 12px 0 0">
+          <h1 style="color:#fff;margin:0;font-size:22px">Application Not Accepted</h1>
+        </div>
+        <div style="background:#fff;padding:28px 32px;border:1px solid #fca5a5;border-top:none;border-radius:0 0 12px 12px">
+          <p style="margin:0 0 16px">Hi <strong>${parent.firstName}</strong>,</p>
+          <p style="margin:0 0 20px">Your tuition application for <strong>${student?.firstName ?? ""} ${student?.lastName ?? ""}</strong> at <strong>${catalogSchool?.name ?? "your school"}</strong> (ref: <strong>${application.referenceNumber}</strong>) has not been accepted by the school.</p>
+          <div style="background:#fef2f2;border-left:4px solid #b91c1c;border-radius:6px;padding:16px;margin-bottom:24px">
+            <p style="margin:0;font-size:14px;color:#b91c1c"><strong>Reason provided by school:</strong></p>
+            <p style="margin:8px 0 0;font-size:14px;color:#7f1d1d">${reason}</p>
+          </div>
+          <p style="margin:0 0 20px;font-size:14px;color:#4b5563">The SkulCredit team will follow up with the school on your behalf. You may start a new application or contact our support team for assistance.</p>
+          <div style="text-align:center;margin:24px 0">
+            <a href="${frontendUrl}/parent/applications" style="display:inline-block;background:#881337;color:#fff;font-weight:bold;padding:12px 28px;border-radius:8px;text-decoration:none;font-size:14px">View My Applications</a>
+          </div>
+          <p style="font-size:13px;color:#6b7280;margin:0">The SkulCredit Team</p>
+        </div>
+      </div>`,
+    });
+  }
 
   private async _sendParentServiceChargeEmail(
     applicationId: string,

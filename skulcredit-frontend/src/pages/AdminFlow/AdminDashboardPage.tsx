@@ -70,7 +70,6 @@ const PortfolioChart: React.FC = () => {
           <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
         </linearGradient>
       </defs>
-      {/* grid lines */}
       {[0.25, 0.5, 0.75].map((v, i) => (
         <line
           key={i}
@@ -82,10 +81,8 @@ const PortfolioChart: React.FC = () => {
           strokeWidth="1"
         />
       ))}
-      {/* areas */}
       <path d={areaPath(disbursed)} fill="url(#gDis)" />
       <path d={areaPath(repaid)} fill="url(#gRep)" />
-      {/* lines */}
       <polyline
         points={pts(disbursed)}
         stroke="#881337"
@@ -224,7 +221,6 @@ const AdminDashboardPage: React.FC = () => {
   return (
     <DashboardLayout sidebar={<AdminSidebar />} header={<AdminTopBar />}>
       <div className="max-w-[1280px] mx-auto py-8 px-2 space-y-8">
-        {/* page title */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
@@ -241,8 +237,6 @@ const AdminDashboardPage: React.FC = () => {
             </button>
           </div>
         </div>
-
-        {/* KPI row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             {
@@ -303,10 +297,7 @@ const AdminDashboardPage: React.FC = () => {
             </div>
           ))}
         </div>
-
-        {/* chart + quick summary */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Portfolio Overview */}
           <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -353,8 +344,6 @@ const AdminDashboardPage: React.FC = () => {
               </span>
             </div>
           </div>
-
-          {/* Quick Summary */}
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -438,8 +427,6 @@ const AdminDashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Action Required */}
         <div className="bg-white rounded-xl border border-slate-200">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
             <div>
@@ -516,8 +503,6 @@ const AdminDashboardPage: React.FC = () => {
             </table>
           </div>
         </div>
-
-        {/* Recent Activity */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <div className="flex items-center justify-between mb-5">
             <h2 className="font-semibold text-slate-900 flex items-center gap-2">

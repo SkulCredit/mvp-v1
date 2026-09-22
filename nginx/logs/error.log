@@ -11,3 +11,6 @@
 2026/09/21 06:34:18 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
 2026/09/21 06:34:31 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
 2026/09/21 06:34:57 [emerg] 1#1: "proxy_pass" cannot have URI part in location given by regular expression, or inside named location, or inside "if" statement, or inside "limit_except" block in /etc/nginx/conf.d/09-administrative-security.conf:182
+2026/09/21 23:00:07 [notice] 178#178: signal process started
+2026/09/21 23:08:14 [notice] 119#119: signal process started
+2026/09/21 23:31:21 [error] 30#30: *57 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: _, request: "GET /socket.io/?EIO=4&transport=websocket HTTP/1.1", upstream: "http://172.19.0.5:8080/socket.io/?EIO=4&transport=websocket", host: "localhost"

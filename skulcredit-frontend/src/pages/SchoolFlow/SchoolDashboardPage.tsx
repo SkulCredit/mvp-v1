@@ -8,23 +8,27 @@ import {
 } from "../../components/layout";
 import { useAuth } from "../../context/AuthContext";
 import { schoolService } from "../../services/schoolService";
-import { dashboardService } from "../../services/dashboardService";
+import { useSocket } from "../../context/SocketContext";
 import { AxiosError } from "axios";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 type DashboardStatus = "pending" | "approved" | "active";
 
-interface DashboardData {
-  school?: Record<string, unknown>;
-  applications?: {
-    id: string;
-    status: string;
-    amount?: number;
-    createdAt?: string;
-  }[];
-  students?: unknown[];
-  disbursements?: { id: string; amount?: number; status: string }[];
+interface DashboardStats {
+  totalStudents: number;
+  totalApplications: number;
+  pendingVerification: number; 
+  verifiedCount: number;
+  totalDisbursed: number; 
+  recentApplications: RawApp[];
+}
+
+interface RawApp {
+  id: string;
+  status: string;
+  amountRequested?: number;
+  createdAt?: string;
+  student?: { firstName?: string; lastName?: string };
 }
 
 interface RegForm {
@@ -33,25 +37,15 @@ interface RegForm {
   accountName: string;
 }
 
-// ── Small shared pieces ───────────────────────────────────────────────────────
-
-const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex justify-between py-2 border-b border-slate-50 last:border-0">
-    <span className="text-sm text-slate-500">{label}</span>
-    <span className="text-sm font-semibold text-slate-800">{value}</span>
-  </div>
-);
-
 const StatCard: React.FC<{
   icon: React.ReactNode;
   label: string;
   value: string;
-  sub: string;
+  sub?: string;
   linkLabel: string;
-  to: string;
   onClick: () => void;
 }> = ({ icon, label, value, sub, linkLabel, onClick }) => (
-  <div className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-3 shadow-sm">
+  <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow">
     <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center">
       {icon}
     </div>
@@ -77,9 +71,9 @@ const QuickAction: React.FC<{
 }> = ({ icon, label, onClick }) => (
   <button
     onClick={onClick}
-    className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col items-center gap-3 hover:border-brand/40 hover:shadow-sm transition-all text-center"
+    className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col items-center gap-3 hover:border-brand/40 hover:shadow-sm transition-all text-center group"
   >
-    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center">
+    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center group-hover:bg-brand/20 transition-colors">
       {icon}
     </div>
     <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
@@ -89,7 +83,6 @@ const QuickAction: React.FC<{
   </button>
 );
 
-// ── Activity icons by keyword ─────────────────────────────────────────────────
 const activityIcon = (text: string) => {
   if (/application/i.test(text)) return "file-text";
   if (/payment|disbursement/i.test(text)) return "credit-card";
@@ -99,22 +92,26 @@ const activityIcon = (text: string) => {
   return "activity";
 };
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 const SchoolDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { socket } = useSocket();
 
-  const [dashboardData, setDashboardData] = useState<DashboardData>({
-    school: {},
-    applications: [],
-    students: [],
-    disbursements: [],
-  });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardStatus, setDashboardStatus] =
     useState<DashboardStatus>("active");
+
+  const [stats, setStats] = useState<DashboardStats>({
+    totalStudents: 0,
+    totalApplications: 0,
+    pendingVerification: 0,
+    verifiedCount: 0,
+    totalDisbursed: 0,
+    recentApplications: [],
+  });
+
   const [regForm, setRegForm] = useState<RegForm>({
     bankName: "",
     accountNumber: "",
@@ -123,44 +120,47 @@ const SchoolDashboardPage: React.FC = () => {
   const [regSubmitting, setRegSubmitting] = useState(false);
   const [regError, setRegError] = useState("");
 
-  const schoolName =
-    (user?.schoolName ?? user?.name ?? "Partner School") + " - Partner Portal";
+  const loadDashboard = async () => {
+    setIsLoading(true);
+    try {
+      const data = (await schoolService.getDashboard()) as {
+        stats?: {
+          totalStudents?: number;
+          totalApplications?: number;
+          pendingVerification?: number;
+        };
+        recentApplications?: RawApp[];
+        profile?: { status?: string };
+      };
 
-  const myApplications = dashboardData.applications ?? [];
-  const pendingCount = myApplications.filter(
-    (a) => a.status === "pending_school_approval",
-  ).length;
-  const verifiedCount = myApplications.filter((a) =>
-    ["school_approved", "disbursed"].includes(a.status),
-  ).length;
-  const totalStudents = dashboardData.students?.length ?? 0;
-  const totalDisbursed = (dashboardData.disbursements ?? []).reduce(
-    (s, d) => s + (d.amount ?? 0),
-    0,
-  );
+      const s = data?.stats ?? {};
+      const apps = (data?.recentApplications ?? []) as RawApp[];
 
-  const RECENT_ACTIVITIES = [
-    "New tuition application submitted for *Sarah A.*",
-    "Parent uploaded proof-of-income for *Samuel O.*",
-    "Student *John Okoro* was marked as verified by the school.",
-    "School received a payment of ₦150,000 for *Amaka N*",
-    "Pending document update request submitted by the school admin",
-    "Application for *Chioma Peter* moved from Pending → Under Review",
-    "Disbursement alert: ₦200,000 processed for *HND 1 Students*",
-    "Support ticket #20321 was updated by the SchoolCredit team",
-  ];
+      const verified = apps.filter((a) =>
+        ["school_approved", "disbursed", "approved", "under_review"].includes(
+          a.status,
+        ),
+      ).length;
+      const disbursed = apps
+        .filter((a) => a.status === "disbursed")
+        .reduce((sum, a) => sum + Number(a.amountRequested ?? 0), 0);
+
+      setStats({
+        totalStudents: s.totalStudents ?? 0,
+        totalApplications: s.totalApplications ?? 0,
+        pendingVerification: s.pendingVerification ?? 0,
+        verifiedCount: verified,
+        totalDisbursed: disbursed,
+        recentApplications: apps,
+      });
+    } catch {
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await dashboardService.getSchoolDashboard();
-        setDashboardData(data as DashboardData);
-      } catch {
-        /* silent */
-      } finally {
-        setIsLoading(false);
-      }
-    })();
+    loadDashboard();
   }, []);
 
   useEffect(() => {
@@ -169,6 +169,17 @@ const SchoolDashboardPage: React.FC = () => {
     ) as DashboardStatus | null;
     if (s) setDashboardStatus(s);
   }, [location]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => {
+      void loadDashboard();
+    };
+    socket.on("notification:new", handler);
+    return () => {
+      socket.off("notification:new", handler);
+    };
+  }, [socket]);
 
   const handleBankSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,39 +215,29 @@ const SchoolDashboardPage: React.FC = () => {
   const inputCls =
     "w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand";
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
     <DashboardLayout
-      sidebar={<SchoolSidebar />}
-      header={<SchoolTopBar notificationCount={pendingCount} />}
+      sidebar={
+        <SchoolSidebar
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
+        />
+      }
+      header={<SchoolTopBar onMobileMenuOpen={() => setMobileNavOpen(true)} />}
     >
       {/* ════ PENDING ════ */}
       {dashboardStatus === "pending" && (
-        <div className="max-w-3xl mx-auto pt-8 space-y-6 animate-fade-in-up">
-          {/* Welcome */}
+        <div className="pt-8 space-y-6 animate-fade-in-up w-[90%] mx-auto">
           <div>
             <h1 className="text-xl font-bold text-brand">
               Welcome to your Dashboard
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">{schoolName}</p>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {user?.schoolName ?? user?.name} - Partner Portal
+            </p>
           </div>
 
-          {/* Verification complete banner */}
-          <div className="flex items-center justify-between bg-slate-100 rounded-xl px-5 py-3.5">
-            <span className="text-sm font-medium text-slate-700">
-              Verification Complete
-            </span>
-            <span className="text-sm text-slate-400">
-              You can now manage students, applications, and disbursements.
-            </span>
-            <button className="text-slate-400 hover:text-slate-600">
-              <Icon name="info" className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Under review card */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 flex gap-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex gap-4">
             <div className="w-12 h-12 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
               <Icon name="clock" className="w-6 h-6 text-amber-600" />
             </div>
@@ -245,32 +246,28 @@ const SchoolDashboardPage: React.FC = () => {
                 Application Under Review
               </h3>
               <p className="text-sm text-amber-700 mb-4">
-                Thank you for registering with SkulCredit! Your school
-                application is currently being reviewed by our team.
+                Your school application is being reviewed by our team. You'll be
+                notified once approved.
               </p>
-
-              <div className="bg-white rounded-xl p-4 border border-amber-100">
-                <p className="text-sm font-semibold text-slate-700 mb-3">
-                  What happens next?
-                </p>
+              <div className="bg-white rounded-xl p-4 border border-amber-100 space-y-3">
                 {[
                   {
                     n: 1,
                     title: "Document Review",
-                    desc: "Our team is reviewing your submitted documents and school information",
+                    desc: "Our team is reviewing your submitted documents",
                   },
                   {
                     n: 2,
                     title: "On-Site Verification",
-                    desc: "We will schedule a visit to verify your school facilities and operations",
+                    desc: "We will schedule a visit to verify your school",
                   },
                   {
                     n: 3,
                     title: "Accreditation",
-                    desc: "Once approved, you'll be notified to submit bank details to receive disbursements",
+                    desc: "Once approved, you'll submit bank details to receive disbursements",
                   },
                 ].map(({ n, title, desc }) => (
-                  <div key={n} className="flex gap-3 mb-3 last:mb-0">
+                  <div key={n} className="flex gap-3">
                     <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                       {n}
                     </span>
@@ -283,22 +280,17 @@ const SchoolDashboardPage: React.FC = () => {
                   </div>
                 ))}
               </div>
-
               <div className="flex gap-6 mt-4">
                 <div className="flex items-center gap-2 text-sm text-slate-600">
                   <Icon name="clock" className="w-4 h-4 text-amber-600" />
                   <span>
-                    Estimated Review Time
-                    <br />
-                    <strong>3–5 business days</strong>
+                    Estimated: <strong>3–5 business days</strong>
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-600">
                   <Icon name="phone" className="w-4 h-4 text-amber-600" />
                   <span>
-                    Questions?
-                    <br />
-                    <strong>Schools@skulcredit.com</strong>
+                    Questions? <strong>Schools@skulcredit.com</strong>
                   </span>
                 </div>
               </div>
@@ -307,7 +299,6 @@ const SchoolDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* ════ APPROVED — bank details ════ */}
       {dashboardStatus === "approved" && (
         <div className="max-w-lg mx-auto pt-10 animate-fade-in-up">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
@@ -347,7 +338,7 @@ const SchoolDashboardPage: React.FC = () => {
                 {
                   label: "Account Name*",
                   key: "accountName",
-                  placeholder: "Official school account name",
+                  placeholder: "School Account Name",
                 },
               ].map(({ label, key, placeholder }) => (
                 <div key={key}>
@@ -391,13 +382,14 @@ const SchoolDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* ════ ACTIVE — main dashboard ════ */}
       {dashboardStatus === "active" && (
-        <div className="max-w-4xl mx-auto pt-8 space-y-8 animate-fade-in-up">
+        <div className="pt-8 space-y-8 animate-fade-in-up w-[90%] mx-auto">
           {/* Header */}
           <div>
-            <h1 className="text-xl font-bold text-brand">Dashboard</h1>
-            <div className="flex items-center gap-2 mt-1 text-sm text-slate-600">
+            <h1 className="text-2xl font-extrabold text-slate-900">
+              Dashboard
+            </h1>
+            <div className="flex items-center gap-2 mt-1 text-sm">
               <Icon name="check-circle" className="w-4 h-4 text-emerald-500" />
               <span className="font-semibold text-slate-700">
                 Your Verification is Complete
@@ -409,15 +401,17 @@ const SchoolDashboardPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Overview stat cards */}
           {isLoading ? (
             <div className="flex justify-center py-12">
               <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
             <>
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                <h2 className="text-sm font-bold text-brand mb-4">Overview</h2>
+              {/* Overview stat cards */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <h2 className="text-sm font-bold text-brand mb-4 uppercase tracking-wide">
+                  Overview
+                </h2>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <StatCard
                     icon={
@@ -426,11 +420,9 @@ const SchoolDashboardPage: React.FC = () => {
                         className="w-6 h-6 text-brand"
                       />
                     }
-                    label="Total Student"
-                    value={String(totalStudents || 140)}
-                    sub=""
+                    label="Total Students"
+                    value={String(stats.totalStudents)}
                     linkLabel="View Students"
-                    to="/school/students"
                     onClick={() => navigate("/school/students")}
                   />
                   <StatCard
@@ -438,10 +430,8 @@ const SchoolDashboardPage: React.FC = () => {
                       <Icon name="file-text" className="w-6 h-6 text-brand" />
                     }
                     label="New Applications"
-                    value={`${pendingCount || 12} Pending`}
-                    sub=""
+                    value={`${stats.pendingVerification} Pending`}
                     linkLabel="Review Now"
-                    to="/school/applications"
                     onClick={() => navigate("/school/applications")}
                   />
                   <StatCard
@@ -452,10 +442,8 @@ const SchoolDashboardPage: React.FC = () => {
                       />
                     }
                     label="Verified Applications"
-                    value={`${verifiedCount || 86} Verified`}
-                    sub=""
+                    value={`${stats.verifiedCount} Verified`}
                     linkLabel="View List"
-                    to="/school/applications"
                     onClick={() => navigate("/school/applications")}
                   />
                   <StatCard
@@ -464,21 +452,19 @@ const SchoolDashboardPage: React.FC = () => {
                     }
                     label="Payments Received"
                     value={
-                      totalDisbursed > 0
-                        ? `₦${totalDisbursed.toLocaleString()}`
-                        : "₦4,250,000"
+                      stats.totalDisbursed > 0
+                        ? `₦${stats.totalDisbursed.toLocaleString("en-NG")}`
+                        : "₦0"
                     }
-                    sub=""
                     linkLabel="View Payments"
-                    to="/school/disbursement"
                     onClick={() => navigate("/school/disbursement")}
                   />
                 </div>
               </div>
 
               {/* Quick actions */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                <h2 className="text-sm font-bold text-slate-800 mb-4">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <h2 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wide">
                   Quick Actions
                 </h2>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -513,32 +499,50 @@ const SchoolDashboardPage: React.FC = () => {
 
               {/* Recent activities */}
               <div>
-                <h2 className="text-base font-bold text-slate-800 mb-4">
+                <h2 className="text-base font-bold text-slate-800 mb-3">
                   Recent Activities
                 </h2>
-                <div className="flex flex-col divide-y divide-slate-100 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                  {RECENT_ACTIVITIES.map((text, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
-                        <Icon
-                          name={activityIcon(text)}
-                          className="w-4 h-4 text-brand"
-                        />
-                      </div>
-                      <p
-                        className="text-sm text-slate-600"
-                        dangerouslySetInnerHTML={{
-                          __html: text.replace(
-                            /\*(.*?)\*/g,
-                            "<strong>$1</strong>",
-                          ),
-                        }}
-                      />
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
+                  {stats.recentApplications.length === 0 ? (
+                    <div className="px-5 py-10 text-center text-sm text-slate-400">
+                      No recent activity yet.
                     </div>
-                  ))}
+                  ) : (
+                    stats.recentApplications.slice(0, 8).map((app, i) => {
+                      const studentName = app.student
+                        ? `${app.student.firstName ?? ""} ${app.student.lastName ?? ""}`.trim()
+                        : "—";
+                      const actText =
+                        app.status === "school_verification"
+                          ? `New tuition application submitted for ${studentName}`
+                          : app.status === "disbursed"
+                            ? `Payment of ₦${Number(app.amountRequested ?? 0).toLocaleString("en-NG")} disbursed for ${studentName}`
+                            : `Application for ${studentName} — status: ${app.status.replace(/_/g, " ")}`;
+                      return (
+                        <div
+                          key={`${app.id}-${i}`}
+                          className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                          onClick={() => navigate("/school/applications")}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
+                            <Icon
+                              name={activityIcon(actText)}
+                              className="w-4 h-4 text-brand"
+                            />
+                          </div>
+                          <p className="text-sm text-slate-600">{actText}</p>
+                          <span className="ml-auto text-xs text-slate-400 shrink-0">
+                            {app.createdAt
+                              ? new Date(app.createdAt).toLocaleDateString(
+                                  "en-NG",
+                                  { day: "numeric", month: "short" },
+                                )
+                              : ""}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </>
