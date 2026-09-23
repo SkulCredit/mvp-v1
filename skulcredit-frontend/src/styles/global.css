@@ -264,12 +264,11 @@
   }
 }
 
-/* ── react-country-state-city — match form design ──────────────────────────── */
 .stdropdown-container {
-  border: 1px solid #e5e7eb !important; /* gray-200 */
-  border-radius: 0.5rem !important; /* rounded-lg */
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.5rem !important; 
   font-family: inherit !important;
-  font-size: 0.875rem !important; /* text-sm */
+  font-size: 0.875rem !important; 
   background: #fff !important;
   width: 100% !important;
   transition: border-color 0.15s ease !important;
@@ -287,8 +286,8 @@
 }
 
 .stdropdown-input {
-  padding: 0.625rem 0.75rem !important; /* py-2.5 px-3 */
-  color: #1f2937 !important; /* gray-800 */
+  padding: 0.625rem 0.75rem !important; 
+  color: #1f2937 !important; 
   cursor: pointer !important;
 }
 
@@ -299,11 +298,10 @@
 }
 
 .stdropdown-input input::placeholder {
-  color: #9ca3af !important; /* placeholder-gray-400 */
+  color: #9ca3af !important; 
 }
 
 .stdropdown-tool-tip {
-  /* the chevron arrow — keep it tidy */
   color: #9ca3af !important;
 }
 
@@ -323,7 +321,7 @@
 }
 
 .stdropdown-item:hover {
-  background-color: #fdf2f8 !important; /* light brand tint */
+  background-color: #fdf2f8 !important; 
   color: #8b1c53 !important;
 }
 
@@ -350,13 +348,11 @@
   border-color: #8b1c53 !important;
 }
 
-/* disabled state */
 .stdropdown-container[style*="opacity"] {
   background: #f9fafb !important;
   cursor: not-allowed !important;
 }
 
-/* ── react-international-phone — match form design ──────────────────────────── */
 .react-international-phone-input-container {
   display: flex !important;
   width: 100% !important;

@@ -71,8 +71,10 @@ export const schoolService = {
     return response.data.data;
   },
 
-  getApplications: async (): Promise<unknown> => {
-    const response = await apiClient.get("/schools/applications");
+  getApplications: async (page = 1, limit = 10): Promise<unknown> => {
+    const response = await apiClient.get(
+      `/schools/applications?page=${page}&limit=${limit}`,
+    );
     return response.data.data;
   },
 

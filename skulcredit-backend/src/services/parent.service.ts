@@ -1,4 +1,4 @@
-﻿import bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
 import { ParentRepository, UserRepository } from "../repositories";
 import sendEmail from "../utils/email";
@@ -14,11 +14,13 @@ import {
   User,
   CatalogSchool,
   RepaymentSchedule,
+  Repayment,
   SchoolBankAccount,
   FundingPartner,
 } from "../models/index";
 import ApiError from "../utils/apiError";
 import env from "../config/env";
+import paystackService from "../integrations/paystack/paystack.service";
 import identityService, {
   NinVerificationResponse,
 } from "../integrations/lendsqr/identity.service";
@@ -232,7 +234,7 @@ class ParentService {
       const blockedUntil = nextTerm?.portalOpeningDate ?? null;
       await parent.update({ eligibilityBlockedUntil: blockedUntil });
       logger.warn(
-        `Loan score FAILED for userId=${userId} — decision="${dd?.decision}" — blocked until ${blockedUntil ?? "next term"}.`,
+        `Loan score FAILED for userId=${userId} � decision="${dd?.decision}" � blocked until ${blockedUntil ?? "next term"}.`,
       );
     }
 
@@ -445,11 +447,15 @@ class ParentService {
     await student.destroy();
   }
 
-  async getApplications(userId: string) {
+  async getApplications(
+    userId: string,
+    { page = 1, limit = 10 }: { page?: number; limit?: number } = {},
+  ) {
     const parent = await ParentRepository.findOne({ userId });
     if (!parent) throw new ApiError(404, "Parent profile not found");
 
-    return LoanApplication.findAll({
+    const offset = (Number(page) - 1) * Number(limit);
+    const { count, rows } = await LoanApplication.findAndCountAll({
       where: { parentId: parent.id },
       include: [
         {
@@ -464,7 +470,19 @@ class ParentService {
         },
       ],
       order: [["createdAt", "DESC"]],
+      limit: Number(limit),
+      offset,
     });
+
+    return {
+      applications: rows,
+      pagination: {
+        total: count,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(count / Number(limit)),
+      },
+    };
   }
 
   async getApplication(userId: string, applicationId: string) {
@@ -984,7 +1002,7 @@ class ParentService {
         );
       } else {
         logger.warn(
-          `[parent.service] No BVN for parent ${parent.id} — loan booking job skipped for application ${application.id}`,
+          `[parent.service] No BVN for parent ${parent.id} � loan booking job skipped for application ${application.id}`,
         );
       }
     }
@@ -1148,11 +1166,11 @@ class ParentService {
         if (!user?.email) return;
         const planLabel =
           payload.tenor === 1 ? "Full payment" : `${payload.tenor}-month plan`;
-        const amountFormatted = `₦${Number(payload.tuitionAmount).toLocaleString("en-NG")}`;
+        const amountFormatted = `?${Number(payload.tuitionAmount).toLocaleString("en-NG")}`;
 
         sendEmail({
           email: user.email,
-          subject: `Application Received – ${application.referenceNumber}`,
+          subject: `Application Received � ${application.referenceNumber}`,
           message: `Your application for ${student.firstName} ${student.lastName} has been received and is under review.`,
           html: `
           <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#333">
@@ -1168,7 +1186,7 @@ class ParentService {
                 <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Student</td>
                     <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${student.firstName} ${student.lastName}</td></tr>
                 <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">School</td>
-                    <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${catalogSchool?.name ?? manualSchoolName ?? "—"}</td></tr>
+                    <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${catalogSchool?.name ?? manualSchoolName ?? "�"}</td></tr>
                 <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Repayment Plan</td>
                     <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold;text-align:right">${planLabel}</td></tr>
                 <tr><td style="padding:10px 0;color:#881337;font-weight:bold;font-size:15px">Total Amount</td>
@@ -1244,7 +1262,7 @@ class ParentService {
         requested_amount: payload.tuitionAmount,
         proposed_tenor: payload.tenor,
         proposed_tenor_period: "months",
-        purpose: `School Fees – ${payload.institutionTypeName} – ${payload.academicSession} ${payload.term}`,
+        purpose: `School Fees � ${payload.institutionTypeName} � ${payload.academicSession} ${payload.term}`,
         product_id: LENDSQR_PRODUCT_ID,
         disburse_to: "bank",
         location: parent.addressState ?? undefined,
@@ -1263,7 +1281,7 @@ class ParentService {
       );
     } else {
       logger.warn(
-        `[parent.service] No BVN for parent ${parent.id} — wizard booking job skipped`,
+        `[parent.service] No BVN for parent ${parent.id} � wizard booking job skipped`,
       );
     }
 
@@ -1310,7 +1328,7 @@ class ParentService {
     NotificationPublisher.general(
       userId,
       "Service Charge Paid",
-      "Service charge paid — set up your repayment plan to complete the process.",
+      "Service charge paid � set up your repayment plan to complete the process.",
     );
 
     logger.info(
@@ -1459,7 +1477,7 @@ class ParentService {
       actor: "parent",
       actorId: parent.id,
       status: "approved",
-      note: `Repayment plan confirmed: ${tenor}-month schedule, debit day ${debitDay}, starting ${scheduleRecords[0]?.dueDate ?? "—"}`,
+      note: `Repayment plan confirmed: ${tenor}-month schedule, debit day ${debitDay}, starting ${scheduleRecords[0]?.dueDate ?? "�"}`,
     });
 
     logger.info(
@@ -1496,7 +1514,7 @@ class ParentService {
 
     if (recipients.length === 0) {
       logger.warn(
-        "[parent.service] No active funding partners and FUNDING_PARTNER_EMAIL not set — skipping notification",
+        "[parent.service] No active funding partners and FUNDING_PARTNER_EMAIL not set � skipping notification",
       );
       return;
     }
@@ -1572,9 +1590,9 @@ class ParentService {
       registeredSchool?.bankAccountName ??
       "N/A";
 
-    const amountFmt = `₦${Number(app.amountRequested).toLocaleString("en-NG")}`;
+    const amountFmt = `?${Number(app.amountRequested).toLocaleString("en-NG")}`;
     const serviceChargeFmt = app.serviceChargeAmount
-      ? `₦${Number(app.serviceChargeAmount).toLocaleString("en-NG")}`
+      ? `?${Number(app.serviceChargeAmount).toLocaleString("en-NG")}`
       : "N/A";
     const tenorLabel = `${app.tenor}-month plan`;
 
@@ -1589,12 +1607,12 @@ class ParentService {
           `<tr>
             <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-size:13px">#${s.installmentNumber}</td>
             <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-size:13px">${s.dueDate}</td>
-            <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-size:13px;font-weight:bold">₦${Number(s.totalAmount).toLocaleString("en-NG")}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-size:13px;font-weight:bold">?${Number(s.totalAmount).toLocaleString("en-NG")}</td>
           </tr>`,
       )
       .join("");
 
-    const emailSubject = `Funding Request – ${catalogSchool?.name ?? "School"} – ${app.referenceNumber}`;
+    const emailSubject = `Funding Request � ${catalogSchool?.name ?? "School"} � ${app.referenceNumber}`;
     const emailMessage = `A tuition financing application is ready for funding. Please review the details and confirm disbursement.`;
 
     for (const recipient of recipients) {
@@ -1623,7 +1641,7 @@ class ParentService {
             <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Parent Name</td>
                 <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${parent.firstName} ${parent.lastName}</td></tr>
             <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Student Name</td>
-                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${student?.firstName ?? "—"} ${student?.lastName ?? ""}</td></tr>
+                <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${student?.firstName ?? "�"} ${student?.lastName ?? ""}</td></tr>
             <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Admission Number</td>
                 <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-weight:bold">${student?.studentId ?? "N/A"}</td></tr>
             <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;color:#6b7280;font-size:14px">Grade / Level</td>
@@ -1677,7 +1695,7 @@ class ParentService {
           <div style="text-align:center;margin-bottom:16px">
             <a href="${disbursementUrl}"
                style="display:inline-block;background:#16a34a;color:#fff;font-weight:bold;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:15px;margin-right:12px">
-              ✓ Disbursement Complete
+              ? Disbursement Complete
             </a>
           </div>
 
@@ -1709,7 +1727,7 @@ class ParentService {
   }): Promise<void> {
     const { application, catalogSchool, partnerSchool, student, parent } = args;
 
-    const amountFormatted = `₦${Number(application.amountRequested).toLocaleString("en-NG")}`;
+    const amountFormatted = `?${Number(application.amountRequested).toLocaleString("en-NG")}`;
     const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:3000";
 
     const applicationDetailsHtml = `
@@ -1746,12 +1764,12 @@ class ParentService {
 
       await sendEmail({
         email: schoolUser.email,
-        subject: `SkulCredit: Parent Application Verification Required – ${application.referenceNumber}`,
+        subject: `SkulCredit: Parent Application Verification Required � ${application.referenceNumber}`,
         message: `A parent has applied to pay school fees for a student at your school. Please log in to verify.`,
         html: `
         <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#333">
           <div style="background:#881337;padding:28px 32px;border-radius:12px 12px 0 0">
-            <h1 style="color:#fff;margin:0;font-size:22px">New Parent Application — Action Required</h1>
+            <h1 style="color:#fff;margin:0;font-size:22px">New Parent Application � Action Required</h1>
           </div>
           <div style="background:#fff;padding:28px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
             <p style="margin:0 0 12px">Hello <strong>${catalogSchool.name}</strong>,</p>
@@ -1767,7 +1785,7 @@ class ParentService {
               </a>
             </div>
             <p style="font-size:12px;color:#6b7280;margin:0 0 8px">
-              Not logged in? <a href="${loginThenVerifyLink}" style="color:#881337">Click here to log in</a> — after login you'll be redirected automatically to this application.
+              Not logged in? <a href="${loginThenVerifyLink}" style="color:#881337">Click here to log in</a> � after login you'll be redirected automatically to this application.
             </p>
             <p style="font-size:12px;color:#9ca3af;margin:0">
               This link is specific to application <strong>${application.referenceNumber}</strong>. If you have questions, contact SkulCredit support.
@@ -1838,6 +1856,101 @@ class ParentService {
       );
     }
   }
-}
 
+  async payInstallment(
+    userId: string,
+    applicationId: string,
+    payload: {
+      paystackReference: string;
+      scheduleIds: string[];
+      type: "scheduled" | "early_partial" | "early_full";
+    },
+  ) {
+    const parent = await ParentRepository.findOne({ userId });
+    if (!parent) throw new ApiError(404, "Parent profile not found");
+
+    const application = await LoanApplication.findOne({
+      where: { id: applicationId, parentId: parent.id },
+    });
+    if (!application) throw new ApiError(404, "Application not found");
+
+    const verification = (await paystackService.verifyPayment(
+      payload.paystackReference,
+    )) as { data?: { status?: string; amount?: number } };
+
+    if (verification?.data?.status !== "success") {
+      throw new ApiError(
+        400,
+        "Payment verification failed — transaction not successful",
+      );
+    }
+
+    const amountPaid = (verification.data.amount ?? 0) / 100;
+
+    const schedules = await RepaymentSchedule.findAll({
+      where: {
+        id: { [Op.in]: payload.scheduleIds },
+        loanApplicationId: applicationId,
+        parentId: parent.id,
+      },
+    });
+
+    if (schedules.length === 0) {
+      throw new ApiError(404, "No matching schedule installments found");
+    }
+
+    const repayment = await Repayment.create({
+      loanApplicationId: applicationId,
+      parentId: parent.id,
+      repaymentScheduleId: schedules.length === 1 ? schedules[0].id : null,
+      amount: amountPaid,
+      currency: "NGN",
+      paymentMethod: "card",
+      status: "successful",
+      paidAt: new Date(),
+      paystackReference: payload.paystackReference,
+      type: payload.type,
+    } as never);
+
+    for (const schedule of schedules) {
+      await schedule.update({
+        status: "paid",
+        paidAt: new Date(),
+        amountPaid: Number(schedule.totalAmount),
+      });
+    }
+
+    const remaining = await RepaymentSchedule.count({
+      where: {
+        loanApplicationId: applicationId,
+        status: { [Op.notIn]: ["paid", "waived"] },
+      },
+    });
+
+    if (remaining === 0) {
+      await application.update({ status: "repaid" });
+      await ApplicationEvent.create({
+        loanApplicationId: applicationId,
+        actor: "parent",
+        actorId: parent.id,
+        status: "repaid",
+        note: `All installments cleared. Final payment ref: ${payload.paystackReference}`,
+      });
+    } else {
+      await ApplicationEvent.create({
+        loanApplicationId: applicationId,
+        actor: "parent",
+        actorId: parent.id,
+        status: application.status,
+        note: `Payment of ${amountPaid} recorded. Ref: ${payload.paystackReference}. ${remaining} installment(s) remaining.`,
+      });
+    }
+
+    logger.info(
+      `[parent.service] Repayment recorded | application=${applicationId} | ref=${payload.paystackReference} | amount=${amountPaid}`,
+    );
+
+    return repayment;
+  }
+}
 export default new ParentService();

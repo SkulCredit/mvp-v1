@@ -6,8 +6,6 @@ import {
   SchoolTopBar,
 } from "../../components/layout";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type TicketStatus = "Open" | "Closed" | "In Progress";
 
 interface Ticket {
@@ -16,8 +14,6 @@ interface Ticket {
   status: TicketStatus;
   date: string;
 }
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
 
 const TICKETS: Ticket[] = [
   {
@@ -87,8 +83,6 @@ const STATUS_CLS: Record<TicketStatus, string> = {
   Closed: "bg-white text-slate-600 border border-slate-300",
   "In Progress": "bg-amber-50 text-amber-600 border border-amber-200",
 };
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 const SchoolSupportPage: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);

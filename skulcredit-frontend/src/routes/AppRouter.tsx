@@ -17,9 +17,7 @@
  *   SCHOOL  /school/*   – individually wrapped
  *   ADMIN   /admin/*    – individually wrapped
  *                         /admin          → redirect → /admin/dashboard
- *                         unauthenticated → /admin/auth/login?next=…
- *
- * Any unknown path falls through to the catch-all → /
+ *                         unauthenticated → /admin/auth/login?next=
  */
 
 import React, { Suspense } from "react";
@@ -32,7 +30,6 @@ import {
 import ProtectedRoute from "../components/ProtectedRoute";
 import PublicRoute from "../components/PublicRoute";
 import { AuthSpinner } from "../context/AuthContext";
-
 
 const HomePage = React.lazy(() => import("../pages/Home/HomePage"));
 const UnifiedAuthPage = React.lazy(
@@ -82,6 +79,9 @@ const ServiceChargePage = React.lazy(
 );
 const PaymentConfirmationPage = React.lazy(
   () => import("../pages/ParentFlow/PaymentConfirmationPage"),
+);
+const ParentRepaymentPayPage = React.lazy(
+  () => import("../pages/ParentFlow/ParentRepaymentPayPage"),
 );
 
 const SchoolDashboardPage = React.lazy(
@@ -207,6 +207,10 @@ const AppRouter: React.FC = () => (
             element={<ServiceChargePage />}
           />
           <Route path="/parent/payment" element={<PaymentConfirmationPage />} />
+          <Route
+            path="/parent/repayment-pay"
+            element={<ParentRepaymentPayPage />}
+          />
         </Route>
         <Route
           path="/school/dashboard"

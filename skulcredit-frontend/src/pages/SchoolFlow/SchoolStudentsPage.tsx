@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import Icon from "../../components/Icon";
+import Pagination from "../../components/ui/Pagination";
 import {
   DashboardLayout,
   SchoolSidebar,
   SchoolTopBar,
 } from "../../components/layout";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 type Level = "All" | "Primary" | "Secondary" | "Tertiary";
 type StatusKey = "Active" | "Pending";
@@ -18,9 +17,6 @@ interface Student {
   cls: string;
   status: StatusKey;
 }
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
-
 const STUDENTS: Student[] = [
   {
     id: "STU-001",
@@ -92,16 +88,16 @@ const STATUS_CLS: Record<StatusKey, string> = {
   Pending: "bg-amber-50  text-amber-600  border border-amber-200",
 };
 
-// ── Page ──────────────────────────────────────────────────────────────────────
-
 const SchoolStudentsPage: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [level, setLevel] = useState<Level>("All");
+  const [page, setPage] = useState(1);
+  const PAGE_LIMIT = 5;
 
   const LEVELS: Level[] = ["All", "Primary", "Secondary", "Tertiary"];
 
-  const visible = STUDENTS.filter((s) => {
+  const filtered = STUDENTS.filter((s) => {
     const matchLevel =
       level === "All" || s.level.toLowerCase().includes(level.toLowerCase());
     const matchSearch =
@@ -110,6 +106,8 @@ const SchoolStudentsPage: React.FC = () => {
       s.id.toLowerCase().includes(search.toLowerCase());
     return matchLevel && matchSearch;
   });
+
+  const visible = filtered.slice((page - 1) * PAGE_LIMIT, page * PAGE_LIMIT);
 
   return (
     <DashboardLayout
@@ -142,7 +140,10 @@ const SchoolStudentsPage: React.FC = () => {
                 type="text"
                 placeholder="-Type student name or ID-"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full pl-9 pr-4 py-2.5 rounded-full border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
               />
             </div>
@@ -158,7 +159,10 @@ const SchoolStudentsPage: React.FC = () => {
             {LEVELS.map((l) => (
               <button
                 key={l}
-                onClick={() => setLevel(l)}
+                onClick={() => {
+                  setLevel(l);
+                  setPage(1);
+                }}
                 className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${
                   level === l
                     ? "bg-brand text-white"
@@ -214,6 +218,13 @@ const SchoolStudentsPage: React.FC = () => {
               ))
             )}
           </div>
+          <Pagination
+            page={page}
+            totalPages={Math.ceil(filtered.length / PAGE_LIMIT)}
+            total={filtered.length}
+            limit={PAGE_LIMIT}
+            onPageChange={setPage}
+          />
         </div>
       </div>
     </DashboardLayout>

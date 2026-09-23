@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback } from "react";
+import Pagination from "../../components/ui/Pagination";
 import { useNavigate } from "react-router-dom";
 import { parentService } from "../../services/parentService";
 import { resolveUploadUrl } from "../../utils/uploadUrl";
@@ -1212,20 +1213,44 @@ const MyApplicationsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_LIMIT = 10;
 
-  useEffect(() => {
+  const fetchPage = useCallback((p: number) => {
     setLoading(true);
-    parentService
-      .getApplications()
+    setFetchError(null);
+    (
+      parentService.getApplications as (
+        p: number,
+        l: number,
+      ) => Promise<unknown>
+    )(p, PAGE_LIMIT)
       .then((data) => {
-        const raw = Array.isArray(data) ? (data as RawApplication[]) : [];
-        setApplications(raw.map(normalize));
+        const d = data as {
+          applications?: unknown[];
+          pagination?: { total: number; totalPages: number; page: number };
+        };
+        const rows = Array.isArray(data)
+          ? (data as RawApplication[])
+          : ((d.applications ?? []) as RawApplication[]);
+        setApplications(rows.map(normalize));
+        if (d.pagination) {
+          setTotal(d.pagination.total);
+          setTotalPages(d.pagination.totalPages);
+          setPage(d.pagination.page);
+        }
       })
       .catch(() =>
         setFetchError("Failed to load applications. Please refresh."),
       )
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchPage(1);
+  }, [fetchPage]);
 
   const handleNewApplication = () => navigate("/parent/details");
 
@@ -1557,6 +1582,13 @@ const MyApplicationsPage: React.FC = () => {
             ) : (
               <ApplicationsTable apps={filtered} onRowClick={handleRowClick} />
             )}
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              limit={PAGE_LIMIT}
+              onPageChange={fetchPage}
+            />
           </div>
           <div className="rounded-2xl border border-pink-200 bg-[#FFF5F8] px-6 py-5 flex items-center justify-between gap-4">
             <div>

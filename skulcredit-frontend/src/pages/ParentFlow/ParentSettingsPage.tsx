@@ -78,8 +78,8 @@ interface StudentFormData {
   tuitionAmount: string;
   studentId: string;
   academicSession: string; // e.g. "2026/2027"
-  termId: string; // academic_terms UUID
-  termName: string; // e.g. "First Term"
+  termId: string; 
+  termName: string; 
 }
 
 const UserIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -423,7 +423,6 @@ const ParentSettingsPage: React.FC = () => {
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [loadingClasses, setLoadingClasses] = useState(false);
 
-  // Academic sessions for the student modal session/term dropdowns
   const [sessions, setSessions] = useState<AcademicSessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
@@ -705,14 +704,12 @@ const ParentSettingsPage: React.FC = () => {
     setCatalogSchools([]);
     setClassLevelGroups([]);
     setShowStudentModal(true);
-    // Load sessions for the modal dropdowns
     if (!sessions.length) {
       setLoadingSessions(true);
       catalogService
         .getSessions()
         .then((data) => {
           setSessions(data);
-          // Auto-select current session + active term for new students
           const current = data.find((s) => s.isCurrent);
           if (current) {
             const activeTerm = current.terms.find(
@@ -751,7 +748,6 @@ const ParentSettingsPage: React.FC = () => {
     setClassLevelGroups([]);
     setShowStudentModal(true);
 
-    // Load sessions for the dropdowns, auto-select current session + active term
     if (!sessions.length) {
       setLoadingSessions(true);
       catalogService
@@ -775,7 +771,6 @@ const ParentSettingsPage: React.FC = () => {
         .finally(() => setLoadingSessions(false));
     }
 
-    // Resolve institution type + schools + class levels from the student's schoolId
     if (!s.schoolId) return;
     try {
       const types = institutionTypes.length
@@ -1139,8 +1134,6 @@ const ParentSettingsPage: React.FC = () => {
                 />
               </FormField>
             </div>
-
-            {/* ── Institution Type ── */}
             <SelectField
               label="Institution Type"
               required
@@ -1164,8 +1157,6 @@ const ParentSettingsPage: React.FC = () => {
                 </option>
               ))}
             </SelectField>
-
-            {/* ── Choose School ── */}
             <SelectField
               label="Choose School"
               required
@@ -1194,7 +1185,6 @@ const ParentSettingsPage: React.FC = () => {
               ))}
             </SelectField>
 
-            {/* ── Class / Level ── */}
             <SelectField
               label="Class / Level"
               required
@@ -1218,8 +1208,6 @@ const ParentSettingsPage: React.FC = () => {
                 </option>
               ))}
             </SelectField>
-
-            {/* ── Academic Session ── */}
             <SelectField
               label="Academic Session"
               required
@@ -1246,8 +1234,6 @@ const ParentSettingsPage: React.FC = () => {
                 </option>
               ))}
             </SelectField>
-
-            {/* ── Term ── */}
             {(() => {
               const activeSession = sessions.find(
                 (s) => s.sessionName === studentForm.academicSession,
@@ -1328,7 +1314,7 @@ const ParentSettingsPage: React.FC = () => {
         />
       )}
 
-      <div className="flex flex-col gap-6 px-4 sm:px-6 py-8 w-full max-w-3xl mx-auto pb-16">
+      <div className="flex flex-col gap-6 py-8 pb-16 w-full">
         {/* Page title */}
         <div>
           <h1 className="text-xl font-bold text-[#8B1C53]">My Profile</h1>
@@ -1369,8 +1355,6 @@ const ParentSettingsPage: React.FC = () => {
                   <Spinner className="h-5 w-5 border-white" />
                 </div>
               )}
-
-              {/* Hover overlay to change photo */}
               {!photoLoading && (
                 <button
                   type="button"

@@ -181,11 +181,13 @@ class ParentController {
     next: NextFunction,
   ): Promise<void> {
     try {
+      const page = parseInt(String(req.query.page ?? 1), 10);
+      const limit = parseInt(String(req.query.limit ?? 10), 10);
       successResponse(
         res,
         200,
         "Applications fetched successfully",
-        await parentService.getApplications(req.user!.userId),
+        await parentService.getApplications(req.user!.userId, { page, limit }),
       );
     } catch (error) {
       next(error);
@@ -620,6 +622,29 @@ class ParentController {
         id,
       );
       successResponse(res, 200, "Repayment schedule fetched", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async payInstallment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const { paystackReference, scheduleIds, type } = req.body as {
+        paystackReference: string;
+        scheduleIds: string[];
+        type: "scheduled" | "early_partial" | "early_full";
+      };
+      const result = await parentService.payInstallment(req.user!.userId, id, {
+        paystackReference,
+        scheduleIds,
+        type: type ?? "scheduled",
+      });
+      successResponse(res, 200, "Repayment recorded successfully", result);
     } catch (error) {
       next(error);
     }

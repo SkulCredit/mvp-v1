@@ -15,8 +15,6 @@ import apiClient from "../../services/apiClient";
 import Button from "../../components/ui/Button";
 import { PlusIcon } from "lucide-react";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 interface AppRow {
   id: string;
   schoolName?: string;
@@ -42,11 +40,7 @@ const DEFAULT_STATS: DashboardStats = {
   pendingApplications: 0,
   totalApprovedAmount: 0,
 };
-
-// ── localStorage key — stores the last term ID the parent saw the modal for ──
 const TERM_MODAL_SEEN_KEY = "skulcredit_term_modal_seen_id";
-
-// ── New Term Modal ─────────────────────────────────────────────────────────────
 
 const NewTermModal: React.FC<{
   firstName: string;
@@ -63,7 +57,6 @@ const NewTermModal: React.FC<{
       aria-labelledby="new-term-modal-title"
     >
       <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden">
-        {/* Header */}
         <div className="bg-brand px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0">
@@ -95,7 +88,6 @@ const NewTermModal: React.FC<{
           </div>
         </div>
 
-        {/* Body */}
         <div className="px-6 py-5">
           <p className="text-sm text-gray-700 leading-relaxed">
             Welcome back, <strong>{firstName}</strong>! It&apos;s a new school
@@ -103,8 +95,6 @@ const NewTermModal: React.FC<{
             can easily pay their school fees?
           </p>
         </div>
-
-        {/* Actions */}
         <div className="px-6 pb-6 flex gap-3">
           <button
             type="button"
@@ -125,8 +115,6 @@ const NewTermModal: React.FC<{
     </div>,
     document.body,
   );
-
-// ── Stat card ──────────────────────────────────────────────────────────────────
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -157,8 +145,6 @@ const StatCard: React.FC<StatCardProps> = ({
   </div>
 );
 
-// ── School-request helpers ─────────────────────────────────────────────────────
-
 const STATUS_MESSAGES: Record<SchoolRequestStatus, string> = {
   pending:
     "Your request is under review. We'll notify you once it's processed.",
@@ -176,8 +162,6 @@ const STATUS_PILL_CLS: Record<SchoolRequestStatus, string> = {
   rejected: "bg-red-100 text-red-600",
 };
 
-// ── Page ───────────────────────────────────────────────────────────────────────
-
 const ParentDashboardHomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -191,13 +175,10 @@ const ParentDashboardHomePage: React.FC = () => {
   const [kycStatus, setKycStatus] = useState<string>("pending");
   const [myApplications, setMyApplications] = useState<AppRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // ── New-term modal (backend-driven) ────────────────────────────────────────
   const [showTermModal, setShowTermModal] = useState(false);
   const [currentTerm, setCurrentTerm] = useState<CurrentTermData | null>(null);
 
   useEffect(() => {
-    // Fetch active term from the backend
     apiClient
       .get<{ data: { isOpen: boolean; term: CurrentTermData | null } }>(
         "/parents/current-term",
@@ -205,18 +186,15 @@ const ParentDashboardHomePage: React.FC = () => {
       .then(({ data }) => {
         const term = data.data.term;
         if (!data.data.isOpen || !term) return;
-
-        // Show modal only if this is a term the parent hasn't been notified about yet
         const seenId = localStorage.getItem(TERM_MODAL_SEEN_KEY);
         if (seenId !== term.id) {
           setCurrentTerm(term);
           setShowTermModal(true);
-          // Record immediately so a page refresh doesn't re-show the modal
           localStorage.setItem(TERM_MODAL_SEEN_KEY, term.id);
         }
       })
       .catch(() => {
-        /* silent — modal is non-critical */
+
       });
   }, []);
 
@@ -229,7 +207,6 @@ const ParentDashboardHomePage: React.FC = () => {
     setShowTermModal(false);
   };
 
-  // ── Dashboard data ─────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     (async () => {

@@ -206,6 +206,11 @@ router.get(
   parentController.getRepaymentSchedule.bind(parentController),
 );
 
+router.post(
+  "/applications/:id/pay-installment",
+  parentController.payInstallment.bind(parentController),
+);
+
 router.get(
   "/school-requests",
   parentController.getSchoolRequests.bind(parentController),

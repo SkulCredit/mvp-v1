@@ -7,7 +7,6 @@ import {
 } from "../../components/layout";
 import { useAuth } from "../../context/AuthContext";
 
-// ── Detail row ────────────────────────────────────────────────────────────────
 const Row: React.FC<{ label: string; value: React.ReactNode }> = ({
   label,
   value,
@@ -20,7 +19,6 @@ const Row: React.FC<{ label: string; value: React.ReactNode }> = ({
   </div>
 );
 
-// ── Section card ─────────────────────────────────────────────────────────────
 const SectionCard: React.FC<{
   icon: string;
   title: string;
@@ -42,7 +40,6 @@ const DOCS = [
   "State Certification",
 ];
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 const SchoolVerificationSettingsPage: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { user } = useAuth();

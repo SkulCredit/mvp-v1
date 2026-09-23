@@ -420,7 +420,7 @@ const SchoolApplicationDetailPage: React.FC = () => {
                   <button
                     onClick={handleAccept}
                     disabled={actioning}
-                    className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-green-700 text-white font-bold py-3.5 rounded-2xl transition-colors disabled:opacity-50 shadow-sm"
+                    className="w-full flex items-center justify-center gap-2 bg-brand text-white font-bold py-3.5 rounded-2xl transition-colors disabled:opacity-50 shadow-sm"
                   >
                     {actioning ? (
                       <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

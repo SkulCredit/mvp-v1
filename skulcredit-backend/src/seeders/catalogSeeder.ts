@@ -23,10 +23,19 @@ interface InstitutionTypeEntry {
   sub_levels?: SubLevel[];
 }
 
+interface BankAccountEntry {
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  bankCode?: string;
+  isPrimary: boolean;
+}
+
 interface SchoolEntry {
   institution_name: string;
   tier?: string | null;
   institution_types: InstitutionTypeEntry[];
+  bank_accounts?: BankAccountEntry[];
 }
 
 interface FlatClassRow {
@@ -37,7 +46,7 @@ interface FlatClassRow {
 const SCHOOLS: SchoolEntry[] = [
   {
     institution_name: "Gulf Flower Schools",
-    tier: null, // non-registered
+    tier: null,
     institution_types: [
       {
         type: "Nursery",
@@ -68,7 +77,7 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "Foster Prime Schools",
-    tier: null, // non-registered
+    tier: null,
     institution_types: [
       {
         type: "Nursery",
@@ -135,7 +144,7 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "Stars International College",
-    tier: null, // non-registered
+    tier: null,
     institution_types: [
       {
         type: "Nursery",
@@ -173,7 +182,7 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "St. Jude's Private Schools",
-    tier: null, // non-registered
+    tier: null,
     institution_types: [
       {
         type: "Nursery",
@@ -209,7 +218,7 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "Loral International Schools",
-    tier: null, // non-registered
+    tier: null,
     institution_types: [
       {
         type: "Nursery",
@@ -258,7 +267,7 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "Gracewood International School",
-    tier: null, // non-registered
+    tier: null,
     institution_types: [
       {
         type: "Nursery",
@@ -294,7 +303,7 @@ const SCHOOLS: SchoolEntry[] = [
   },
   {
     institution_name: "Camilla Brook Place",
-    tier: null, // non-registered
+    tier: null,
     institution_types: [
       {
         type: "Nursery",
@@ -315,6 +324,48 @@ const SCHOOLS: SchoolEntry[] = [
           "Basic V",
           "Basic VI",
         ],
+      },
+    ],
+  },
+  {
+    institution_name: "Dothan Nursery & Primary School",
+    tier: "2",
+    institution_types: [
+      {
+        type: "Nursery",
+        classes: [
+          "Creche / Toddler",
+          "Preparatory / Playgroup",
+          "Nursery I",
+          "Nursery II",
+        ],
+      },
+      {
+        type: "Primary",
+        classes: [
+          "Basic I",
+          "Basic II",
+          "Basic III",
+          "Basic IV",
+          "Basic V",
+          "Basic VI",
+        ],
+      },
+    ],
+    bank_accounts: [
+      {
+        bankName: "First Bank",
+        accountNumber: "2028767398",
+        accountName: "Dothan Nursery & Primary School",
+        bankCode: "011",
+        isPrimary: true,
+      },
+      {
+        bankName: "Wema Bank",
+        accountNumber: "0126041565",
+        accountName: "Dothan Nursery & Primary School",
+        bankCode: "035",
+        isPrimary: false,
       },
     ],
   },
@@ -368,15 +419,67 @@ export async function seedCatalog(): Promise<void> {
     { type: QueryTypes.SELECT },
   );
 
+  const typeNames = collectInstitutionTypes(SCHOOLS);
+  const typeIdMap = new Map<string, string>();
+
   if (parseInt(existing.count, 10) > 0) {
-    logger.info("School catalog already seeded — skipping");
+    const existingTypes = await sequelize.query<{ id: string; name: string }>(
+      "SELECT id, name FROM catalog_institution_types",
+      { type: QueryTypes.SELECT },
+    );
+    for (const t of existingTypes) {
+      typeIdMap.set(t.name, t.id);
+    }
+
+    for (const school of SCHOOLS) {
+      const [existing_school] = await sequelize.query<{ id: string }>(
+        "SELECT id FROM catalog_schools WHERE name = :name LIMIT 1",
+        {
+          replacements: { name: school.institution_name },
+          type: QueryTypes.SELECT,
+        },
+      );
+
+      if (!existing_school) {
+        const tier = school.tier ?? null;
+        const isRegistered = tier !== null;
+        const rate = tier
+          ? (TIER_RATES[tier] ?? NON_REGISTERED_RATE)
+          : NON_REGISTERED_RATE;
+
+        const [schoolRow] = await sequelize.query<{ id: string }>(
+          `INSERT INTO catalog_schools
+             (id, name, is_registered, tier, service_charge_rate, is_active, created_at, updated_at)
+           VALUES
+             (gen_random_uuid(), :name, :is_registered, :tier, :rate, true, NOW(), NOW())
+           RETURNING id`,
+          {
+            replacements: {
+              name: school.institution_name,
+              is_registered: isRegistered,
+              tier,
+              rate,
+            },
+            type: QueryTypes.SELECT,
+          },
+        );
+
+        const schoolId = schoolRow.id;
+        await insertClassLevels(school, schoolId, typeIdMap);
+        await insertBankAccounts(school, schoolId);
+        logger.info(
+          `Catalog: inserted new school "${school.institution_name}"`,
+        );
+      } else {
+        await insertBankAccounts(school, existing_school.id, true);
+      }
+    }
+
+    logger.info("School catalog already seeded — checked for new entries");
     return;
   }
 
   logger.info("Seeding school catalog…");
-
-  const typeNames = collectInstitutionTypes(SCHOOLS);
-  const typeIdMap = new Map<string, string>();
 
   for (let i = 0; i < typeNames.length; i++) {
     const name = typeNames[i];
@@ -414,35 +517,82 @@ export async function seedCatalog(): Promise<void> {
     );
 
     const schoolId = schoolRow.id;
-
-    for (const it of school.institution_types) {
-      const typeId = typeIdMap.get(it.type);
-      if (!typeId) continue;
-
-      const classRows = flattenClasses(it);
-      for (let sortOrder = 0; sortOrder < classRows.length; sortOrder++) {
-        const { sub_level_group, class_name } = classRows[sortOrder];
-        await sequelize.query(
-          `INSERT INTO catalog_school_class_levels
-             (id, school_id, institution_type_id, sub_level_group, class_name, sort_order, created_at, updated_at)
-           VALUES
-             (gen_random_uuid(), :school_id, :type_id, :sub_level_group, :class_name, :sort_order, NOW(), NOW())`,
-          {
-            replacements: {
-              school_id: schoolId,
-              type_id: typeId,
-              sub_level_group,
-              class_name,
-              sort_order: sortOrder,
-            },
-            type: QueryTypes.INSERT,
-          },
-        );
-      }
-    }
+    await insertClassLevels(school, schoolId, typeIdMap);
+    await insertBankAccounts(school, schoolId);
   }
 
   logger.info(
     `School catalog seeded: ${typeNames.length} types, ${SCHOOLS.length} schools`,
   );
+}
+
+async function insertClassLevels(
+  school: SchoolEntry,
+  schoolId: string,
+  typeIdMap: Map<string, string>,
+): Promise<void> {
+  for (const it of school.institution_types) {
+    const typeId = typeIdMap.get(it.type);
+    if (!typeId) continue;
+
+    const classRows = flattenClasses(it);
+    for (let sortOrder = 0; sortOrder < classRows.length; sortOrder++) {
+      const { sub_level_group, class_name } = classRows[sortOrder];
+      await sequelize.query(
+        `INSERT INTO catalog_school_class_levels
+           (id, school_id, institution_type_id, sub_level_group, class_name, sort_order, created_at, updated_at)
+         VALUES
+           (gen_random_uuid(), :school_id, :type_id, :sub_level_group, :class_name, :sort_order, NOW(), NOW())`,
+        {
+          replacements: {
+            school_id: schoolId,
+            type_id: typeId,
+            sub_level_group,
+            class_name,
+            sort_order: sortOrder,
+          },
+          type: QueryTypes.INSERT,
+        },
+      );
+    }
+  }
+}
+
+async function insertBankAccounts(
+  school: SchoolEntry,
+  schoolId: string,
+  skipIfExists = false,
+): Promise<void> {
+  if (!school.bank_accounts?.length) return;
+
+  for (const acct of school.bank_accounts) {
+    if (skipIfExists) {
+      const [found] = await sequelize.query<{ id: string }>(
+        "SELECT id FROM school_bank_account_details WHERE catalog_school_id = :schoolId AND account_number = :acctNum LIMIT 1",
+        {
+          replacements: { schoolId, acctNum: acct.accountNumber },
+          type: QueryTypes.SELECT,
+        },
+      );
+      if (found) continue;
+    }
+
+    await sequelize.query(
+      `INSERT INTO school_bank_account_details
+         (id, catalog_school_id, bank_name, account_number, account_name, bank_code, is_primary, is_verified, created_at, updated_at)
+       VALUES
+         (gen_random_uuid(), :schoolId, :bankName, :accountNumber, :accountName, :bankCode, :isPrimary, true, NOW(), NOW())`,
+      {
+        replacements: {
+          schoolId,
+          bankName: acct.bankName,
+          accountNumber: acct.accountNumber,
+          accountName: acct.accountName,
+          bankCode: acct.bankCode ?? null,
+          isPrimary: acct.isPrimary,
+        },
+        type: QueryTypes.INSERT,
+      },
+    );
+  }
 }

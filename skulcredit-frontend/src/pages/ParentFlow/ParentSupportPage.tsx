@@ -145,7 +145,6 @@ const ParentSupportPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 mt-12 w-[90%] mx-auto animate-fade-in-up">
-      {/* ── Help & Support banner ── */}
       <div className="rounded-2xl bg-[#8B1C53] px-6 pt-8 pb-6 text-white text-center">
         <h2 className="text-xl font-bold">Help &amp; Support</h2>
         <p className="mt-1 text-sm text-white/70">
@@ -160,7 +159,6 @@ const ParentSupportPage: React.FC = () => {
                 key={ch.title}
                 className="rounded-xl bg-white px-5 py-6 flex flex-col items-center gap-3 text-center"
               >
-                {/* icon in light-pink circle */}
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#8B1C53]/10">
                   <Icon className="text-[#8B1C53]" />
                 </div>

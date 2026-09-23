@@ -1,7 +1,5 @@
 import apiClient from "./apiClient";
 
-// ── Param interfaces ──────────────────────────────────────────────────────────
-
 export interface AddStudentParams {
   schoolId: string;
   firstName: string;
@@ -63,8 +61,6 @@ export interface NinVerificationData {
   image_url: string;
 }
 
-// ── Service ───────────────────────────────────────────────────────────────────
-
 export const parentService = {
   getProfile: async (): Promise<unknown> => {
     const response = await apiClient.get("/parents/profile");
@@ -87,13 +83,11 @@ export const parentService = {
     return response.data.data;
   },
 
-  /** Submit BVN-based KYC with full profile payload to Lendsqr v2/customers */
   verifyKYC: async (params: VerifyKycParams): Promise<unknown> => {
     const response = await apiClient.post("/parents/kyc", params);
     return response.data.data;
   },
 
-  /** Verify NIN only — returns NIN identity data for display */
   verifyNin: async (nin: string): Promise<NinVerificationData> => {
     const response = await apiClient.post<{
       data: { data: NinVerificationData };
@@ -127,8 +121,10 @@ export const parentService = {
     return response.data.data;
   },
 
-  getApplications: async (): Promise<unknown> => {
-    const response = await apiClient.get("/parents/applications");
+  getApplications: async (page = 1, limit = 10): Promise<unknown> => {
+    const response = await apiClient.get(
+      `/parents/applications?page=${page}&limit=${limit}`,
+    );
     return response.data.data;
   },
 
@@ -233,10 +229,6 @@ export const parentService = {
     return response.data.data;
   },
 
-  /**
-   * Confirm service charge has been paid for an application.
-   * Called after successful Paystack payment.
-   */
   confirmServiceCharge: async (
     applicationId: string,
     paystackReference?: string,
@@ -248,10 +240,6 @@ export const parentService = {
     return response.data.data;
   },
 
-  /**
-   * Confirm repayment plan for an application.
-   * Generates installment records backend-side and triggers the funding partner handoff.
-   */
   setupRepayment: async (
     applicationId: string,
     opts: { debitDay?: number } = {},
@@ -281,13 +269,41 @@ export const parentService = {
     return response.data.data;
   },
 
-  /**
-   * Submit the 4-step new-application wizard as a JSON request.
-   * Backend: POST /parents/submit-application-json
-   * (The multipart endpoint still exists for the KYC wizard; this one is
-   *  for the streamlined StudentDetailsPage flow where documents are already
-   *  on file from a prior KYC submission.)
-   */
+  initiateRepaymentPayment: async (payload: {
+    amount: number;
+    applicationId: string;
+    scheduleIds: string[];
+    type: "scheduled" | "early_partial" | "early_full";
+    callbackUrl: string;
+  }): Promise<unknown> => {
+    const response = await apiClient.post("/payments/initialize", {
+      amount: payload.amount,
+      callbackUrl: payload.callbackUrl,
+      metadata: {
+        type: "repayment",
+        applicationId: payload.applicationId,
+        scheduleIds: payload.scheduleIds,
+        repaymentType: payload.type,
+      },
+    });
+    return response.data.data;
+  },
+
+  confirmInstallmentPayment: async (
+    applicationId: string,
+    payload: {
+      paystackReference: string;
+      scheduleIds: string[];
+      type: "scheduled" | "early_partial" | "early_full";
+    },
+  ): Promise<unknown> => {
+    const response = await apiClient.post(
+      `/parents/applications/${applicationId}/pay-installment`,
+      payload,
+    );
+    return response.data.data;
+  },
+
   submitWizardApplication: async ({
     childId,
     schoolId,
@@ -342,8 +358,6 @@ export const parentService = {
   },
 };
 
-// ── Academic session/term types ───────────────────────────────────────────────
-
 export interface AcademicTermSummary {
   id: string;
   termId: string;
@@ -358,14 +372,12 @@ export interface AcademicTermSummary {
 export interface AcademicSessionSummary {
   id: string;
   sessionId: string;
-  sessionName: string; // "2026/2027"
+  sessionName: string; 
   startYear: number;
   endYear: number;
   isCurrent: boolean;
   terms: AcademicTermSummary[];
 }
-
-// ── Catalog types ─────────────────────────────────────────────────────────────
 
 export interface CatalogInstitutionType {
   id: string;
@@ -393,17 +405,14 @@ export interface CatalogClassLevelGroup {
   classes: CatalogClassLevel[];
 }
 
-// ── Catalog service ───────────────────────────────────────────────────────────
-
 export const catalogService = {
-  /** Fetch all academic sessions with their terms — for the wizard session/term picker */
   getSessions: async (): Promise<AcademicSessionSummary[]> => {
     const response = await apiClient.get<{ data: AcademicSessionSummary[] }>(
       "/parents/sessions",
     );
     return response.data.data;
   },
-  /** Step 1 of 3: fetch all institution types (Nursery, Primary, Secondary …) */
+
   getInstitutionTypes: async (): Promise<CatalogInstitutionType[]> => {
     const response = await apiClient.get<{
       data: CatalogInstitutionType[];
@@ -411,7 +420,6 @@ export const catalogService = {
     return response.data.data;
   },
 
-  /** Step 2 of 3: fetch schools that offer the selected institution type */
   getSchools: async (institutionTypeId: string): Promise<CatalogSchool[]> => {
     const response = await apiClient.get<{ data: CatalogSchool[] }>(
       `/catalog/schools?institutionTypeId=${institutionTypeId}`,
@@ -419,7 +427,7 @@ export const catalogService = {
     return response.data.data;
   },
 
-  /** Step 3 of 3: fetch class levels for the selected school + institution type */
+
   getClassLevels: async (
     schoolId: string,
     institutionTypeId: string,

@@ -10,8 +10,6 @@
  *   • Sent automatically by the browser to /api/v1/auth/* routes.
  *   • SameSite=Strict (prod) / Lax (dev) prevents CSRF.
  *
- * USER PROFILE  — stored in localStorage as non-sensitive display data only
- *   (name, email, role). No tokens.
  */
 
 let _accessToken: string | null = null;

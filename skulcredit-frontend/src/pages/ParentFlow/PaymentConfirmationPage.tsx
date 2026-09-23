@@ -11,12 +11,9 @@ const PaymentConfirmationPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Paystack redirects back with ?reference= and optionally ?applicationId=
   const paystackRef =
     searchParams.get("reference") ?? searchParams.get("trxref");
   const applicationId = searchParams.get("applicationId");
-
-  // On mount: verify Paystack reference and confirm service charge
   useEffect(() => {
     if (!paystackRef) {
       setProcessing(false);
@@ -24,15 +21,11 @@ const PaymentConfirmationPage: React.FC = () => {
     }
     (async () => {
       try {
-        // 1. Verify the payment with Paystack
         await paymentService.verifyPayment(paystackRef);
-
-        // 2. If we have an applicationId, mark service charge as paid
         if (applicationId) {
           await parentService.confirmServiceCharge(applicationId, paystackRef);
         }
       } catch {
-        // Non-fatal — page still shows confirmation
       } finally {
         setProcessing(false);
       }
@@ -45,7 +38,6 @@ const PaymentConfirmationPage: React.FC = () => {
     return () => clearTimeout(t);
   }, [stage]);
 
-  /* ── Status badge for the header ── */
   const statusBadge = (
     <div className="flex items-center gap-2 text-emerald-600 text-sm font-bold bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
       <Icon name="check-circle" className="w-4 h-4" />
@@ -69,7 +61,6 @@ const PaymentConfirmationPage: React.FC = () => {
       </div>
 
       <main className="flex-1 py-10 px-4 md:px-8 relative flex items-center justify-center min-h-[calc(100vh-80px)]">
-        {/* ── Stage 1: Receipt ── */}
         <div
           className={`w-full max-w-lg mx-auto absolute transition-all duration-500 z-20 ${stage !== 1 ? "opacity-0 pointer-events-none hidden" : ""}`}
         >
@@ -127,8 +118,6 @@ const PaymentConfirmationPage: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* ── Stage 2: Disbursement tracker ── */}
         <div
           className={`w-full max-w-5xl mx-auto absolute transition-all duration-500 z-10 ${stage !== 2 ? "opacity-0 pointer-events-none hidden" : ""}`}
         >
