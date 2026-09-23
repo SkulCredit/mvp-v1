@@ -39,6 +39,7 @@ import {
   AcademicTerm,
   DeviceToken,
   Term,
+  FundingPartner,
 } from "../models/index";
 import ApiError from "../utils/apiError";
 
@@ -1326,6 +1327,66 @@ class AdminService {
     const t = await Term.findByPk(id);
     if (!t) throw new ApiError(404, "School term not found");
     await t.destroy();
+  }
+
+  async listFundingPartners(status?: string) {
+    const where: Record<string, unknown> = {};
+    if (status) where.status = status;
+    return FundingPartner.findAll({ where, order: [["name", "ASC"]] });
+  }
+
+  async getFundingPartner(id: string) {
+    const fp = await FundingPartner.findByPk(id);
+    if (!fp) throw new ApiError(404, "Funding partner not found");
+    return fp;
+  }
+
+  async createFundingPartner(payload: {
+    name: string;
+    email: string;
+    phone?: string | null;
+    contactPerson?: string | null;
+    status?: "active" | "inactive";
+    notes?: string | null;
+  }) {
+    const existing = await FundingPartner.findOne({
+      where: { email: payload.email },
+    });
+    if (existing)
+      throw new ApiError(
+        409,
+        "A funding partner with this email already exists",
+      );
+    return FundingPartner.create(payload as never);
+  }
+
+  async updateFundingPartner(
+    id: string,
+    payload: {
+      name?: string;
+      email?: string;
+      phone?: string | null;
+      contactPerson?: string | null;
+      status?: "active" | "inactive";
+      notes?: string | null;
+    },
+  ) {
+    const fp = await FundingPartner.findByPk(id);
+    if (!fp) throw new ApiError(404, "Funding partner not found");
+    if (payload.email && payload.email !== fp.email) {
+      const conflict = await FundingPartner.findOne({
+        where: { email: payload.email },
+      });
+      if (conflict)
+        throw new ApiError(409, "Email is already in use by another partner");
+    }
+    return fp.update(payload as never);
+  }
+
+  async deleteFundingPartner(id: string) {
+    const fp = await FundingPartner.findByPk(id);
+    if (!fp) throw new ApiError(404, "Funding partner not found");
+    await fp.destroy();
   }
 }
 

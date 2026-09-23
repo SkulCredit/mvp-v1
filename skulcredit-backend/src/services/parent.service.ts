@@ -15,6 +15,7 @@ import {
   CatalogSchool,
   RepaymentSchedule,
   SchoolBankAccount,
+  FundingPartner,
 } from "../models/index";
 import ApiError from "../utils/apiError";
 import env from "../config/env";
@@ -494,8 +495,55 @@ class ParentService {
           as: "events",
           order: [["createdAt", "ASC"]],
         },
+        {
+          model: RepaymentSchedule,
+          as: "schedule",
+          order: [["installmentNumber", "ASC"]],
+        },
       ],
     });
+    if (!application) throw new ApiError(404, "Application not found");
+    return application;
+  }
+
+  async getRepaymentSchedule(userId: string, applicationId: string) {
+    const parent = await ParentRepository.findOne({ userId });
+    if (!parent) throw new ApiError(404, "Parent profile not found");
+
+    const application = await LoanApplication.findOne({
+      where: { id: applicationId, parentId: parent.id },
+      attributes: [
+        "id",
+        "referenceNumber",
+        "amountRequested",
+        "amountApproved",
+        "tenor",
+        "status",
+        "serviceFeePaid",
+        "serviceChargeAmount",
+        "disbursementStatus",
+        "mandateDebitDay",
+        "mandateStatus",
+      ],
+      include: [
+        {
+          model: Student,
+          as: "student",
+          attributes: ["id", "firstName", "lastName", "gradeLevel"],
+        },
+        {
+          model: CatalogSchool,
+          as: "catalogSchool",
+          attributes: ["id", "name"],
+        },
+        {
+          model: RepaymentSchedule,
+          as: "schedule",
+          order: [["installmentNumber", "ASC"]],
+        },
+      ],
+    });
+
     if (!application) throw new ApiError(404, "Application not found");
     return application;
   }
@@ -1272,10 +1320,58 @@ class ParentService {
     return application;
   }
 
+  getMandatePreview(
+    tenor: number,
+    totalAmount: number,
+    debitDay: number,
+  ): {
+    installmentNumber: number;
+    dueDate: string;
+    amount: number;
+    outstandingBalance: number;
+  }[] {
+    const clampedDay = Math.min(Math.max(Math.round(debitDay), 1), 28);
+    const installmentAmount = Math.round(totalAmount / tenor);
+    const lastInstallmentAmount = totalAmount - installmentAmount * (tenor - 1);
+
+    const now = new Date();
+    const baseMonth =
+      now.getDate() >= clampedDay ? now.getMonth() + 1 : now.getMonth();
+    const baseYear = now.getFullYear() + (baseMonth > 11 ? 1 : 0);
+    const normalizedBaseMonth = baseMonth % 12;
+
+    const preview: {
+      installmentNumber: number;
+      dueDate: string;
+      amount: number;
+      outstandingBalance: number;
+    }[] = [];
+    let outstandingBalance = totalAmount;
+
+    for (let i = 0; i < tenor; i++) {
+      const rawMonth = normalizedBaseMonth + i;
+      const year = baseYear + Math.floor((normalizedBaseMonth + i) / 12);
+      const month = rawMonth % 12;
+      const isLast = i === tenor - 1;
+      const amount = isLast ? lastInstallmentAmount : installmentAmount;
+      outstandingBalance -= amount;
+
+      const dueDate = new Date(year, month, clampedDay);
+      preview.push({
+        installmentNumber: i + 1,
+        dueDate: dueDate.toISOString().split("T")[0],
+        amount,
+        outstandingBalance: Math.max(0, outstandingBalance),
+      });
+    }
+
+    return preview;
+  }
+
   async setupRepayment(
     userId: string,
     applicationId: string,
-    opts: { repaymentStartDate?: string } = {},
+    opts: { debitDay?: number } = {},
   ): Promise<{
     application: typeof LoanApplication.prototype;
     schedule: (typeof RepaymentSchedule.prototype)[];
@@ -1327,40 +1423,26 @@ class ParentService {
     const totalAmount = Number(
       application.amountApproved ?? application.amountRequested,
     );
-    const installmentAmount = Math.round(totalAmount / tenor);
-    const lastInstallmentAdjustment =
-      totalAmount - installmentAmount * (tenor - 1);
-    const startDate = opts.repaymentStartDate
-      ? new Date(opts.repaymentStartDate)
-      : (() => {
-          const d = new Date();
-          d.setMonth(d.getMonth() + 1);
-          d.setDate(1);
-          return d;
-        })();
+    const debitDay = opts.debitDay
+      ? Math.min(Math.max(Math.round(opts.debitDay), 1), 28)
+      : 1;
+
+    const preview = this.getMandatePreview(tenor, totalAmount, debitDay);
 
     const scheduleRecords: (typeof RepaymentSchedule.prototype)[] = [];
-    let outstandingBalance = totalAmount;
 
-    for (let i = 1; i <= tenor; i++) {
-      const dueDate = new Date(startDate);
-      dueDate.setMonth(dueDate.getMonth() + (i - 1));
-      const isLast = i === tenor;
-      const amount = isLast ? lastInstallmentAdjustment : installmentAmount;
-      outstandingBalance -= amount;
-
+    for (const item of preview) {
       const record = await RepaymentSchedule.create({
         loanApplicationId: application.id,
         parentId: parent.id,
-        installmentNumber: i,
-        dueDate: dueDate.toISOString().split("T")[0],
-        principalAmount: amount,
+        installmentNumber: item.installmentNumber,
+        dueDate: item.dueDate,
+        principalAmount: item.amount,
         interestAmount: 0,
-        totalAmount: amount,
-        outstandingBalance: Math.max(0, outstandingBalance),
+        totalAmount: item.amount,
+        outstandingBalance: item.outstandingBalance,
         status: "upcoming",
       });
-
       scheduleRecords.push(record);
     }
 
@@ -1368,6 +1450,8 @@ class ParentService {
       status: "approved",
       decidedAt: new Date(),
       decidedBy: parent.id,
+      mandateDebitDay: debitDay,
+      mandateStatus: "pending",
     });
 
     await ApplicationEvent.create({
@@ -1375,11 +1459,11 @@ class ParentService {
       actor: "parent",
       actorId: parent.id,
       status: "approved",
-      note: `Repayment plan confirmed: ${tenor}-month schedule starting ${scheduleRecords[0]?.dueDate ?? "—"}`,
+      note: `Repayment plan confirmed: ${tenor}-month schedule, debit day ${debitDay}, starting ${scheduleRecords[0]?.dueDate ?? "—"}`,
     });
 
     logger.info(
-      `[parent.service] Repayment schedule created | application=${application.id} | installments=${tenor}`,
+      `[parent.service] Repayment schedule created | application=${application.id} | installments=${tenor} | debitDay=${debitDay}`,
     );
 
     this._notifyFundingPartner(application, parent).catch((err) =>
@@ -1399,10 +1483,20 @@ class ParentService {
     application: typeof LoanApplication.prototype,
     parent: { id: string; firstName: string; lastName: string },
   ): Promise<void> {
-    const partnerEmail = env.fundingPartner.email;
-    if (!partnerEmail) {
+    const activePartners = await FundingPartner.findAll({
+      where: { status: "active" },
+    });
+
+    const fallbackEmail = env.fundingPartner.email;
+    const recipients: { email: string; name: string }[] = activePartners.length
+      ? activePartners.map((p) => ({ email: p.email, name: p.name }))
+      : fallbackEmail
+        ? [{ email: fallbackEmail, name: env.fundingPartner.name }]
+        : [];
+
+    if (recipients.length === 0) {
       logger.warn(
-        "[parent.service] FUNDING_PARTNER_EMAIL not configured — skipping email",
+        "[parent.service] No active funding partners and FUNDING_PARTNER_EMAIL not set — skipping notification",
       );
       return;
     }
@@ -1500,18 +1594,22 @@ class ParentService {
       )
       .join("");
 
-    await sendEmail({
-      email: partnerEmail,
-      subject: `Funding Request – ${catalogSchool?.name ?? "School"} – ${app.referenceNumber}`,
-      message: `A tuition financing application is ready for funding. Please review the details and confirm disbursement.`,
-      html: `
+    const emailSubject = `Funding Request – ${catalogSchool?.name ?? "School"} – ${app.referenceNumber}`;
+    const emailMessage = `A tuition financing application is ready for funding. Please review the details and confirm disbursement.`;
+
+    for (const recipient of recipients) {
+      await sendEmail({
+        email: recipient.email,
+        subject: emailSubject,
+        message: emailMessage,
+        html: `
       <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;color:#333">
         <div style="background:#881337;padding:28px 32px;border-radius:12px 12px 0 0">
           <h1 style="color:#fff;margin:0;font-size:22px">Funding Request Ready for Disbursement</h1>
           <p style="color:#fce7f3;margin:8px 0 0;font-size:14px">Application ${app.referenceNumber ?? app.id}</p>
         </div>
         <div style="background:#fff;padding:28px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
-          <p style="margin:0 0 20px">Hello <strong>${env.fundingPartner.name}</strong>,</p>
+          <p style="margin:0 0 20px">Hello <strong>${recipient.name}</strong>,</p>
           <p style="margin:0 0 20px">
             A tuition financing application has been fully processed and is ready for disbursement.
             The parent has paid the service charge and confirmed their repayment plan.
@@ -1594,11 +1692,11 @@ class ParentService {
           </p>
         </div>
       </div>`,
-    });
-
-    logger.info(
-      `[parent.service] Funding partner email sent to ${partnerEmail} for application ${app.id}`,
-    );
+      });
+      logger.info(
+        `[parent.service] Funding partner email sent to ${recipient.email} for application ${app.id}`,
+      );
+    }
   }
 
   private async _sendSchoolVerificationEmail(args: {

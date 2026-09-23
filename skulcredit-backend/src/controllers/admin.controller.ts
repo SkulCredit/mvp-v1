@@ -1,6 +1,4 @@
-﻿
-
-import { Request, Response, NextFunction } from "express";
+﻿import { Request, Response, NextFunction } from "express";
 import adminService from "../services/admin.service";
 import schoolTermService from "../services/schoolTerm.service";
 import { successResponse } from "../utils/response";
@@ -1770,6 +1768,99 @@ class AdminController {
     try {
       await adminService.deleteSchoolTerm(String(req.params.id));
       successResponse(res, 200, "School term deleted");
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async listFundingPartners(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { status } = req.query as { status?: string };
+      successResponse(
+        res,
+        200,
+        "Funding partners fetched",
+        await adminService.listFundingPartners(status),
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async getFundingPartner(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      successResponse(
+        res,
+        200,
+        "Funding partner fetched",
+        await adminService.getFundingPartner(String(req.params.id)),
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async createFundingPartner(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await adminService.createFundingPartner(
+        req.body as {
+          name: string;
+          email: string;
+          phone?: string | null;
+          contactPerson?: string | null;
+          status?: "active" | "inactive";
+          notes?: string | null;
+        },
+      );
+      successResponse(res, 201, "Funding partner created", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async updateFundingPartner(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await adminService.updateFundingPartner(
+        String(req.params.id),
+        req.body as {
+          name?: string;
+          email?: string;
+          phone?: string | null;
+          contactPerson?: string | null;
+          status?: "active" | "inactive";
+          notes?: string | null;
+        },
+      );
+      successResponse(res, 200, "Funding partner updated", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async deleteFundingPartner(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      await adminService.deleteFundingPartner(String(req.params.id));
+      successResponse(res, 200, "Funding partner deleted");
     } catch (e) {
       next(e);
     }

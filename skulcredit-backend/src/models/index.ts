@@ -22,6 +22,7 @@ import SchoolTerm from "./SchoolTerm";
 import AcademicSession from "./AcademicSession";
 import AcademicTerm from "./AcademicTerm";
 import SchoolBankAccount from "./SchoolBankAccount";
+import FundingPartner from "./FundingPartner";
 
 User.hasOne(Parent, { foreignKey: "userId", as: "parentProfile" });
 User.hasOne(School, { foreignKey: "userId", as: "schoolProfile" });
@@ -210,4 +211,5 @@ export {
   AcademicSession,
   AcademicTerm,
   SchoolBankAccount,
+  FundingPartner,
 };

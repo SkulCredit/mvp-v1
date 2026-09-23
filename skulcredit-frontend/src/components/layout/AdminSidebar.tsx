@@ -10,6 +10,7 @@ export type AdminTab =
   | "disbursements"
   | "repayments"
   | "schools"
+  | "funding-partners"
   | "risk"
   | "compliance"
   | "audit"
@@ -56,6 +57,12 @@ const OPERATIONS_NAV: NavItem[] = [
     icon: "building-2",
     label: "Schools",
     path: "/admin/schools",
+  },
+  {
+    tab: "funding-partners",
+    icon: "landmark",
+    label: "Funding Partners",
+    path: "/admin/funding-partners",
   },
 ];
 

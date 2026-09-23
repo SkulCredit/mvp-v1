@@ -559,13 +559,67 @@ class ParentController {
   ): Promise<void> {
     try {
       const id = String(req.params.id);
-      const { repaymentStartDate } = req.body as {
-        repaymentStartDate?: string;
-      };
+      const { debitDay } = req.body as { debitDay?: number };
       const result = await parentService.setupRepayment(req.user!.userId, id, {
-        repaymentStartDate,
+        debitDay: debitDay ? Number(debitDay) : undefined,
       });
       successResponse(res, 200, "Repayment plan set up successfully", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getMandatePreview(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const debitDay = req.query.debitDay ? Number(req.query.debitDay) : 1;
+
+      const appData = await parentService.getRepaymentSchedule(
+        req.user!.userId,
+        id,
+      );
+
+      const app = appData as {
+        tenor: number;
+        amountApproved: number | null;
+        amountRequested: number;
+      };
+
+      const totalAmount = Number(app.amountApproved ?? app.amountRequested);
+      const preview = parentService.getMandatePreview(
+        app.tenor,
+        totalAmount,
+        debitDay,
+      );
+
+      successResponse(res, 200, "Mandate preview generated", {
+        tenor: app.tenor,
+        totalAmount,
+        debitDay: Math.min(Math.max(Math.round(debitDay), 1), 28),
+        installmentAmount: Math.round(totalAmount / app.tenor),
+        preview,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getRepaymentSchedule(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const result = await parentService.getRepaymentSchedule(
+        req.user!.userId,
+        id,
+      );
+      successResponse(res, 200, "Repayment schedule fetched", result);
     } catch (error) {
       next(error);
     }

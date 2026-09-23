@@ -33,9 +33,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import PublicRoute from "../components/PublicRoute";
 import { AuthSpinner } from "../context/AuthContext";
 
-// ── Lazy page imports ─────────────────────────────────────────────────────────
 
-// Public / auth
 const HomePage = React.lazy(() => import("../pages/Home/HomePage"));
 const UnifiedAuthPage = React.lazy(
   () => import("../pages/Auth/UnifiedAuthPage"),
@@ -48,12 +46,10 @@ const SchoolOnboardingPage = React.lazy(
   () => import("../pages/SchoolFlow/SchoolOnboardingPage"),
 );
 
-// Admin auth — new primary login page at /admin/auth/login
 const AdminLoginPage = React.lazy(
   () => import("../pages/AdminFlow/AdminLoginPage"),
 );
 
-// Parent flow
 const ParentLayout = React.lazy(
   () => import("../pages/ParentFlow/ParentLayout"),
 );
@@ -88,7 +84,6 @@ const PaymentConfirmationPage = React.lazy(
   () => import("../pages/ParentFlow/PaymentConfirmationPage"),
 );
 
-// School flow
 const SchoolDashboardPage = React.lazy(
   () => import("../pages/SchoolFlow/SchoolDashboardPage"),
 );
@@ -114,12 +109,10 @@ const SchoolSettingsPage = React.lazy(
   () => import("../pages/SchoolFlow/SchoolSettingsPage"),
 );
 
-// Admin flow
 const AdminDashboardPage = React.lazy(
   () => import("../pages/AdminFlow/AdminDashboardPage"),
 );
 
-// Funding partner flow
 const FundingPartnerDisbursementPage = React.lazy(
   () => import("../pages/FundingPartner/FundingPartnerDisbursementPage"),
 );
@@ -132,14 +125,14 @@ const AdminDisbursementsPage = React.lazy(
 const AdminSchoolsPage = React.lazy(
   () => import("../pages/AdminFlow/AdminSchoolsPage"),
 );
-
-// ── Router ────────────────────────────────────────────────────────────────────
+const AdminFundingPartnersPage = React.lazy(
+  () => import("../pages/AdminFlow/AdminFundingPartnersPage"),
+);
 
 const AppRouter: React.FC = () => (
   <Router>
     <Suspense fallback={<AuthSpinner />}>
       <Routes>
-        {/* ── PUBLIC ─────────────────────────────────────────────── */}
         <Route
           path="/"
           element={
@@ -173,8 +166,6 @@ const AppRouter: React.FC = () => (
           }
         />
         <Route path="/school/onboarding" element={<SchoolOnboardingPage />} />
-        {/* ── ADMIN AUTH ─────────────────────────────────────────── */}
-        {/*  /admin/auth/login  – if already logged-in as admin, go straight to dashboard */}
         <Route
           path="/admin/auth/login"
           element={
@@ -183,12 +174,10 @@ const AppRouter: React.FC = () => (
             </PublicRoute>
           }
         />
-        {/* legacy /auth/admin → redirect to new admin login */}
         <Route
           path="/auth/admin"
           element={<Navigate to="/admin/auth/login" replace />}
         />
-        {/* ── PARENT ROUTES ──────────────────────────────────────── */}
         <Route
           element={
             <ProtectedRoute allowedRoles={["parent"]}>
@@ -219,7 +208,6 @@ const AppRouter: React.FC = () => (
           />
           <Route path="/parent/payment" element={<PaymentConfirmationPage />} />
         </Route>
-        {/* ── SCHOOL ROUTES ──────────────────────────────────────── */}
         <Route
           path="/school/dashboard"
           element={
@@ -284,8 +272,6 @@ const AppRouter: React.FC = () => (
             </ProtectedRoute>
           }
         />
-        {/* ── ADMIN ROUTES ───────────────────────────────────────── */}
-        {/* bare /admin → redirect to dashboard (ProtectedRoute will catch unauthenticated) */}
         <Route
           path="/admin"
           element={<Navigate to="/admin/dashboard" replace />}
@@ -322,12 +308,18 @@ const AppRouter: React.FC = () => (
             </ProtectedRoute>
           }
         />
-        {/* ── FUNDING PARTNER (public) ────────────────────────── */}
+        <Route
+          path="/admin/funding-partners"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminFundingPartnersPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/funding-partner/disbursement/:id"
           element={<FundingPartnerDisbursementPage />}
         />
-        {/* ── CATCH-ALL ──────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />{" "}
       </Routes>
     </Suspense>

@@ -1,101 +1,344 @@
-TODO:
 
-# Task 1
+# TASK — Funding Partner / Disbursement Flow
 
-Any section in the parent UI that parent is require to select or provide school details and parent didnt not see the school of his/her child in our provided list of school, there should be an option for that parent to create or add the child school manully,
-Input fields that should show when that action is click are:
+So, once the parent has completed the repayment schedule and the application has gotten to the **funding/disbursement stage**, the next step is the funding partner.
 
-- Name of the school
-- contact of the any person in school -(must be active for verification) [email or phone number]
-- school account details
-- location of the school
+The idea is that we don't want the funding partner to come into the main SkulCredit dashboard and start looking around for the application. We want to give them a **secure link to the specific transaction**.
 
-# Task 2
+So when the application is ready for funding, SkulCredit should generate a funding-partner link for that particular application.
 
-in "parent/details" page
+That link is then sent to the funding partner **via email**.
 
--- Tuition & repayment details
+The email should tell them that there is a funding request waiting for their review, and the link should take them directly to the transaction.
 
-remove
-Full payment option
+---
 
-we have two options,
+## What happens when the funding partner opens the link
 
-1. 4 month
-2. 3 month
+When the funding partner clicks the link from their email, it should take them to a **Funding / Disbursement Review page**.
 
-# Task 3
+This page should show them the complete transaction details they need to make their decision.
 
-in "parent/details" page
-Application flow show .. in (Review) stage
+Basically, I want the funding partner to be able to understand the entire journey of the applicant from that one page.
 
-- shows the tier of the school, percentage and services charges (this should be from backend because we have all the datils of register schools and non-register schools and their tier that each school before to.)
+So they should see things like:
 
-- All those details must be fetch from backend and display before you click submit.
+* Applicant/parent details
+* Student details
+* School name
+* School account/payment details
+* Tuition amount
+* Service charge
+* Total amount payable
+* Repayment plan selected
+* Number of repayment months
+* Monthly repayment amount
+* Repayment dates
+* Application information
+* Verification/KYC status
+* Any other information that is relevant to their credit assessment
 
-# Task 4
+The idea is that **everything they need to check the transaction should be available on this page**.
 
-in "parent/details" page
+They shouldn't have to go back and forth between different pages to understand what they are funding.
 
-- Once parent click the submit button, everything is process in backend, system must send update school,
-  If the school is registered school, send a link their emaill and the application details like
-  {
-  parent request : Requesting to pay child school fees
-  parent name: Queen Mike
-  term: First time
-  seasion: 2026/20207
-  student: James Mike
-  Adminision number: TWQ242423
-  School fees amount: N400,000.00
-  }
+---
 
-so link will be sent to school email to verify the parent application details is correct along with the details, once the click link, it redirect them to pur platform in school portal, if the school is not logged-in before, the link redirect them to school login page and the link will still be pending on the url so that one logged-in it automatically redirect the school that parent application to verify, the see the details and see two buttons (accept or reject),
-if the school accept, the status of the application will update in the backend and parent page, and notification will be send to be parent email and page notification regarding the update that his/her application status but when the school click when reject button, it ask the school to provide, explanation or why rejecting the application so skulcredit can follow up.
+# Funding Partner Review
 
-This is only applicable to registered school.
+Now, the funding partner will do their own checks.
 
-For none-register school we send a link and details of the parent of application to the school contact person in charge of communcation, which is why #Task1 was introduced.
+This is important because SkulCredit is not making the final credit decision for the funding partner.
 
-For recap:
-this is task1:
+The funding partner is going to look at the information we have provided and carry out whatever additional checks they require to determine whether they are comfortable funding the transaction.
 
-```
-# Task 1
-Any section in the parent UI that parent is require to select or provide school details and parent didnt not see the school of his/her child in our provided list of school, there should be an option for that parent to create or add the child school manully,
-Input fields that should show when that action is click are:
+So the page should have a clear status such as:
 
-- Name of the school
-- contact of the any person in school -(must be active for verification) [email or phone number]
-- school account details
-- location of the school
-```
+**Pending Funding Partner Review**
 
-# Task 5
+And then the funding partner can go through the transaction details.
 
-in page http://localhost/parent/applications  
-Timeline
+Once they are satisfied that the applicant is eligible and creditworthy based on their own process, they can proceed with the disbursement.
 
-we need add add more.
+---
 
---so After "Decision", just below "Decision"
+# Disbursement
 
-Add
+Once they decide to fund the application, they should have a clear action on the page:
 
-1. "Pay service charge"
-2. "setup repayment"
+**Proceed to Disbursement**
 
-# Task 6
+The funding partner then makes the actual payment to the **school's account** using the school banking details displayed on the transaction.
 
-Once School Accept or confirm the parent application, nofitication will be send to parent email that Application has been accepted, he should complete the next stage of the application by clicking the button link.
+For example:
 
-The button link, has application id which will redirect a parent to a page where parent will pay for "Service Charge".
-once parent complete this service charge task and it succesful, it redirect parent to "Setup Repayment Plan"
+> **School:** Dothan Comprehensive Schools
+> **Bank:** XXXXX Bank
+> **Account Name:** Dothan Comprehensive Schools
+> **Account Number:** XXXXXXXX
+> **Amount to Disburse:** ₦450,000
 
-And once parent complete this too, system will send a link to funding partner --unilag or microfinance bank containing the parent, student, and school details and school bank details which the money will be send to.
+The exact bank information should come from the application/school record and should be clearly displayed so that the funding partner knows exactly where the money is supposed to go.
 
-the link we have call-to-action so when the funding partner make the tranfer and it successful, the success when ask them to click the "Disbument Complete or Rejected" button to parent get notification and skulcredit application will also get notified and the this call "Disbursed to school" status to update in the backend.
+---
 
-# Task 7
+# After the funding partner makes the transfer
 
-- when a parent repayment is overdue - constantly notify them using cronjob to check payment that is going due in days to remind them and when paymen is duel or overduel also send the parent constant reminder email like your repay is due day 1, day 2 etc.
-- Note: this platform does not lay no interest rate due payment.
+This part is very important.
+
+We should **not automatically mark the application as disbursed just because the funding partner opened the page or clicked "Proceed to Disbursement."**
+
+The actual money has to be transferred first.
+
+So after the funding partner has made the payment to the school account, they return to the transaction page.
+
+There should then be an action like:
+
+**Mark as Disbursed**
+
+or
+
+**Confirm Disbursement**
+
+When they click that, we record that the funding partner has confirmed that the funds have been disbursed.
+
+The transaction status then changes from something like:
+
+**Pending Disbursement**
+
+to:
+
+**Disbursed**
+
+---
+
+# What happens on the parent side
+
+This is where the two systems connect.
+
+As soon as the funding partner confirms the disbursement, the parent's application status on the SkulCredit dashboard should automatically update.
+
+The parent should now see the application as **GREEN / Funded / Disbursed**.
+
+For example:
+
+**Application Status**
+
+🟢 **Funding Completed**
+
+> Your school fees have been successfully funded and disbursed to your school.
+
+The parent should also receive a notification by email.
+
+Something like:
+
+> **Your school fee funding has been completed**
+>
+> Your funding partner has successfully confirmed the disbursement of ₦450,000 to Dothan Comprehensive Schools.
+>
+> Your repayment schedule begins on [date].
+>
+> Next repayment: ₦112,500 on [date].
+
+The same notification should also appear inside the parent's SkulCredit dashboard.
+
+---
+
+# The important part — status flow
+
+I want us to think about this as a proper application state transition rather than just a button.
+
+The flow should basically be:
+
+**Parent completes repayment schedule**
+
+↓
+
+**Application ready for funding**
+
+↓
+
+**Funding partner link generated**
+
+↓
+
+**Email sent to funding partner**
+
+↓
+
+**Funding partner opens secure transaction link**
+
+↓
+
+**Funding partner reviews complete application**
+
+↓
+
+**Funding partner performs their own credit checks**
+
+↓
+
+**Funding partner approves/funds**
+
+↓
+
+**Funding partner disburses money to school account**
+
+↓
+
+**Funding partner returns to transaction page**
+
+↓
+
+**Funding partner clicks "Confirm Disbursement"**
+
+↓
+
+**SkulCredit records the disbursement**
+
+↓
+
+**Application status changes to GREEN / DISBURSED**
+
+↓
+
+**Parent receives email notification**
+
+↓
+
+**Parent dashboard updates**
+
+↓
+
+**Repayment schedule becomes active**
+
+---
+
+# We also need to handle the different statuses properly
+
+I don't want this to be just a single "disbursed/not disbursed" field.
+
+We should have clear states so that everyone knows exactly where the application is.
+
+For example:
+
+**Ready for Funding**
+
+The parent has completed the required setup and the application is ready to be sent to a funding partner.
+
+**Sent to Funding Partner**
+
+The funding request has been generated and the funding partner has been notified.
+
+**Under Funding Partner Review**
+
+The funding partner has opened the transaction and is reviewing the application.
+
+**Approved for Disbursement**
+
+The funding partner has completed their checks and is ready to fund.
+
+**Disbursement Pending**
+
+The funding partner has approved the transaction but has not yet confirmed that the money has been transferred.
+
+**Disbursed**
+
+The funding partner has confirmed that the funds have been transferred to the school.
+
+**Rejected / Declined**
+
+If the funding partner decides not to fund the transaction, we should record that outcome and the reason where applicable.
+
+---
+
+# The link should be secure
+
+The funding partner link is important because it contains sensitive financial and applicant information.
+
+So this should not just be a normal public URL where somebody can change the application ID and see another person's transaction.
+
+The link should be tied to the specific funding request and funding partner.
+
+Ideally, the funding partner should be authenticated or the link should contain a secure, expiring token.
+
+We should also record things like:
+
+* When the link was generated
+* When the email was sent
+* When the funding partner opened the link
+* When they started their review
+* When they approved
+* When they confirmed disbursement
+* Who confirmed the disbursement
+* Date and time of confirmation
+* Amount disbursed
+* Any rejection/decline reason
+
+This gives us a proper audit trail.
+
+---
+
+# One more important thing
+
+The **parent should not be able to mark the application as disbursed**.
+
+Only the funding partner should be able to confirm that the money has actually been disbursed.
+
+The parent can see the status, but the funding confirmation comes from the funding partner side.
+
+So the parent experience is basically:
+
+> **Waiting for Funding Partner**
+
+then
+
+> **Funding Partner Reviewing**
+
+then
+
+> **Funding Approved**
+
+and finally:
+
+> 🟢 **Funds Disbursed**
+
+Once it gets to **Funds Disbursed**, the repayment schedule that the parent previously agreed to becomes the active repayment schedule.
+
+---
+
+# Overall idea
+
+The way I want us to think about the system is:
+
+**SkulCredit manages the application and repayment relationship.**
+
+**The funding partner makes the funding/credit decision and disburses the money.**
+
+So we're connecting both sides through this transaction.
+
+The funding partner gets a **secure transaction link**, reviews the complete application, performs their own checks, sends the money directly to the school account, comes back to the same transaction page and confirms the disbursement.
+
+Once they confirm it, **SkulCredit becomes the source of truth for the application's new status**, and the parent is automatically notified that their funding has been completed.
+
+The repayment schedule the parent already set up should then remain attached to that application and move from **scheduled** to **active**, because funding has now actually happened.
+
+---
+
+## The simplest mental model
+
+Think of it as three separate experiences:
+
+**1. Parent**
+
+`Set repayment schedule → Wait for funding → Get notified → Start repayment`
+
+**2. Funding Partner**
+
+`Receive email → Open transaction → Review applicant → Approve → Disburse to school → Confirm disbursement`
+
+**3. SkulCredit**
+
+`Create funding request → Track funding partner → Receive disbursement confirmation → Update application → Notify parent → Activate repayment`
+
+That is the flow I want us to build.

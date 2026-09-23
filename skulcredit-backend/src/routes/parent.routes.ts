@@ -197,6 +197,16 @@ router.post(
 );
 
 router.get(
+  "/applications/:id/mandate-preview",
+  parentController.getMandatePreview.bind(parentController),
+);
+
+router.get(
+  "/applications/:id/schedule",
+  parentController.getRepaymentSchedule.bind(parentController),
+);
+
+router.get(
   "/school-requests",
   parentController.getSchoolRequests.bind(parentController),
 );

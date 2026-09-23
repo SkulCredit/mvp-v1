@@ -254,11 +254,29 @@ export const parentService = {
    */
   setupRepayment: async (
     applicationId: string,
-    opts: { repaymentStartDate?: string } = {},
+    opts: { debitDay?: number } = {},
   ): Promise<unknown> => {
     const response = await apiClient.post(
       `/parents/applications/${applicationId}/setup-repayment`,
       opts,
+    );
+    return response.data.data;
+  },
+
+  getMandatePreview: async (
+    applicationId: string,
+    debitDay: number,
+  ): Promise<unknown> => {
+    const response = await apiClient.get(
+      `/parents/applications/${applicationId}/mandate-preview`,
+      { params: { debitDay } },
+    );
+    return response.data.data;
+  },
+
+  getRepaymentSchedule: async (applicationId: string): Promise<unknown> => {
+    const response = await apiClient.get(
+      `/parents/applications/${applicationId}/schedule`,
     );
     return response.data.data;
   },

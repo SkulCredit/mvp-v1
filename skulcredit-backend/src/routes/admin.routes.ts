@@ -153,7 +153,7 @@ router.get("/users/:id", ctrl.getUser.bind(ctrl));
 router.patch("/users/:id/toggle-active", ctrl.toggleUserActive.bind(ctrl));
 router.patch("/users/:id/email", ctrl.resetUserEmail.bind(ctrl));
 
-//  PARENTS 
+//  PARENTS
 router.get("/parents", ctrl.listParents.bind(ctrl));
 router.get("/parents/:id", ctrl.getParent.bind(ctrl));
 router.patch("/parents/:id/kyc", ctrl.updateParentKyc.bind(ctrl));
@@ -165,7 +165,7 @@ router.put("/schools/:id/approve", ctrl.approveSchool.bind(ctrl));
 router.put("/schools/:id/reject", ctrl.rejectSchool.bind(ctrl));
 router.patch("/schools/:id/status", ctrl.updateSchoolStatus.bind(ctrl));
 
-//  CATALOG SCHOOLS 
+//  CATALOG SCHOOLS
 router.get("/catalog-schools", ctrl.listCatalogSchools.bind(ctrl));
 router.get("/catalog-schools/:id", ctrl.getCatalogSchool.bind(ctrl));
 router.patch("/catalog-schools/:id", ctrl.updateCatalogSchool.bind(ctrl));
@@ -240,15 +240,15 @@ router.post("/repayments/manual", ctrl.recordManualRepayment.bind(ctrl));
 router.get("/repayments", ctrl.listRepayments.bind(ctrl));
 router.get("/repayments/:id", ctrl.getRepayment.bind(ctrl));
 
-//  REPAYMENT SCHEDULE 
+//  REPAYMENT SCHEDULE
 router.patch("/schedule/:id", ctrl.updateScheduleInstallment.bind(ctrl));
 
-//  DOCUMENTS (KYC) 
+//  DOCUMENTS (KYC)
 router.get("/documents", ctrl.listDocuments.bind(ctrl));
 router.get("/documents/:id", ctrl.getDocument.bind(ctrl));
 router.delete("/documents/:id", ctrl.deleteDocument.bind(ctrl));
 
-//  SCHOOL REQUESTS 
+//  SCHOOL REQUESTS
 router.get("/school-requests", ctrl.listSchoolRequests.bind(ctrl));
 router.get("/school-requests/:id", ctrl.getSchoolRequest.bind(ctrl));
 router.patch(
@@ -282,9 +282,15 @@ router.put("/terms/:id", ctrl.updateTerm.bind(ctrl));
 router.delete("/terms/:id", ctrl.deleteTerm.bind(ctrl));
 router.put("/terms/:id/activate", ctrl.activateTerm.bind(ctrl));
 
-//  LEGACY SCHOOL TERMS (per-school terms created by school accounts) 
+//  LEGACY SCHOOL TERMS (per-school terms created by school accounts)
 router.get("/school-terms", ctrl.listSchoolTerms.bind(ctrl));
 router.get("/school-terms/:id", ctrl.getSchoolTerm.bind(ctrl));
 router.delete("/school-terms/:id", ctrl.deleteSchoolTerm.bind(ctrl));
+
+router.get("/funding-partners", ctrl.listFundingPartners.bind(ctrl));
+router.post("/funding-partners", ctrl.createFundingPartner.bind(ctrl));
+router.get("/funding-partners/:id", ctrl.getFundingPartner.bind(ctrl));
+router.put("/funding-partners/:id", ctrl.updateFundingPartner.bind(ctrl));
+router.delete("/funding-partners/:id", ctrl.deleteFundingPartner.bind(ctrl));
 
 export default router;
