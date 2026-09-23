@@ -5,8 +5,6 @@ import Icon from "../../components/Icon";
 import apiClient from "../../services/apiClient";
 import { AxiosError } from "axios";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type SchoolView = "login" | "signup" | "otp" | "forgot";
 
 interface RegData {
@@ -19,8 +17,6 @@ interface RegData {
 }
 
 type RegErrors = Partial<Record<keyof RegData | "form", string>>;
-
-// ── Shared helpers ────────────────────────────────────────────────────────────
 
 const inputCls = (hasError?: boolean) =>
   [
@@ -55,8 +51,6 @@ const FieldErr: React.FC<{ msg?: string }> = ({ msg }) =>
 const Spinner: React.FC = () => (
   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
 );
-
-// ── Verification modal (shown after OTP verified) ─────────────────────────────
 
 const VerificationModal: React.FC<{ onStart: () => void }> = ({ onStart }) => (
   <div
@@ -123,18 +117,15 @@ const SchoolAuthPage: React.FC = () => {
   const { login, register } = useAuth();
   const [searchParams] = useSearchParams();
 
-  // ── view state ───────────────────────────────────────────────────────────
   const [view, setView] = useState<SchoolView>("login");
   const [showVerifyModal, setShowVerifyModal] = useState(false);
 
-  // ── login ────────────────────────────────────────────────────────────────
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [showLoginPw, setShowLoginPw] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
-  // ── registration ─────────────────────────────────────────────────────────
   const [reg, setReg] = useState<RegData>({
     schoolName: "",
     email: "",
@@ -147,17 +138,13 @@ const SchoolAuthPage: React.FC = () => {
   const [showRegPw, setShowRegPw] = useState(false);
   const [showConfPw, setShowConfPw] = useState(false);
 
-  // ── otp ──────────────────────────────────────────────────────────────────
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [otpValue, setOtpValue] = useState("");
   const [otpError, setOtpError] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── shared ───────────────────────────────────────────────────────────────
   const [isLoading, setIsLoading] = useState(false);
-
-  // ── helpers ──────────────────────────────────────────────────────────────
 
   const startCooldown = () => {
     setResendCooldown(60);
@@ -177,8 +164,6 @@ const SchoolAuthPage: React.FC = () => {
     if (regErrors[field as keyof RegErrors])
       setRegErrors((p) => ({ ...p, [field]: undefined }));
   };
-
-  // ── login handler ────────────────────────────────────────────────────────
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,8 +186,6 @@ const SchoolAuthPage: React.FC = () => {
       setIsLoading(false);
     }
   };
-
-  // ── register handler ─────────────────────────────────────────────────────
 
   const validateReg = (): boolean => {
     const e: RegErrors = {};
@@ -238,7 +221,6 @@ const SchoolAuthPage: React.FC = () => {
         },
         "school",
       );
-      // Registration succeeded → go to OTP verification
       setRegisteredEmail(reg.email.trim());
       setOtpValue("");
       setOtpError("");
@@ -261,8 +243,6 @@ const SchoolAuthPage: React.FC = () => {
     }
   };
 
-  // ── OTP handlers ─────────────────────────────────────────────────────────
-
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otpValue.length !== 6) {
@@ -276,7 +256,6 @@ const SchoolAuthPage: React.FC = () => {
         email: registeredEmail,
         otp: otpValue,
       });
-      // OTP confirmed → show the school verification modal
       setShowVerifyModal(true);
     } catch (err) {
       const axErr = err as AxiosError<{ message?: string }>;
@@ -295,15 +274,11 @@ const SchoolAuthPage: React.FC = () => {
       await apiClient.post("/auth/send-otp", { email: registeredEmail });
       startCooldown();
     } catch {
-      /* silent */
     }
   };
 
-  // ── render ────────────────────────────────────────────────────────────────
-
   return (
     <>
-      {/* Verification modal — shown after OTP is confirmed */}
       {showVerifyModal && (
         <VerificationModal
           onStart={() => {
@@ -599,11 +574,9 @@ const SchoolAuthPage: React.FC = () => {
           </div>
         )}
 
-        {/* ══ OTP VERIFICATION ══ */}
         {view === "otp" && (
           <div className="w-full max-w-md animate-fade-in-up bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="text-center mb-8">
-              {/* mail icon circle */}
               <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-5 shadow-sm">
                 <Icon name="mail" className="w-8 h-8 text-brand" />
               </div>
@@ -703,8 +676,6 @@ const SchoolAuthPage: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* ══ FORGOT PASSWORD ══ */}
         {view === "forgot" && (
           <div className="w-full max-w-md animate-fade-in-up bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="text-center mb-8">

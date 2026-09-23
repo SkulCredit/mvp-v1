@@ -4,6 +4,8 @@ import Icon from "../Icon";
 import { useAuth } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationContext";
 import { resolveUploadUrl } from "../../utils/uploadUrl";
+import NotificationDrawer from "../notifications/NotificationDrawer";
+import { AppNotification } from "../../services/notificationService";
 
 export interface Notification {
   id: string;
@@ -44,110 +46,138 @@ function timeAgo(dateStr: string): string {
 
 const NotificationDropdown: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeNotification, setActiveNotification] =
+    useState<AppNotification | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useClickOutside(ref, () => setOpen(false));
 
   const { notifications, unreadCount, loading, markRead, markAllRead } =
     useNotifications();
 
-  return (
-    <div ref={ref} className="relative">
-      <button
-        aria-label="Notifications"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="relative p-2.5 rounded-xl border border-slate-200 text-slate-500
-                   hover:text-brand hover:bg-slate-50 transition-colors focus-visible:outline-none
-                   focus-visible:ring-2 focus-visible:ring-brand/40"
-      >
-        <Icon name="bell" className="w-5 h-5" />
-        {unreadCount > 0 && (
-          <span
-            aria-hidden="true"
-            className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center
-                       justify-center rounded-full bg-brand text-white text-[10px] font-bold leading-none
-                       border-2 border-white"
-          >
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        )}
-      </button>
+  const handleNotificationClick = (n: AppNotification) => {
+    setActiveNotification(n);
+    setDrawerOpen(true);
+    setOpen(false);
+  };
 
-      {open && (
-        <div
-          className="absolute right-0 mt-2 w-[340px] bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)]
-                     border border-slate-100 z-50 overflow-hidden"
+  const handleDrawerClose = () => {
+    setDrawerOpen(false);
+  };
+
+  const handleViewAll = () => {
+    setOpen(false);
+    if (notifications.length > 0) {
+      setActiveNotification(notifications[0]);
+      setDrawerOpen(true);
+    }
+  };
+
+  return (
+    <>
+      <div ref={ref} className="relative">
+        <button
+          aria-label="Notifications"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className="relative p-2.5 rounded-xl border border-slate-200 text-slate-500
+                     hover:text-brand hover:bg-slate-50 transition-colors focus-visible:outline-none
+                     focus-visible:ring-2 focus-visible:ring-brand/40"
         >
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
-            <span className="text-sm font-bold text-slate-800">
-              Notifications
+          <Icon name="bell" className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span
+              aria-hidden="true"
+              className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center
+                         justify-center rounded-full bg-brand text-white text-[10px] font-bold leading-none
+                         border-2 border-white"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
             </span>
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllRead}
-                className="text-xs font-semibold text-brand hover:underline transition-colors"
-              >
-                Mark all read
-              </button>
+          )}
+        </button>
+
+        {open && (
+          <div
+            className="absolute right-0 mt-2 w-[340px] bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)]
+                       border border-slate-100 z-50 overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
+              <span className="text-sm font-bold text-slate-800">
+                Notifications
+              </span>
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllRead}
+                  className="text-xs font-semibold text-brand hover:underline transition-colors"
+                >
+                  Mark all read
+                </button>
+              )}
+            </div>
+
+            <ul
+              className="divide-y divide-slate-50 overflow-y-auto scrollbar-brand"
+              style={{ maxHeight: "340px" }}
+            >
+              {loading ? (
+                <li className="px-5 py-8 flex justify-center">
+                  <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                </li>
+              ) : notifications.length === 0 ? (
+                <li className="px-5 py-8 text-center text-sm text-slate-400">
+                  You're all caught up!
+                </li>
+              ) : (
+                notifications.map((n) => (
+                  <li
+                    key={n.id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={`flex items-start gap-3 px-5 py-4 transition-colors cursor-pointer
+                      ${n.isRead ? "hover:bg-slate-50" : "bg-brand/5 hover:bg-brand/10"}`}
+                  >
+                    <span
+                      className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
+                        !n.isRead ? "bg-brand" : "bg-transparent"
+                      }`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 leading-snug">
+                        {n.title}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5 leading-relaxed line-clamp-2">
+                        {n.message}
+                      </p>
+                    </div>
+                    <span className="text-[11px] text-slate-400 shrink-0 mt-0.5 whitespace-nowrap">
+                      {timeAgo(n.createdAt)}
+                    </span>
+                  </li>
+                ))
+              )}
+            </ul>
+
+            {notifications.length > 0 && (
+              <div className="border-t border-slate-100 px-5 py-3 text-center">
+                <button
+                  onClick={handleViewAll}
+                  className="text-sm font-semibold text-brand hover:text-brand-hover transition-colors"
+                >
+                  View all notifications
+                </button>
+              </div>
             )}
           </div>
+        )}
+      </div>
 
-          <ul
-            className="divide-y divide-slate-50 overflow-y-auto scrollbar-brand"
-            style={{ maxHeight: "340px" }}
-          >
-            {loading ? (
-              <li className="px-5 py-8 flex justify-center">
-                <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-              </li>
-            ) : notifications.length === 0 ? (
-              <li className="px-5 py-8 text-center text-sm text-slate-400">
-                You're all caught up!
-              </li>
-            ) : (
-              notifications.map((n) => (
-                <li
-                  key={n.id}
-                  onClick={() => {
-                    if (!n.isRead) markRead(n.id);
-                  }}
-                  className={`flex items-start gap-3 px-5 py-4 transition-colors cursor-pointer
-                    ${n.isRead ? "hover:bg-slate-50" : "bg-brand/5 hover:bg-brand/10"}`}
-                >
-                  <span
-                    className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
-                      !n.isRead ? "bg-brand" : "bg-transparent"
-                    }`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 leading-snug">
-                      {n.title}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                      {n.message}
-                    </p>
-                  </div>
-                  <span className="text-[11px] text-slate-400 shrink-0 mt-0.5 whitespace-nowrap">
-                    {timeAgo(n.createdAt)}
-                  </span>
-                </li>
-              ))
-            )}
-          </ul>
-
-          {notifications.length > 0 && (
-            <div className="border-t border-slate-100 px-5 py-3 text-center">
-              <button
-                onClick={() => setOpen(false)}
-                className="text-sm font-semibold text-brand hover:text-brand-hover transition-colors"
-              >
-                View all notifications
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+      <NotificationDrawer
+        notification={activeNotification}
+        open={drawerOpen}
+        onClose={handleDrawerClose}
+        onMarkRead={markRead}
+      />
+    </>
   );
 };
 

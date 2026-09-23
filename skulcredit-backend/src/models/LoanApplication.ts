@@ -26,8 +26,10 @@ export interface LoanApplicationAttributes {
   decidedAt: Date | null;
   serviceFeePaid: boolean;
   disbursementStatus: "pending" | "processing" | "successful" | "failed";
-  serviceChargeRate: number | null; 
-  serviceChargeAmount: number | null; 
+  serviceChargeRate: number | null;
+  serviceChargeAmount: number | null;
+  mandateDebitDay: number | null;
+  mandateStatus: "not_set" | "pending" | "active" | "failed" | "cancelled";
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -54,6 +56,8 @@ type LoanApplicationCreationAttributes = Optional<
   | "schoolId"
   | "serviceChargeRate"
   | "serviceChargeAmount"
+  | "mandateDebitDay"
+  | "mandateStatus"
 >;
 
 export class LoanApplicationInstance
@@ -89,6 +93,13 @@ export class LoanApplicationInstance
     | "failed";
   declare serviceChargeRate: number | null;
   declare serviceChargeAmount: number | null;
+  declare mandateDebitDay: number | null;
+  declare mandateStatus:
+    | "not_set"
+    | "pending"
+    | "active"
+    | "failed"
+    | "cancelled";
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -168,6 +179,21 @@ LoanApplicationInstance.init(
     serviceChargeAmount: {
       type: DataTypes.DECIMAL(15, 2),
       allowNull: true,
+    },
+    mandateDebitDay: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    mandateStatus: {
+      type: DataTypes.ENUM(
+        "not_set",
+        "pending",
+        "active",
+        "failed",
+        "cancelled",
+      ),
+      allowNull: false,
+      defaultValue: "not_set",
     },
   },
   {

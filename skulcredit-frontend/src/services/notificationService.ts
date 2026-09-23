@@ -53,6 +53,17 @@ const notificationService = {
   deleteNotification: async (id: string): Promise<void> => {
     await apiClient.delete(`/notifications/${id}`);
   },
+
+  replyToNotification: async (
+    id: string,
+    message: string,
+  ): Promise<AppNotification> => {
+    const res = await apiClient.post<{ data: AppNotification }>(
+      `/notifications/${id}/reply`,
+      { message },
+    );
+    return res.data.data;
+  },
 };
 
 export default notificationService;

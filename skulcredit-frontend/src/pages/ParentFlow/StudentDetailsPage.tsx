@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import Pagination from "../../components/ui/Pagination";
 import {
   parentService,
   catalogService,
@@ -48,9 +49,9 @@ interface TuitionDetails {
   gradeLevel: string;
   tuitionAmount: number;
   repaymentPlanId: "3month" | "4month";
-  academicSession: string; 
-  term: string; 
-  termId: string; 
+  academicSession: string;
+  term: string;
+  termId: string;
   isManualSchool?: boolean;
 }
 
@@ -337,6 +338,8 @@ const NavBar: React.FC<{
   );
 };
 
+const CHILD_PAGE_SIZE = 5;
+
 const StepSelectChild: React.FC<{
   children: Child[];
   selectedId: string | null;
@@ -349,143 +352,178 @@ const StepSelectChild: React.FC<{
   onSelect,
   onAddNew,
   blockedStudentIds = new Set(),
-}) => (
-  <div className="space-y-6">
-    <div>
-      <h2 className="text-lg sm:text-2xl font-extrabold text-gray-900">
-        Who are you applying for?
-      </h2>
-      <p className="mt-1 text-sm text-gray-500">
-        Select a child already on your account, or add a new child to continue
-      </p>
-    </div>
+}) => {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(children.length / CHILD_PAGE_SIZE);
+  const paged = children.slice(
+    (page - 1) * CHILD_PAGE_SIZE,
+    page * CHILD_PAGE_SIZE,
+  );
 
-    {children.length > 0 && (
-      <div className="mt-4">
-        <p className="text-sm font-bold text-gray-700 mb-3">
-          Existing Children
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg sm:text-2xl font-extrabold text-gray-900">
+          Who are you applying for?
+        </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Select a child already on your account, or add a new child to continue
         </p>
-        <div className="space-y-3">
-          {children.map((child) => {
-            const selected = selectedId === child.id;
-            const blocked = blockedStudentIds.has(child.id);
-            return (
-              <div
-                key={child.id}
-                onClick={() => !blocked && onSelect(child.id)}
-                className={`flex items-center gap-3 bg-white rounded-2xl border px-3 sm:px-5 py-3 sm:py-4 transition-all ${
-                  blocked
-                    ? "border-gray-100 opacity-60 cursor-not-allowed bg-gray-50"
-                    : selected
-                      ? "border-[#881337] ring-2 ring-[#881337]/20 cursor-pointer"
-                      : "border-gray-200 hover:border-[#881337]/40 cursor-pointer"
-                }`}
-              >
-                <img
-                  src={
-                    child.photo ||
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(child.firstName)}&background=881337&color=fff&size=44`
-                  }
-                  alt={child.firstName}
-                  className="w-10 h-10 rounded-full object-cover shrink-0"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(child.firstName)}&background=881337&color=fff&size=44`;
-                  }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-gray-900 text-sm truncate">
-                    {child.firstName} {child.lastName}
-                  </p>
-                  {child.schoolName && (
-                    <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="w-3 h-3 shrink-0"
-                        aria-hidden="true"
-                      >
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                        <polyline points="9 22 9 12 15 12 15 22" />
-                      </svg>
-                      <span className="truncate">{child.schoolName}</span>
+      </div>
+
+      {children.length > 0 && (
+        <div className="mt-4">
+          <p className="text-sm font-bold text-gray-700 mb-3">
+            Existing Children
+          </p>
+          <div className="space-y-3">
+            {paged.map((child) => {
+              const selected = selectedId === child.id;
+              const blocked = blockedStudentIds.has(child.id);
+              return (
+                <div
+                  key={child.id}
+                  onClick={() => !blocked && onSelect(child.id)}
+                  className={`flex items-center gap-3 bg-white rounded-2xl border px-3 sm:px-5 py-3 sm:py-4 transition-all ${
+                    blocked
+                      ? "border-gray-100 opacity-60 cursor-not-allowed bg-gray-50"
+                      : selected
+                        ? "border-[#881337] ring-2 ring-[#881337]/20 cursor-pointer"
+                        : "border-gray-200 hover:border-[#881337]/40 cursor-pointer"
+                  }`}
+                >
+                  <img
+                    src={
+                      child.photo ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(child.firstName)}&background=881337&color=fff&size=44`
+                    }
+                    alt={child.firstName}
+                    className="w-10 h-10 rounded-full object-cover shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(child.firstName)}&background=881337&color=fff&size=44`;
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 text-sm truncate">
+                      {child.firstName} {child.lastName}
                     </p>
-                  )}
-                  {child.gradeLevel && (
-                    <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="w-3 h-3 shrink-0"
-                        aria-hidden="true"
-                      >
-                        <rect
-                          x="3"
-                          y="3"
-                          width="18"
-                          height="18"
-                          rx="2"
-                          ry="2"
-                        />
-                        <line x1="3" y1="9" x2="21" y2="9" />
-                        <line x1="3" y1="15" x2="21" y2="15" />
-                        <line x1="9" y1="3" x2="9" y2="21" />
-                        <line x1="15" y1="3" x2="15" y2="21" />
-                      </svg>
-                      {child.gradeLevel}
-                    </p>
-                  )}
-                </div>
-                {/* Radio dot — hidden when blocked */}
-                {blocked ? (
-                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2.5 py-1 text-[11px] font-semibold text-amber-700 whitespace-nowrap">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="w-3 h-3"
-                      aria-hidden="true"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="12" />
-                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
-                    Applied this term
-                  </span>
-                ) : (
-                  <div
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "border-[#881337]" : "border-gray-300"}`}
-                  >
-                    {selected && (
-                      <div className="w-2.5 h-2.5 rounded-full bg-[#881337]" />
+                    {child.schoolName && (
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="w-3 h-3 shrink-0"
+                          aria-hidden="true"
+                        >
+                          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                          <polyline points="9 22 9 12 15 12 15 22" />
+                        </svg>
+                        <span className="truncate">{child.schoolName}</span>
+                      </p>
+                    )}
+                    {child.gradeLevel && (
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="w-3 h-3 shrink-0"
+                          aria-hidden="true"
+                        >
+                          <rect
+                            x="3"
+                            y="3"
+                            width="18"
+                            height="18"
+                            rx="2"
+                            ry="2"
+                          />
+                          <line x1="3" y1="9" x2="21" y2="9" />
+                          <line x1="3" y1="15" x2="21" y2="15" />
+                          <line x1="9" y1="3" x2="9" y2="21" />
+                          <line x1="15" y1="3" x2="15" y2="21" />
+                        </svg>
+                        {child.gradeLevel}
+                      </p>
                     )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                  {blocked ? (
+                    <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2.5 py-1 text-[11px] font-semibold text-amber-700 whitespace-nowrap">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-3 h-3"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      Applied this term
+                    </span>
+                  ) : (
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "border-[#881337]" : "border-gray-300"}`}
+                    >
+                      {selected && (
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#881337]" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {totalPages > 1 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={children.length}
+              limit={CHILD_PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          )}
         </div>
-      </div>
-    )}
+      )}
 
-    {/* Add new child */}
-    <button
-      type="button"
-      onClick={onAddNew}
-      className="w-full flex items-center gap-3 bg-white rounded-2xl border border-gray-200 hover:border-[#881337]/40 px-3 sm:px-5 py-3 sm:py-4 transition-all text-left group"
-    >
-      <div className="w-10 h-10 rounded-full bg-[#881337]/10 flex items-center justify-center shrink-0 group-hover:bg-[#881337]/20 transition-colors">
+      <button
+        type="button"
+        onClick={onAddNew}
+        className="w-full flex items-center gap-3 bg-white rounded-2xl border border-gray-200 hover:border-[#881337]/40 px-3 sm:px-5 py-3 sm:py-4 transition-all text-left group"
+      >
+        <div className="w-10 h-10 rounded-full bg-[#881337]/10 flex items-center justify-center shrink-0 group-hover:bg-[#881337]/20 transition-colors">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-5 h-5 text-[#881337]"
+            aria-hidden="true"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-gray-900 text-sm">Add a new child</p>
+          <p className="mt-0.5 text-xs text-gray-500 leading-snug">
+            Add your child's details once. Reuse for future applications.
+          </p>
+        </div>
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -493,38 +531,19 @@ const StepSelectChild: React.FC<{
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="w-5 h-5 text-[#881337]"
+          className="w-5 h-5 text-gray-300 group-hover:text-[#881337] transition-colors shrink-0"
           aria-hidden="true"
         >
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="9 18 15 12 9 6" />
         </svg>
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-bold text-gray-900 text-sm">Add a new child</p>
-        <p className="mt-0.5 text-xs text-gray-500 leading-snug">
-          Add your child's details once. Reuse for future applications.
-        </p>
-      </div>
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="w-5 h-5 text-gray-300 group-hover:text-[#881337] transition-colors shrink-0"
-        aria-hidden="true"
-      >
-        <polyline points="9 18 15 12 9 6" />
-      </svg>
-    </button>
-  </div>
-);
+      </button>
+    </div>
+  );
+};
 
 interface ManualSchoolData {
   schoolName: string;
-  contact: string; 
+  contact: string;
   bankName?: string;
   accountNumber?: string;
   accountName?: string;
@@ -1315,7 +1334,6 @@ const StepReview: React.FC<{
   );
   const planLabel = selectedPlan?.label ?? tuitionDetails.repaymentPlanId;
 
-
   const [schoolDetail, setSchoolDetail] = useState<{
     tier: string | null;
     serviceChargeRate: number | null;
@@ -1331,8 +1349,7 @@ const StepReview: React.FC<{
         const d = res.data?.data;
         if (d) setSchoolDetail(d);
       })
-      .catch(() => {
-      });
+      .catch(() => {});
   }, [tuitionDetails.schoolId, tuitionDetails.isManualSchool]);
 
   const backendServiceChargeRate = schoolDetail?.serviceChargeRate ?? null;
@@ -1655,8 +1672,7 @@ const StudentDetailsPage: React.FC = () => {
         }
         setBlockedStudentIds(blocked);
       })
-      .catch(() => {
-      });
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1684,13 +1700,12 @@ const StudentDetailsPage: React.FC = () => {
           tuitionAmount: s.tuitionAmount ?? 0,
           schoolId: s.school?.id ?? s.schoolId,
           schoolName: s.school?.schoolName,
-          photo: undefined, 
+          photo: undefined,
         }));
 
         setChildren(normalized);
       })
-      .catch(() => {
-      });
+      .catch(() => {});
   }, []);
 
   const selectedChild = children.find((c) => c.id === selectedChildId) ?? null;
@@ -1784,7 +1799,7 @@ const StudentDetailsPage: React.FC = () => {
       })
       .catch(() => showToast("Failed to load academic sessions."))
       .finally(() => setLoadingSessions(false));
-  }, [step, showToast]); 
+  }, [step, showToast]);
 
   const [selectedPlanId, setSelectedPlanId] = useState<
     "3month" | "4month" | null

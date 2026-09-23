@@ -405,8 +405,6 @@ const SchoolOnboardingPage: React.FC = () => {
               </div>
             </div>
           </SectionCard>
-
-          {/* ── Section 3: Contact Information ── */}
           <SectionCard
             icon="user"
             iconColor="text-violet-500"

@@ -9,24 +9,20 @@ import { useAuth } from "../../context/AuthContext";
 import apiClient from "../../services/apiClient";
 import { AxiosError } from "axios";
 
-// ── Input style ───────────────────────────────────────────────────────────────
 const inputCls =
   "w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 bg-white " +
   "focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand";
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 const SchoolSettingsPage: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Profile
   const [name, setName] = useState(user?.name ?? "John Administrator");
   const [phone, setPhone] = useState(user?.phoneNumber ?? "+234-903 123 4567");
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState("");
 
-  // School info
   const [schoolName, setSchoolName] = useState(
     user?.schoolName ?? user?.name ?? "Springfield High School",
   );
@@ -48,7 +44,6 @@ const SchoolSettingsPage: React.FC = () => {
         headers: { "Content-Type": "multipart/form-data" },
       });
     } catch {
-      /* silent */
     } finally {
       setDocUploading(false);
     }
@@ -98,7 +93,6 @@ const SchoolSettingsPage: React.FC = () => {
       header={<SchoolTopBar onMobileMenuOpen={() => setMobileNavOpen(true)} />}
     >
       <div className="pt-8 space-y-5 animate-fade-in-up w-[90%] mx-auto">
-        {/* Page header */}
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-lg font-bold text-slate-900">Settings</h1>
@@ -108,8 +102,6 @@ const SchoolSettingsPage: React.FC = () => {
           </div>
           <Icon name="settings" className="w-7 h-7 text-slate-400" />
         </div>
-
-        {/* ── Profile Settings ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <h2 className="text-sm font-bold text-slate-800 mb-4">
             Profile Settings
@@ -189,7 +181,6 @@ const SchoolSettingsPage: React.FC = () => {
           </form>
         </div>
 
-        {/* ── School Information ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <h2 className="text-sm font-bold text-slate-800 mb-4">
             School Information
@@ -275,8 +266,6 @@ const SchoolSettingsPage: React.FC = () => {
             </button>
           </form>
         </div>
-
-        {/* ── Bank Details ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <h2 className="text-sm font-bold text-slate-800">Bank Details</h2>
@@ -294,7 +283,7 @@ const SchoolSettingsPage: React.FC = () => {
               { label: "Account Holder:", value: "School Administrator" },
               {
                 label: "Verification Status:",
-                value: "✅ Verified (Read-Only)",
+                value: "Verified (Read-Only)",
               },
             ].map(({ label, value }) => (
               <div

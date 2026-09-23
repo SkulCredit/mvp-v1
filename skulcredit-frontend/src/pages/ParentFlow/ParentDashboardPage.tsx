@@ -585,10 +585,8 @@ const ParentDashboardPage: React.FC = () => {
           return (
             <div className="flex flex-col gap-4 pt-8 animate-fade-in-up w-[85%] mx-auto">
               <div className="bg-white rounded-2xl border-2 border-brand/30 px-6 py-5">
-                {/* Top row */}
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex items-start gap-3">
-                    {/* Shield in gray circle */}
                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
                       <ShieldIcon />
                     </div>
@@ -601,21 +599,16 @@ const ParentDashboardPage: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  {/* % pill */}
                   <span className="shrink-0 inline-flex items-center px-3 py-1 rounded-lg bg-slate-100 text-sm font-bold text-slate-700">
                     {progressPct}%
                   </span>
                 </div>
-
-                {/* Progress bar */}
                 <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden mb-4">
                   <div
                     className="h-full rounded-full bg-brand transition-all duration-500"
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
-
-                {/* Why verify hint */}
                 <div className="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3">
                   <p className="text-xs text-slate-700 leading-relaxed">
                     <span className="font-bold text-blue-700">Why verify?</span>{" "}
@@ -639,9 +632,7 @@ const ParentDashboardPage: React.FC = () => {
                         : "bg-white border-slate-200"
                     }`}
                   >
-                    {/* Left: icon + text */}
                     <div className="flex items-start gap-4 flex-1 min-w-0">
-                      {/* Circle icon */}
                       <div
                         className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
                           isVerified

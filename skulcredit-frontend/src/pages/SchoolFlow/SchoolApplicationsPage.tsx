@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../../components/Icon";
+import Pagination from "../../components/ui/Pagination";
 import {
   DashboardLayout,
   SchoolSidebar,
@@ -109,16 +110,34 @@ const SchoolApplicationsPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [newCount, setNewCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_LIMIT = 10;
   const loadedOnceRef = useRef(false);
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (p = 1, silent = false) => {
     if (!silent) setIsLoading(true);
     try {
-      const data = await schoolService.getApplications();
+      const data = await (
+        schoolService.getApplications as (
+          p: number,
+          l: number,
+        ) => Promise<unknown>
+      )(p, PAGE_LIMIT);
+      const d = data as {
+        applications?: AppRecord[];
+        pagination?: { total: number; totalPages: number; page: number };
+      };
       const arr = Array.isArray(data)
         ? data
-        : ((data as { applications?: AppRecord[] })?.applications ?? []);
-      setApplications(arr as AppRecord[]);
+        : ((d.applications ?? []) as AppRecord[]);
+      setApplications(arr);
+      if (d.pagination) {
+        setTotal(d.pagination.total);
+        setTotalPages(d.pagination.totalPages);
+        setPage(d.pagination.page);
+      }
     } catch {
     } finally {
       setIsLoading(false);
@@ -126,7 +145,7 @@ const SchoolApplicationsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    load().then(() => {
+    load(1).then(() => {
       loadedOnceRef.current = true;
     });
   }, [load]);
@@ -136,7 +155,7 @@ const SchoolApplicationsPage: React.FC = () => {
     const handler = (n: { referenceType?: string }) => {
       if (n.referenceType !== "loan_application") return;
       setNewCount((c) => c + 1);
-      load(true);
+      load(page, true);
     };
     socket.on("notification:new", handler);
     return () => {
@@ -350,6 +369,13 @@ const SchoolApplicationsPage: React.FC = () => {
               })}
             </div>
           )}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={PAGE_LIMIT}
+            onPageChange={(p) => load(p)}
+          />
         </div>
       </div>
     </DashboardLayout>

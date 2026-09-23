@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import Icon from "../../components/Icon";
+import Pagination from "../../components/ui/Pagination";
 import {
   DashboardLayout,
   SchoolSidebar,
   SchoolTopBar,
 } from "../../components/layout";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 type DisbStatus = "Completed" | "Pending";
 
@@ -18,8 +17,6 @@ interface DisbRow {
   status: DisbStatus;
   ref: string;
 }
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
 
 const ROWS: DisbRow[] = [
   {
@@ -86,8 +83,6 @@ const STATUS_CLS: Record<DisbStatus, string> = {
   Completed: "bg-emerald-50 text-emerald-600 border border-emerald-200",
   Pending: "bg-amber-50  text-amber-600  border border-amber-200",
 };
-
-// ── Detail view ───────────────────────────────────────────────────────────────
 
 const DetailRow: React.FC<{ label: string; value: React.ReactNode }> = ({
   label,
@@ -206,15 +201,15 @@ const DisbursementDetail: React.FC<{ row: DisbRow; onBack: () => void }> = ({
   </div>
 );
 
-// ── Main page ─────────────────────────────────────────────────────────────────
-
 const SchoolDisbursementPage: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [detail, setDetail] = useState<DisbRow | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_LIMIT = 5;
 
-  const visible = ROWS.filter((r) => {
+  const filtered = ROWS.filter((r) => {
     const matchStatus =
       statusFilter === "All Status" || r.status === statusFilter;
     const matchSearch =
@@ -223,6 +218,8 @@ const SchoolDisbursementPage: React.FC = () => {
       r.ref.toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
+
+  const visible = filtered.slice((page - 1) * PAGE_LIMIT, page * PAGE_LIMIT);
 
   return (
     <DashboardLayout
@@ -277,14 +274,20 @@ const SchoolDisbursementPage: React.FC = () => {
                 type="text"
                 placeholder="-Search by student or payment reference ID-"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full pl-9 pr-4 py-2.5 rounded-full border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
               />
             </div>
             <div className="relative">
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
                 className="appearance-none bg-brand text-white text-sm font-semibold pl-4 pr-9 py-2.5 rounded-lg focus:outline-none cursor-pointer"
               >
                 {["All Status", "Completed", "Pending"].map((s) => (
@@ -348,6 +351,13 @@ const SchoolDisbursementPage: React.FC = () => {
               ))}
             </div>
           </div>
+          <Pagination
+            page={page}
+            totalPages={Math.ceil(filtered.length / PAGE_LIMIT)}
+            total={filtered.length}
+            limit={PAGE_LIMIT}
+            onPageChange={setPage}
+          />
 
           {/* Export row */}
           <div className="flex gap-3 pb-4">

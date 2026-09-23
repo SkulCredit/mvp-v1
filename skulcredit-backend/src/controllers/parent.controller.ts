@@ -181,11 +181,13 @@ class ParentController {
     next: NextFunction,
   ): Promise<void> {
     try {
+      const page = parseInt(String(req.query.page ?? 1), 10);
+      const limit = parseInt(String(req.query.limit ?? 10), 10);
       successResponse(
         res,
         200,
         "Applications fetched successfully",
-        await parentService.getApplications(req.user!.userId),
+        await parentService.getApplications(req.user!.userId, { page, limit }),
       );
     } catch (error) {
       next(error);
@@ -559,13 +561,90 @@ class ParentController {
   ): Promise<void> {
     try {
       const id = String(req.params.id);
-      const { repaymentStartDate } = req.body as {
-        repaymentStartDate?: string;
-      };
+      const { debitDay } = req.body as { debitDay?: number };
       const result = await parentService.setupRepayment(req.user!.userId, id, {
-        repaymentStartDate,
+        debitDay: debitDay ? Number(debitDay) : undefined,
       });
       successResponse(res, 200, "Repayment plan set up successfully", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getMandatePreview(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const debitDay = req.query.debitDay ? Number(req.query.debitDay) : 1;
+
+      const appData = await parentService.getRepaymentSchedule(
+        req.user!.userId,
+        id,
+      );
+
+      const app = appData as {
+        tenor: number;
+        amountApproved: number | null;
+        amountRequested: number;
+      };
+
+      const totalAmount = Number(app.amountApproved ?? app.amountRequested);
+      const preview = parentService.getMandatePreview(
+        app.tenor,
+        totalAmount,
+        debitDay,
+      );
+
+      successResponse(res, 200, "Mandate preview generated", {
+        tenor: app.tenor,
+        totalAmount,
+        debitDay: Math.min(Math.max(Math.round(debitDay), 1), 28),
+        installmentAmount: Math.round(totalAmount / app.tenor),
+        preview,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getRepaymentSchedule(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const result = await parentService.getRepaymentSchedule(
+        req.user!.userId,
+        id,
+      );
+      successResponse(res, 200, "Repayment schedule fetched", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async payInstallment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const { paystackReference, scheduleIds, type } = req.body as {
+        paystackReference: string;
+        scheduleIds: string[];
+        type: "scheduled" | "early_partial" | "early_full";
+      };
+      const result = await parentService.payInstallment(req.user!.userId, id, {
+        paystackReference,
+        scheduleIds,
+        type: type ?? "scheduled",
+      });
+      successResponse(res, 200, "Repayment recorded successfully", result);
     } catch (error) {
       next(error);
     }

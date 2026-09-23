@@ -17,8 +17,6 @@ interface VerificationItem {
   requiredForApplication?: boolean;
 }
 
-// ── Icons 
-
 const MarkedIcon: React.FC<{ className?: string }> = ({ className = "w-8 h-8" }) => (
   <img src="/marked-icon.svg" alt="" aria-hidden="true" className={className} />
 );
@@ -34,8 +32,6 @@ const ShieldIcon: React.FC = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
   </svg>
 );
-
-// ── Page ─
 
 const ParentVerificationPage: React.FC = () => {
   const navigate = useNavigate();
@@ -78,14 +74,10 @@ const ParentVerificationPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4 pt-8 animate-fade-in-up w-[85%] mx-auto pb-12">
-
-      {/* ── Page heading ──────────*/}
       <div className="mb-1">
         <h2 className="text-xl font-extrabold text-gray-900">Verification</h2>
         <p className="mt-0.5 text-sm text-gray-400">Manage your identity and account verifications</p>
       </div>
-
-      {/* ── Progress card ─────────*/}
       <div className="bg-white rounded-2xl border-2 border-brand/30 px-6 py-5">
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="flex items-start gap-3">
@@ -113,8 +105,6 @@ const ParentVerificationPage: React.FC = () => {
           </p>
         </div>
       </div>
-
-      {/* ── Verification item cards */}
       {verifications.map((item) => {
         const isVerified = item.status === "verified";
         const isIdentity = item.id === "identity";
@@ -125,11 +115,8 @@ const ParentVerificationPage: React.FC = () => {
             key={item.id}
             className={`rounded-2xl border px-6 py-5 flex items-center justify-between gap-4 ${
               isVerified ? "bg-[#F0FDF4] border-green-200" : "bg-white border-slate-200"
-            }`}
-          >
-            {/* Left: icon + text */}
+            }`}>
             <div className="flex items-start gap-4 flex-1 min-w-0">
-              {/* Circle icon */}
               <div
                 className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
                   isVerified
@@ -173,8 +160,6 @@ const ParentVerificationPage: React.FC = () => {
                 )}
               </div>
             </div>
-
-            {/* Right: action */}
             <div className="shrink-0">
               {isVerified ? (
                 <MarkedIcon className="w-8 h-8" />
@@ -194,8 +179,6 @@ const ParentVerificationPage: React.FC = () => {
           </div>
         );
       })}
-
-      {/* ── Why Verification Matters  */}
       <div className="bg-white rounded-2xl border border-slate-200 px-6 py-5">
         <div className="flex items-center gap-2 mb-1">
           <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-brand">

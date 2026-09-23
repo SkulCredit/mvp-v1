@@ -47,7 +47,6 @@
     -->
     <script>
       (function () {
-        // ── Route tables (must stay in sync with src/config/routes.ts) ──────
         var PUBLIC_EXACT = [
           "/",
           "/auth",
@@ -57,7 +56,7 @@
           "/school/onboarding",
         ];
 
-        var PUBLIC_PREFIX = []; // none currently
+        var PUBLIC_PREFIX = [];
 
         var PRIVATE_PREFIX = [
           "/parent",
@@ -75,14 +74,11 @@
           admin: "/admin/dashboard",
         };
 
-        // The role prefix a user is ALLOWED to access.
         var ROLE_PREFIX = {
           parent: "/parent",
           school: "/school",
           admin: "/admin",
         };
-
-        // ── Helpers ──────────────────────────────────────────────────────────
 
         function isPublic(path) {
           if (PUBLIC_EXACT.indexOf(path) !== -1) return true;
@@ -116,17 +112,11 @@
         }
 
         function redirect(to) {
-          // Use replace so the invalid path is not added to browser history.
           if (window.location.pathname !== to) {
             window.location.replace(to);
           }
         }
-
-        // ── Middleware logic ─────────────────────────────────────────────────
-
         var pathname = window.location.pathname;
-
-        // Skip asset paths (should never reach here via nginx, but be safe).
         if (
           pathname.startsWith("/_next") ||
           pathname.startsWith("/api") ||
@@ -139,33 +129,24 @@
         var isAuth = !!(user && user.role);
         var isPublicPath = isPublic(pathname);
         var isPrivatePath = isPrivate(pathname);
-
-        // Rule 1: authenticated user visiting a public page → own dashboard.
         if (isAuth && isPublicPath) {
           redirect(ROLE_DASHBOARD[user.role] || "/auth");
           return;
         }
 
-        // Rule 2: unauthenticated user visiting a private page → /auth.
         if (!isAuth && isPrivatePath) {
           redirect("/auth");
           return;
         }
 
-        // Rule 3: authenticated user visiting the wrong role's private area.
-        // e.g. a PARENT manually typing /admin/dashboard.
         if (isAuth && isPrivatePath) {
           var allowedPrefix = ROLE_PREFIX[user.role];
-          // School users are allowed on /school/* paths only.
-          // Admin users are allowed on /admin/* paths only.
-          // Parent users are allowed on /parent/* paths only.
           if (allowedPrefix && !pathname.startsWith(allowedPrefix)) {
             redirect(ROLE_DASHBOARD[user.role] || "/auth");
             return;
           }
         }
 
-        // Rule 4: proceed normally.
       })();
     </script>
 
