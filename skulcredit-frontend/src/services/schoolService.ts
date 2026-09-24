@@ -24,6 +24,22 @@ export interface VerifyEnrollmentParams {
   note?: string;
 }
 
+export interface CreateStudentParams {
+  firstName: string;
+  lastName: string;
+  studentId?: string;
+  gradeLevel: string;
+  tuitionAmount: number;
+}
+
+export interface UpdateStudentParams {
+  firstName?: string;
+  lastName?: string;
+  studentId?: string;
+  gradeLevel?: string;
+  tuitionAmount?: number;
+}
+
 export const schoolService = {
   getProfile: async (): Promise<unknown> => {
     const response = await apiClient.get("/schools/profile");
@@ -104,6 +120,43 @@ export const schoolService = {
 
   getDashboard: async (): Promise<unknown> => {
     const response = await apiClient.get("/schools/dashboard");
+    return response.data.data;
+  },
+
+  getStudents: async (page = 1, limit = 10, search = ""): Promise<unknown> => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    if (search) params.append("search", search);
+    const response = await apiClient.get(`/schools/students?${params}`);
+    return response.data.data;
+  },
+
+  createStudent: async (data: CreateStudentParams): Promise<unknown> => {
+    const response = await apiClient.post("/schools/students", data);
+    return response.data.data;
+  },
+
+  updateStudent: async (
+    id: string,
+    data: UpdateStudentParams,
+  ): Promise<unknown> => {
+    const response = await apiClient.put(`/schools/students/${id}`, data);
+    return response.data.data;
+  },
+
+  getDisbursements: async (
+    page = 1,
+    limit = 10,
+    status = "",
+  ): Promise<unknown> => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    if (status) params.append("status", status);
+    const response = await apiClient.get(`/schools/disbursements?${params}`);
     return response.data.data;
   },
 };

@@ -1,8 +1,22 @@
 import { Request, Response, NextFunction } from "express";
 import catalogService from "../services/catalog.service";
+import schoolTermService from "../services/schoolTerm.service";
 import { successResponse } from "../utils/response";
 
 class CatalogController {
+  async getSessions(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const sessions = await schoolTermService.listSessions();
+      successResponse(res, 200, "Sessions fetched", sessions);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getInstitutionTypes(
     req: Request,
     res: Response,

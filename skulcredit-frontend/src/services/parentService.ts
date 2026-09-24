@@ -372,7 +372,7 @@ export interface AcademicTermSummary {
 export interface AcademicSessionSummary {
   id: string;
   sessionId: string;
-  sessionName: string; 
+  sessionName: string;
   startYear: number;
   endYear: number;
   isCurrent: boolean;
@@ -408,7 +408,7 @@ export interface CatalogClassLevelGroup {
 export const catalogService = {
   getSessions: async (): Promise<AcademicSessionSummary[]> => {
     const response = await apiClient.get<{ data: AcademicSessionSummary[] }>(
-      "/parents/sessions",
+      "/catalog/sessions",
     );
     return response.data.data;
   },
@@ -426,7 +426,6 @@ export const catalogService = {
     );
     return response.data.data;
   },
-
 
   getClassLevels: async (
     schoolId: string,

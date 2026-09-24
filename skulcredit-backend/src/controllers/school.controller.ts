@@ -156,6 +156,71 @@ class SchoolController {
     }
   }
 
+  async getStudents(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await schoolService.getStudents(
+        req.user!.userId,
+        req.query as { page?: string; limit?: string; search?: string },
+      );
+      successResponse(res, 200, "Students fetched successfully", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createStudent(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await schoolService.createStudent(
+        req.user!.userId,
+        req.body,
+      );
+      successResponse(res, 201, "Student created successfully", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateStudent(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await schoolService.updateStudent(
+        req.user!.userId,
+        String(req.params.id),
+        req.body,
+      );
+      successResponse(res, 200, "Student updated successfully", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDisbursements(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await schoolService.getDisbursements(
+        req.user!.userId,
+        req.query as { page?: string; limit?: string; status?: string },
+      );
+      successResponse(res, 200, "Disbursements fetched successfully", result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async disbursementCallback(
     req: Request,
     res: Response,

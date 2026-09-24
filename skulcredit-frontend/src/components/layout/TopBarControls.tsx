@@ -204,11 +204,51 @@ const UserDropdown: React.FC = () => {
     navigate("/auth");
   };
 
-  const MENU_ITEMS = [
-    { icon: "user", label: "View Profile" },
-    { icon: "settings", label: "Settings" },
-    { icon: "headphones", label: "Help & Support" },
-  ];
+  const role = user?.role ?? "parent";
+
+  const MENU_ITEMS: { icon: string; label: string; to: string }[] =
+    role === "school"
+      ? [
+          {
+            icon: "user",
+            label: "View Profile",
+            to: "/school/account-settings",
+          },
+          {
+            icon: "settings",
+            label: "Settings",
+            to: "/school/account-settings",
+          },
+          {
+            icon: "headphones",
+            label: "Help & Support",
+            to: "/school/support",
+          },
+        ]
+      : role === "admin"
+        ? [
+            { icon: "user", label: "View Profile", to: "/admin/dashboard" },
+            { icon: "settings", label: "Settings", to: "/admin/dashboard" },
+            {
+              icon: "headphones",
+              label: "Help & Support",
+              to: "/admin/dashboard",
+            },
+          ]
+        : [
+            { icon: "user", label: "View Profile", to: "/parent/settings" },
+            { icon: "settings", label: "Settings", to: "/parent/settings" },
+            {
+              icon: "headphones",
+              label: "Help & Support",
+              to: "/parent/support",
+            },
+          ];
+
+  const handleMenuClick = (to: string) => {
+    setOpen(false);
+    navigate(to);
+  };
 
   return (
     <div ref={ref} className="relative">
@@ -266,10 +306,10 @@ const UserDropdown: React.FC = () => {
             </div>
           </div>
           <ul className="py-1">
-            {MENU_ITEMS.map(({ icon, label }) => (
+            {MENU_ITEMS.map(({ icon, label, to }) => (
               <li key={label}>
                 <button
-                  onClick={() => setOpen(false)}
+                  onClick={() => handleMenuClick(to)}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700
                              hover:bg-slate-50 hover:text-brand transition-colors text-left"
                 >

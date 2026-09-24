@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, fn, col } from "sequelize";
 import { SchoolRepository } from "../repositories";
 import {
   Student,
@@ -11,6 +11,7 @@ import {
   SchoolBankAccount,
   RepaymentSchedule,
   School,
+  Disbursement,
 } from "../models/index";
 import ApiError from "../utils/apiError";
 import sendEmail from "../utils/email";
@@ -23,6 +24,35 @@ interface GetApplicationsQuery {
   status?: string;
   page?: number | string;
   limit?: number | string;
+}
+
+interface GetStudentsQuery {
+  page?: number | string;
+  limit?: number | string;
+  search?: string;
+}
+
+interface UpdateStudentData {
+  firstName?: string;
+  lastName?: string;
+  studentId?: string;
+  gradeLevel?: string;
+  tuitionAmount?: number;
+}
+
+interface CreateStudentData {
+  firstName: string;
+  lastName: string;
+  studentId?: string;
+  gradeLevel: string;
+  tuitionAmount: number;
+  parentId: string;
+}
+
+interface GetDisbursementsQuery {
+  page?: number | string;
+  limit?: number | string;
+  status?: string;
 }
 
 interface VerifyEnrollmentData {
@@ -46,7 +76,16 @@ class SchoolService {
       },
     );
     if (!school) throw new ApiError(404, "School profile not found");
-    return school;
+
+    const catalogSchool = await CatalogSchool.findOne({
+      where: { name: school.schoolName },
+      attributes: ["id"],
+    });
+
+    return {
+      ...school.toJSON(),
+      catalogSchoolId: catalogSchool?.id ?? null,
+    };
   }
 
   async completeRegistration(userId: string, data: Record<string, unknown>) {
@@ -386,6 +425,227 @@ class SchoolService {
       profile: school,
       stats: { totalStudents, totalApplications, pendingVerification },
       recentApplications,
+    };
+  }
+
+  async getStudents(
+    userId: string,
+    { page = 1, limit = 10, search }: GetStudentsQuery = {},
+  ) {
+    const school = await SchoolRepository.findOne({ userId });
+    if (!school) throw new ApiError(404, "School profile not found");
+
+    const catalogSchool = await CatalogSchool.findOne({
+      where: { name: school.schoolName },
+      attributes: ["id"],
+    });
+
+    if (!catalogSchool) {
+      return {
+        students: [],
+        pagination: {
+          total: 0,
+          page: 1,
+          limit: parseInt(String(limit)),
+          totalPages: 0,
+        },
+      };
+    }
+
+    const where = search
+      ? {
+          schoolId: catalogSchool.id,
+          [Op.or]: [
+            { firstName: { [Op.iLike]: `%${search}%` } },
+            { lastName: { [Op.iLike]: `%${search}%` } },
+            { studentId: { [Op.iLike]: `%${search}%` } },
+            { gradeLevel: { [Op.iLike]: `%${search}%` } },
+          ],
+        }
+      : { schoolId: catalogSchool.id };
+
+    const offset = (parseInt(String(page)) - 1) * parseInt(String(limit));
+    const { count, rows } = await Student.findAndCountAll({
+      where,
+      include: [
+        {
+          model: Parent,
+          as: "parent",
+          attributes: ["id", "firstName", "lastName"],
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["email", "phoneNumber"],
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: parseInt(String(limit)),
+      offset,
+    });
+
+    return {
+      students: rows,
+      pagination: {
+        total: count,
+        page: parseInt(String(page)),
+        limit: parseInt(String(limit)),
+        totalPages: Math.ceil(count / parseInt(String(limit))),
+      },
+    };
+  }
+
+  async createStudent(userId: string, data: CreateStudentData) {
+    const school = await SchoolRepository.findOne({ userId });
+    if (!school) throw new ApiError(404, "School profile not found");
+
+    const catalogSchool = await CatalogSchool.findOne({
+      where: { name: school.schoolName },
+      attributes: ["id"],
+    });
+    if (!catalogSchool)
+      throw new ApiError(404, "School catalog entry not found");
+
+    if (data.parentId) {
+      const parent = await Parent.findByPk(data.parentId, {
+        attributes: ["id"],
+      });
+      if (!parent) throw new ApiError(404, "Parent not found");
+    }
+
+    return Student.create({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      studentId: data.studentId ?? null,
+      gradeLevel: data.gradeLevel,
+      tuitionAmount: data.tuitionAmount,
+      parentId: data.parentId ?? school.userId,
+      schoolId: catalogSchool.id,
+    });
+  }
+
+  async updateStudent(
+    userId: string,
+    studentId: string,
+    data: UpdateStudentData,
+  ) {
+    const school = await SchoolRepository.findOne({ userId });
+    if (!school) throw new ApiError(404, "School profile not found");
+
+    const catalogSchool = await CatalogSchool.findOne({
+      where: { name: school.schoolName },
+      attributes: ["id"],
+    });
+    if (!catalogSchool)
+      throw new ApiError(404, "School catalog entry not found");
+
+    const student = await Student.findOne({
+      where: { id: studentId, schoolId: catalogSchool.id },
+    });
+    if (!student) throw new ApiError(404, "Student not found");
+
+    const allowed: (keyof UpdateStudentData)[] = [
+      "firstName",
+      "lastName",
+      "studentId",
+      "gradeLevel",
+      "tuitionAmount",
+    ];
+    const filtered = Object.fromEntries(
+      Object.entries(data).filter(([k]) =>
+        allowed.includes(k as keyof UpdateStudentData),
+      ),
+    );
+    return student.update(filtered);
+  }
+
+  async getDisbursements(
+    userId: string,
+    { page = 1, limit = 10, status }: GetDisbursementsQuery = {},
+  ) {
+    const school = await SchoolRepository.findOne({ userId });
+    if (!school) throw new ApiError(404, "School profile not found");
+
+    const where: Record<string, unknown> = { schoolId: school.id };
+    if (status) where.status = status;
+
+    const offset = (parseInt(String(page)) - 1) * parseInt(String(limit));
+    const { count, rows } = await Disbursement.findAndCountAll({
+      where,
+      include: [
+        {
+          model: LoanApplication,
+          as: "loanApplication",
+          attributes: [
+            "id",
+            "referenceNumber",
+            "amountRequested",
+            "amountApproved",
+            "status",
+          ],
+          include: [
+            {
+              model: Student,
+              as: "student",
+              attributes: [
+                "id",
+                "firstName",
+                "lastName",
+                "gradeLevel",
+                "studentId",
+              ],
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: parseInt(String(limit)),
+      offset,
+    });
+
+    const [totalDisbursedResult, pendingAmountResult, lastSuccessful] =
+      await Promise.all([
+        Disbursement.findOne({
+          where: { schoolId: school.id, status: "successful" },
+          attributes: [[fn("SUM", col("amount")), "totalDisbursed"]],
+          raw: true,
+        }),
+        Disbursement.findOne({
+          where: {
+            schoolId: school.id,
+            status: { [Op.in]: ["pending", "processing"] },
+          },
+          attributes: [[fn("SUM", col("amount")), "pendingAmount"]],
+          raw: true,
+        }),
+        Disbursement.findOne({
+          where: { schoolId: school.id, status: "successful" },
+          order: [["disbursed_at", "DESC"]],
+          attributes: ["disbursedAt"],
+        }),
+      ]);
+
+    return {
+      disbursements: rows,
+      summary: {
+        totalDisbursed: Number(
+          (totalDisbursedResult as unknown as { totalDisbursed?: string })
+            ?.totalDisbursed ?? 0,
+        ),
+        pendingDisbursement: Number(
+          (pendingAmountResult as unknown as { pendingAmount?: string })
+            ?.pendingAmount ?? 0,
+        ),
+        lastPaymentDate: lastSuccessful?.disbursedAt ?? null,
+      },
+      pagination: {
+        total: count,
+        page: parseInt(String(page)),
+        limit: parseInt(String(limit)),
+        totalPages: Math.ceil(count / parseInt(String(limit))),
+      },
     };
   }
 
