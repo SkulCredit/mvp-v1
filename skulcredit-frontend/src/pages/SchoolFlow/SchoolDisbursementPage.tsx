@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Icon from "../../components/Icon";
 import Pagination from "../../components/ui/Pagination";
 import {
@@ -6,220 +7,255 @@ import {
   SchoolSidebar,
   SchoolTopBar,
 } from "../../components/layout";
+import { schoolService } from "../../services/schoolService";
 
-type DisbStatus = "Completed" | "Pending";
-
-interface DisbRow {
+interface DisbursementRecord {
   id: string;
-  name: string;
   amount: number;
-  date: string;
-  status: DisbStatus;
-  ref: string;
+  currency: string;
+  status: string;
+  disbursedAt: string | null;
+  disbursementReference: string | null;
+  paystackReference: string | null;
+  recipientBankName: string | null;
+  recipientAccountName: string | null;
+  recipientAccountNumber: string | null;
+  createdAt: string;
+  loanApplication?: {
+    id: string;
+    referenceNumber?: string | null;
+    amountRequested?: number;
+    status?: string;
+    student?: {
+      firstName?: string;
+      lastName?: string;
+      gradeLevel?: string;
+      studentId?: string | null;
+    };
+  };
 }
 
-const ROWS: DisbRow[] = [
-  {
-    id: "DISB-20250113-001",
-    name: "Amaka N.",
-    amount: 150000,
-    date: "20 Nov",
-    status: "Completed",
-    ref: "SCH-23832",
-  },
-  {
-    id: "DISB-20250114-001",
-    name: "John O.",
-    amount: 200000,
-    date: "18 Nov",
-    status: "Completed",
-    ref: "SCH-23835",
-  },
-  {
-    id: "DISB-20250115-001",
-    name: "Sarah A.",
-    amount: 120000,
-    date: "Pending",
-    status: "Pending",
-    ref: "SCH-23836",
-  },
-  {
-    id: "DISB-20250116-001",
-    name: "Ibrahim K.",
-    amount: 180000,
-    date: "19 Nov",
-    status: "Completed",
-    ref: "SCH-23837",
-  },
-  {
-    id: "DISB-20250117-001",
-    name: "Chioma P.",
-    amount: 95000,
-    date: "17 Nov",
-    status: "Pending",
-    ref: "SCH-238390",
-  },
-  {
-    id: "DISB-20250118-001",
-    name: "Yusuf M.",
-    amount: 200000,
-    date: "19 Nov",
-    status: "Completed",
-    ref: "SCH-238323",
-  },
-];
+interface Summary {
+  totalDisbursed: number;
+  pendingDisbursement: number;
+  lastPaymentDate: string | null;
+}
 
-const TOTAL_DISBURSED = ROWS.filter((r) => r.status === "Completed").reduce(
-  (s, r) => s + r.amount,
-  0,
-);
-const TOTAL_PENDING = ROWS.filter((r) => r.status === "Pending").reduce(
-  (s, r) => s + r.amount,
-  0,
-);
-const LAST_PAYMENT = "20 Nov 2025";
-
-const STATUS_CLS: Record<DisbStatus, string> = {
-  Completed: "bg-emerald-50 text-emerald-600 border border-emerald-200",
-  Pending: "bg-amber-50  text-amber-600  border border-amber-200",
+const DISB_STATUS_MAP: Record<
+  string,
+  { label: string; bg: string; text: string; border: string }
+> = {
+  successful: {
+    label: "Completed",
+    bg: "#E8F7F1",
+    text: "#087F5B",
+    border: "#B7E5D4",
+  },
+  pending: {
+    label: "Pending",
+    bg: "#FFF7E6",
+    text: "#B76E00",
+    border: "#FFE1A8",
+  },
+  processing: {
+    label: "Processing",
+    bg: "#EAF2FF",
+    text: "#2563EB",
+    border: "#C7DCFF",
+  },
+  failed: {
+    label: "Failed",
+    bg: "#FDECEC",
+    text: "#C62828",
+    border: "#F5C2C2",
+  },
+  reversed: {
+    label: "Reversed",
+    bg: "#F1F5F9",
+    text: "#64748B",
+    border: "#CBD5E1",
+  },
 };
 
-const DetailRow: React.FC<{ label: string; value: React.ReactNode }> = ({
-  label,
-  value,
-}) => (
-  <div className="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0">
-    <span className="text-sm text-slate-500">{label}</span>
-    <span className="text-sm font-semibold text-slate-800 text-right">
-      {value}
-    </span>
-  </div>
-);
+const disbStatusOf = (s: string) =>
+  DISB_STATUS_MAP[s] ?? {
+    label: s,
+    bg: "#F1F5F9",
+    text: "#64748B",
+    border: "#CBD5E1",
+  };
 
-const SectionCard: React.FC<{ title: string; children: React.ReactNode }> = ({
-  title,
-  children,
-}) => (
-  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-    <h3 className="text-sm font-bold text-brand mb-3 pb-2 border-b border-slate-100">
-      {title}
-    </h3>
-    {children}
-  </div>
-);
+const fmt = (n?: number | null) =>
+  n != null ? `₦${Number(n).toLocaleString("en-NG")}` : "—";
 
-const DisbursementDetail: React.FC<{ row: DisbRow; onBack: () => void }> = ({
-  row,
-  onBack,
-}) => (
-  <div className="max-w-2xl mx-auto pt-8 space-y-5 animate-fade-in-up">
-    {/* Back link */}
-    <button
-      onClick={onBack}
-      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-    >
-      <Icon name="arrow-left" className="w-4 h-4" />
-      Back to Disbursements
-    </button>
+const fmtDate = (iso?: string | null) => {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
 
-    <h1 className="text-xl font-bold text-slate-900">Disbursement Details</h1>
+const PAGE_SIZE_OPTIONS = [10, 30, 50, 100, 500];
 
-    {/* Disbursement Summary */}
-    <SectionCard title="Disbursement Summary">
-      <DetailRow
-        label="Amount Disbursed:"
-        value={`₦${row.amount.toLocaleString()}`}
-      />
-      <DetailRow
-        label="Status:"
-        value={
-          <span
-            className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${STATUS_CLS[row.status]}`}
+interface ActionMenuProps {
+  applicationId: string;
+  onView: () => void;
+}
+
+const ActionMenu: React.FC<ActionMenuProps> = ({ onView }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 hover:border-slate-300 transition-colors"
+      >
+        Actions
+        <Icon
+          name="chevron-down"
+          className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-1.5 w-44 bg-white rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.12)] border border-slate-100 z-30 overflow-hidden py-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+              onView();
+            }}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-brand transition-colors text-left"
           >
-            {row.status}
-          </span>
-        }
-      />
-      <DetailRow label="Disbursement ID:" value={row.id} />
-      <DetailRow
-        label="Amount Disbursed:"
-        value={`₦${row.amount.toLocaleString()}`}
-      />
-      <DetailRow label="Payment Reference:" value="SC-REF-985234" />
-    </SectionCard>
-
-    {/* Student Information */}
-    <SectionCard title="Student Information">
-      <DetailRow label="Student Name:" value="Chidi Okafor" />
-      <DetailRow label="Level:" value="Secondary" />
-      <DetailRow label="Class:" value="SS2" />
-      <DetailRow label="Student ID:" value="STU-2048" />
-      <DetailRow label="Payment Reference:" value="SC-REF-985234" />
-    </SectionCard>
-
-    {/* Parent Information */}
-    <SectionCard title="Parent Information">
-      <DetailRow label="Parent/Guardian:" value="Mrs. Okafor" />
-      <DetailRow label="Phone:" value="0803 123 4567" />
-      <DetailRow label="Relationship:" value="Mother" />
-    </SectionCard>
-
-    {/* Bank Payment Details */}
-    <SectionCard title="Bank Payment Details">
-      <DetailRow label="Paid To:" value="Springfield High School" />
-      <DetailRow label="Account Number:" value="0123456789" />
-      <DetailRow label="Bank:" value="Zenith Bank" />
-      <DetailRow
-        label="Payment Method::"
-        value={`₦${row.amount.toLocaleString()}`}
-      />
-      <DetailRow
-        label="Receipt:"
-        value={
-          <button className="flex items-center gap-1.5 text-brand text-sm font-semibold hover:underline">
-            <Icon name="download" className="w-4 h-4" />
-            Download Receipt
+            <Icon name="eye" className="w-4 h-4 text-slate-400 shrink-0" />
+            View Record
           </button>
-        }
-      />
-    </SectionCard>
-
-    {/* Action */}
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-      <h3 className="text-sm font-bold text-slate-800 mb-3">Action</h3>
-      <div className="flex gap-3">
-        <button className="flex items-center gap-2 border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-slate-50 transition-colors">
-          <Icon name="download" className="w-4 h-4" />
-          Download PDF
-        </button>
-        <button className="flex items-center gap-2 bg-brand text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-[#7a1848] transition-colors">
-          <Icon name="headset" className="w-4 h-4" />
-          Contact Support
-        </button>
-      </div>
+        </div>
+      )}
     </div>
+  );
+};
+
+const SummaryCard: React.FC<{
+  label: string;
+  value: string;
+  icon: string;
+  accent: string;
+}> = ({ label, value, icon, accent }) => (
+  <div className="flex-1 flex flex-col items-center text-center px-4 py-2">
+    <div
+      className="w-9 h-9 rounded-xl flex items-center justify-center mb-2"
+      style={{ backgroundColor: `${accent}20` }}
+    >
+      <Icon name={icon} className="w-5 h-5" style={{ color: accent }} />
+    </div>
+    <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+    <p className="text-lg font-extrabold text-slate-900">{value}</p>
   </div>
 );
 
 const SchoolDisbursementPage: React.FC = () => {
+  const navigate = useNavigate();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All Status");
-  const [detail, setDetail] = useState<DisbRow | null>(null);
-  const [page, setPage] = useState(1);
-  const PAGE_LIMIT = 5;
-
-  const filtered = ROWS.filter((r) => {
-    const matchStatus =
-      statusFilter === "All Status" || r.status === statusFilter;
-    const matchSearch =
-      !search ||
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.ref.toLowerCase().includes(search.toLowerCase());
-    return matchStatus && matchSearch;
+  const [disbursements, setDisbursements] = useState<DisbursementRecord[]>([]);
+  const [summary, setSummary] = useState<Summary>({
+    totalDisbursed: 0,
+    pendingDisbursement: 0,
+    lastPaymentDate: null,
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [limit, setLimit] = useState(10);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const visible = filtered.slice((page - 1) * PAGE_LIMIT, page * PAGE_LIMIT);
+  const load = useCallback(
+    async (p = 1, l = limit, s = statusFilter, silent = false) => {
+      if (!silent) setIsLoading(true);
+      try {
+        const apiStatus =
+          s === "All"
+            ? ""
+            : s === "Completed"
+              ? "successful"
+              : s === "Pending"
+                ? "pending"
+                : s === "Processing"
+                  ? "processing"
+                  : s === "Failed"
+                    ? "failed"
+                    : "";
+
+        const data = await (
+          schoolService.getDisbursements as (
+            p: number,
+            l: number,
+            status: string,
+          ) => Promise<unknown>
+        )(p, l, apiStatus);
+
+        const d = data as {
+          disbursements?: DisbursementRecord[];
+          summary?: Summary;
+          pagination?: { total: number; totalPages: number; page: number };
+        };
+
+        setDisbursements(d.disbursements ?? []);
+        if (d.summary) setSummary(d.summary);
+        if (d.pagination) {
+          setTotal(d.pagination.total);
+          setTotalPages(d.pagination.totalPages);
+          setPage(d.pagination.page);
+        }
+      } catch {
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [limit, statusFilter],
+  );
+
+  useEffect(() => {
+    load(1, limit, statusFilter);
+  }, [limit, statusFilter]);
+
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setSearch(val), 400);
+  };
+
+  const STATUS_TABS = ["All", "Completed", "Pending", "Processing", "Failed"];
+
+  const visible = disbursements.filter((d) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const studentName =
+      `${d.loanApplication?.student?.firstName ?? ""} ${d.loanApplication?.student?.lastName ?? ""}`.toLowerCase();
+    const ref = (d.loanApplication?.referenceNumber ?? "").toLowerCase();
+    const disbRef = (d.disbursementReference ?? "").toLowerCase();
+    return studentName.includes(q) || ref.includes(q) || disbRef.includes(q);
+  });
 
   return (
     <DashboardLayout
@@ -231,147 +267,231 @@ const SchoolDisbursementPage: React.FC = () => {
       }
       header={<SchoolTopBar onMobileMenuOpen={() => setMobileNavOpen(true)} />}
     >
-      {detail ? (
-        <DisbursementDetail row={detail} onBack={() => setDetail(null)} />
-      ) : (
-        <div className="pt-8 space-y-6 animate-fade-in-up w-[90%] mx-auto">
-          {/* Summary card */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-            <h1 className="text-lg font-bold text-slate-900">Disbursement</h1>
-            <p className="text-sm text-slate-500 mb-5">
-              Track all tuition payments sent to your school
-            </p>
-            <div className="grid grid-cols-3 gap-4 divide-x divide-slate-100">
-              <div className="text-center pr-4">
-                <p className="text-xs text-slate-500 mb-1">Total Disbursed</p>
-                <p className="text-xl font-bold text-slate-900">
-                  ₦{TOTAL_DISBURSED.toLocaleString()}
-                </p>
-              </div>
-              <div className="text-center px-4">
-                <p className="text-xs text-slate-500 mb-1">
-                  Pending Disbursement
-                </p>
-                <p className="text-xl font-bold text-slate-900">
-                  ₦{TOTAL_PENDING.toLocaleString()}
-                </p>
-              </div>
-              <div className="text-center pl-4">
-                <p className="text-xs text-slate-500 mb-1">Last Payment</p>
-                <p className="text-xl font-bold text-brand">{LAST_PAYMENT}</p>
-              </div>
-            </div>
+      <div className="pt-8 pb-12 space-y-6 animate-fade-in-up w-[90%] mx-auto">
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-900">
+            Disbursement
+          </h1>
+          <p className="text-sm text-brand mt-0.5">
+            Track all tuition payments sent to your school
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+            <SummaryCard
+              label="Total Disbursed"
+              value={fmt(summary.totalDisbursed)}
+              icon="banknote"
+              accent="#087F5B"
+            />
+            <SummaryCard
+              label="Pending Disbursement"
+              value={fmt(summary.pendingDisbursement)}
+              icon="clock"
+              accent="#B76E00"
+            />
+            <SummaryCard
+              label="Last Payment"
+              value={fmtDate(summary.lastPaymentDate)}
+              icon="calendar-check"
+              accent="#2563EB"
+            />
           </div>
+        </div>
 
-          {/* Search + filter */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
-            <div className="relative flex-1">
-              <Icon
-                name="search"
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-              />
-              <input
-                type="text"
-                placeholder="-Search by student or payment reference ID-"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full pl-9 pr-4 py-2.5 rounded-full border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
-              />
-            </div>
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(1);
-                }}
-                className="appearance-none bg-brand text-white text-sm font-semibold pl-4 pr-9 py-2.5 rounded-lg focus:outline-none cursor-pointer"
-              >
-                {["All Status", "Completed", "Pending"].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <Icon
-                name="calendar"
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white pointer-events-none"
-              />
-            </div>
-          </div>
-
-          {/* History table */}
-          <div>
-            <h2 className="text-base font-bold text-slate-800 mb-3">
-              Disbursement History
-            </h2>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              {/* Header */}
-              <div className="grid grid-cols-[2fr_1.5fr_1fr_1.5fr_2fr_1fr] px-5 py-3 border-b border-slate-100 text-sm font-semibold text-brand">
-                <span>Student</span>
-                <span>Amount</span>
-                <span>Date</span>
-                <span>Status</span>
-                <span>Payment Ref</span>
-                <span>Action</span>
-              </div>
-
-              {visible.map((r, i) => (
-                <div
-                  key={`${r.ref}-${i}`}
-                  className="grid grid-cols-[2fr_1.5fr_1fr_1.5fr_2fr_1fr] items-center px-5 py-3.5 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="flex flex-col gap-3 px-5 py-4 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-slate-500">Show</span>
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    setLimit(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="px-2 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
                 >
-                  <span className="text-sm font-semibold text-slate-800">
-                    {r.name}
-                  </span>
-                  <span className="text-sm text-slate-700">
-                    ₦{r.amount.toLocaleString()}
-                  </span>
-                  <span className="text-sm text-slate-500">{r.date}</span>
-                  <span>
-                    <span
-                      className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${STATUS_CLS[r.status]}`}
-                    >
-                      {r.status}
-                    </span>
-                  </span>
-                  <span className="text-sm font-mono text-slate-500">
-                    {r.ref}
-                  </span>
-                  <button
-                    onClick={() => setDetail(r)}
-                    className="border border-brand text-brand text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-brand/5 transition-colors w-fit"
-                  >
-                    View
-                  </button>
-                </div>
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-slate-500">entries</span>
+              </div>
+              <div className="relative flex-1">
+                <Icon
+                  name="search"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Search student, reference…"
+                  value={searchInput}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+              {STATUS_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setStatusFilter(tab)}
+                  className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                    statusFilter === tab
+                      ? "bg-brand text-white shadow-sm"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {tab}
+                </button>
               ))}
             </div>
           </div>
-          <Pagination
-            page={page}
-            totalPages={Math.ceil(filtered.length / PAGE_LIMIT)}
-            total={filtered.length}
-            limit={PAGE_LIMIT}
-            onPageChange={setPage}
-          />
 
-          {/* Export row */}
-          <div className="flex gap-3 pb-4">
-            <button className="flex items-center gap-2 border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-slate-50 transition-colors">
-              <Icon name="download" className="w-4 h-4" />
-              Export CVS
-            </button>
-            <button className="flex items-center gap-2 bg-brand text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-[#7a1848] transition-colors">
-              <Icon name="file-text" className="w-4 h-4" />
-              Download Statement
-            </button>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="py-3 px-5 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Student
+                  </th>
+                  <th className="py-3 px-5 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Reference
+                  </th>
+                  <th className="py-3 px-5 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="py-3 px-5 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="py-3 px-5 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="py-3 px-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="py-16 text-center">
+                      <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto" />
+                    </td>
+                  </tr>
+                ) : visible.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-16 text-center">
+                      <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                        <Icon
+                          name="credit-card"
+                          className="w-7 h-7 text-slate-300"
+                        />
+                      </div>
+                      <p className="text-sm font-semibold text-slate-600">
+                        No disbursements found
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {searchInput || statusFilter !== "All"
+                          ? "Try adjusting your search or filter."
+                          : "Disbursements will appear here once processed."}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  visible.map((d) => {
+                    const st = disbStatusOf(d.status);
+                    const appId = d.loanApplication?.id ?? "";
+                    const studentName =
+                      `${d.loanApplication?.student?.firstName ?? ""} ${d.loanApplication?.student?.lastName ?? ""}`.trim() ||
+                      "—";
+                    const refDisplay =
+                      d.loanApplication?.referenceNumber ??
+                      d.disbursementReference ??
+                      d.id.slice(0, 12).toUpperCase();
+                    const dateDisplay = d.disbursedAt
+                      ? fmtDate(d.disbursedAt)
+                      : fmtDate(d.createdAt);
+
+                    return (
+                      <tr
+                        key={d.id}
+                        className="hover:bg-slate-50/60 transition-colors"
+                      >
+                        <td className="py-3.5 px-5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0 text-brand font-bold text-xs">
+                              {(
+                                d.loanApplication?.student?.firstName?.[0] ??
+                                "?"
+                              ).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800">
+                                {studentName}
+                              </p>
+                              {d.loanApplication?.student?.gradeLevel && (
+                                <p className="text-xs text-slate-400">
+                                  {d.loanApplication.student.gradeLevel}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-5 text-sm font-mono text-slate-500">
+                          {refDisplay}
+                        </td>
+                        <td className="py-3.5 px-5 text-sm font-semibold text-slate-700">
+                          {fmt(d.amount)}
+                        </td>
+                        <td className="py-3.5 px-5">
+                          <span
+                            style={{
+                              backgroundColor: st.bg,
+                              color: st.text,
+                              borderColor: st.border,
+                            }}
+                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border"
+                          >
+                            {st.label}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-5 text-sm text-slate-500">
+                          {dateDisplay}
+                        </td>
+                        <td className="py-3.5 px-5 text-right">
+                          <ActionMenu
+                            applicationId={appId}
+                            onView={() => {
+                              if (appId)
+                                navigate(`/school/applications/${appId}`);
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="px-5 pb-4 pt-2">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              limit={limit}
+              onPageChange={(p) => load(p, limit, statusFilter)}
+            />
           </div>
         </div>
-      )}
+      </div>
     </DashboardLayout>
   );
 };

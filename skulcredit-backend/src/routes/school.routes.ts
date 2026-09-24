@@ -114,4 +114,16 @@ router.put(
 
 router.get("/dashboard", schoolController.getDashboard.bind(schoolController));
 
+router.get("/students", schoolController.getStudents.bind(schoolController));
+router.post("/students", schoolController.createStudent.bind(schoolController));
+router.put(
+  "/students/:id",
+  schoolController.updateStudent.bind(schoolController),
+);
+
+router.get(
+  "/disbursements",
+  schoolController.getDisbursements.bind(schoolController),
+);
+
 export default router;

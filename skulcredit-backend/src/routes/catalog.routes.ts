@@ -171,4 +171,6 @@ router.get(
   catalogController.getClassLevels.bind(catalogController),
 );
 
+router.get("/sessions", catalogController.getSessions.bind(catalogController));
+
 export default router;
