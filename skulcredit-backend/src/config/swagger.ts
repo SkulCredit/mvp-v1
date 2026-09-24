@@ -2961,6 +2961,479 @@ const swaggerSpec: Record<string, unknown> = {
         responses: { "200": { description: "Deleted" } },
       },
     },
+
+    "/admin/current-term": {
+      get: {
+        summary:
+          "Get the currently active academic term with portal window and effective tenor",
+        tags: ["Admin"],
+        responses: {
+          "200": { description: "Active term details or isOpen:false if none" },
+        },
+      },
+    },
+
+    "/admin/parents/{parentId}/eligibility-status": {
+      get: {
+        summary:
+          "Get a parent's eligibility status (KYC state, block flag, blockedUntil)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "parentId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "The parent's userId",
+          },
+        ],
+        responses: {
+          "200": { description: "Eligibility status" },
+          "404": { description: "Parent not found" },
+        },
+      },
+    },
+
+    "/admin/parents/{parentId}/eligibility-profile": {
+      get: {
+        summary: "Get a parent's full eligibility profile",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "parentId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "The parent's userId",
+          },
+        ],
+        responses: {
+          "200": { description: "Eligibility profile" },
+          "404": { description: "Parent not found" },
+        },
+      },
+      patch: {
+        summary: "Update a parent's eligibility profile fields",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "parentId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "The parent's userId",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  photoUrl: { type: "string" },
+                  phoneNumber: { type: "string" },
+                  employerType: { type: "string" },
+                  yearsInRole: { type: "string" },
+                  monthlyIncome: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Profile updated" },
+          "404": { description: "Parent not found" },
+        },
+      },
+    },
+
+    "/admin/parents/{parentId}/score-check": {
+      post: {
+        summary:
+          "Manually trigger a BVN karma / credit score check for a parent",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "parentId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "The parent's userId",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["bvn"],
+                properties: {
+                  bvn: { type: "string", example: "12345678901" },
+                  requestedAmount: { type: "number", example: 100 },
+                  location: { type: "string", example: "Lagos" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description:
+              "Score check result (pass, decision, creditScore, advisoryAmount)",
+          },
+          "400": { description: "Invalid BVN" },
+          "404": { description: "Parent not found" },
+        },
+      },
+    },
+
+    "/admin/parents/{parentId}/loans/{loanId}/mandate-preview": {
+      get: {
+        summary: "Get the repayment mandate preview for a loan application",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "parentId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "The parent's userId",
+          },
+          {
+            in: "path",
+            name: "loanId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "debitDay",
+            schema: { type: "integer", example: 1 },
+            description: "Day of month (1–28) for installment debit",
+          },
+        ],
+        responses: {
+          "200": { description: "Mandate preview with installment schedule" },
+          "404": { description: "Application not found" },
+        },
+      },
+    },
+
+    "/admin/parents/{parentId}/loans/{loanId}/confirm-service-charge": {
+      post: {
+        summary: "Manually mark service charge as paid for a loan application",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "parentId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "The parent's userId",
+          },
+          {
+            in: "path",
+            name: "loanId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  paystackReference: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Service charge confirmed" },
+          "404": { description: "Application not found" },
+        },
+      },
+    },
+
+    "/admin/parents/{parentId}/loans/{loanId}/setup-repayment": {
+      post: {
+        summary:
+          "Trigger repayment schedule creation and funding partner handoff for a loan",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "parentId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "The parent's userId",
+          },
+          {
+            in: "path",
+            name: "loanId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  debitDay: {
+                    type: "integer",
+                    example: 1,
+                    description: "Day of month for debit (1–28)",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description:
+              "Repayment schedule created and funding partner notified",
+          },
+          "400": {
+            description: "Service charge not paid or invalid application state",
+          },
+          "409": { description: "Repayment schedule already exists" },
+          "404": { description: "Application not found" },
+        },
+      },
+    },
+
+    "/admin/parents/{parentId}/loans/{loanId}/pay-installment": {
+      post: {
+        summary: "Record a repayment installment on behalf of a parent",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "parentId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "The parent's userId",
+          },
+          {
+            in: "path",
+            name: "loanId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["paystackReference", "scheduleIds"],
+                properties: {
+                  paystackReference: { type: "string" },
+                  scheduleIds: {
+                    type: "array",
+                    items: { type: "string", format: "uuid" },
+                  },
+                  type: {
+                    type: "string",
+                    enum: ["scheduled", "early_partial", "early_full"],
+                    default: "scheduled",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Repayment recorded" },
+          "400": { description: "Missing required fields" },
+          "404": { description: "Application not found" },
+        },
+      },
+    },
+
+    "/admin/schools/user/{schoolUserId}/dashboard": {
+      get: {
+        summary: "Get a school's dashboard stats (via the school's userId)",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "schoolUserId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "The school account's userId",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "School dashboard stats and recent applications",
+          },
+          "404": { description: "School not found" },
+        },
+      },
+    },
+
+    "/admin/schools/user/{schoolUserId}/loans/{loanId}/verify-enrollment": {
+      put: {
+        summary: "Confirm or reject student enrollment on behalf of a school",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "schoolUserId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "The school account's userId",
+          },
+          {
+            in: "path",
+            name: "loanId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["action"],
+                properties: {
+                  action: { type: "string", enum: ["confirm", "reject"] },
+                  confirmedTuitionAmount: { type: "number" },
+                  note: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Enrollment confirmed or rejected" },
+          "400": { description: "Application not in a verifiable state" },
+          "404": { description: "Application or school not found" },
+        },
+      },
+    },
+
+    "/admin/users/{userId}/notifications": {
+      get: {
+        summary: "List all notifications for a specific user",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: {
+          "200": { description: "Paginated notifications with unread count" },
+        },
+      },
+    },
+
+    "/admin/users/{userId}/notifications/read-all": {
+      put: {
+        summary: "Mark all notifications as read for a specific user",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": { description: "All notifications marked as read" },
+        },
+      },
+    },
+
+    "/admin/users/{userId}/notifications/{notificationId}/read": {
+      put: {
+        summary: "Mark a single notification as read for a specific user",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "path",
+            name: "notificationId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": { description: "Notification marked as read" },
+          "404": { description: "Notification not found" },
+        },
+      },
+    },
+
+    "/admin/users/{userId}/notifications/{notificationId}/reply": {
+      post: {
+        summary: "Send a reply notification to a user",
+        tags: ["Admin"],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "path",
+            name: "notificationId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["message"],
+                properties: {
+                  message: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "Reply notification sent" },
+          "400": { description: "message is required" },
+          "404": { description: "Original notification not found" },
+        },
+      },
+    },
   },
 };
 

@@ -1,6 +1,9 @@
 ﻿import { Request, Response, NextFunction } from "express";
 import adminService from "../services/admin.service";
 import schoolTermService from "../services/schoolTerm.service";
+import parentService from "../services/parent.service";
+import schoolService from "../services/school.service";
+import notificationService from "../notifications/notification.service";
 import { successResponse } from "../utils/response";
 import { SchoolBankAccount, CatalogSchool } from "../models/index";
 import ApiError from "../utils/apiError";
@@ -1861,6 +1864,337 @@ class AdminController {
     try {
       await adminService.deleteFundingPartner(String(req.params.id));
       successResponse(res, 200, "Funding partner deleted");
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async getParentEligibilityStatus(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await parentService.getEligibilityStatus(
+        String(req.params.parentId),
+      );
+      successResponse(res, 200, "Eligibility status fetched", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async getParentEligibilityProfile(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await parentService.getEligibilityProfile(
+        String(req.params.parentId),
+      );
+      successResponse(res, 200, "Eligibility profile fetched", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async updateParentEligibilityProfile(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await parentService.updateEligibilityProfile(
+        String(req.params.parentId),
+        req.body as {
+          photoUrl?: string;
+          phoneNumber?: string;
+          employerType?: string;
+          yearsInRole?: string;
+          monthlyIncome?: string;
+        },
+      );
+      successResponse(res, 200, "Eligibility profile updated", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminConfirmServiceCharge(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await parentService.confirmServiceCharge(
+        String(req.params.parentId),
+        String(req.params.loanId),
+        (req.body as { paystackReference?: string }).paystackReference,
+      );
+      successResponse(res, 200, "Service charge confirmed", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminSetupRepayment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await parentService.setupRepayment(
+        String(req.params.parentId),
+        String(req.params.loanId),
+        { debitDay: (req.body as { debitDay?: number }).debitDay },
+      );
+      successResponse(res, 200, "Repayment plan set up successfully", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminGetMandatePreview(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const debitDay = req.query.debitDay ? Number(req.query.debitDay) : 1;
+      const appData = await parentService.getRepaymentSchedule(
+        String(req.params.parentId),
+        String(req.params.loanId),
+      );
+      const app = appData as {
+        tenor: number;
+        amountApproved: number | null;
+        amountRequested: number;
+      };
+      const totalAmount = Number(app.amountApproved ?? app.amountRequested);
+      const preview = parentService.getMandatePreview(
+        app.tenor,
+        totalAmount,
+        debitDay,
+      );
+      successResponse(res, 200, "Mandate preview generated", {
+        tenor: app.tenor,
+        totalAmount,
+        debitDay: Math.min(Math.max(Math.round(debitDay), 1), 28),
+        installmentAmount: Math.round(totalAmount / app.tenor),
+        preview,
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminPayInstallment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { paystackReference, scheduleIds, type } = req.body as {
+        paystackReference: string;
+        scheduleIds: string[];
+        type: "scheduled" | "early_partial" | "early_full";
+      };
+      if (!paystackReference || !scheduleIds?.length) {
+        throw new ApiError(
+          400,
+          "paystackReference and scheduleIds are required",
+        );
+      }
+      const result = await parentService.payInstallment(
+        String(req.params.parentId),
+        String(req.params.loanId),
+        {
+          paystackReference,
+          scheduleIds,
+          type: type ?? "scheduled",
+        },
+      );
+      successResponse(res, 200, "Repayment recorded successfully", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminCheckLoanScore(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { bvn, requestedAmount, location } = req.body as {
+        bvn: string;
+        requestedAmount?: number;
+        location?: string;
+      };
+      if (!bvn || !/^\d{11}$/.test(bvn)) {
+        throw new ApiError(400, "Valid 11-digit BVN is required");
+      }
+      const result = await parentService.checkLoanScore(
+        String(req.params.parentId),
+        bvn,
+        requestedAmount ?? 100,
+        location ?? "Lagos",
+      );
+      successResponse(res, 200, "Score check complete", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminVerifyEnrollment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await schoolService.verifyEnrollment(
+        String(req.params.schoolUserId),
+        String(req.params.loanId),
+        req.body as {
+          action: "confirm" | "reject";
+          confirmedTuitionAmount?: number;
+          note?: string;
+        },
+      );
+      const action =
+        (req.body as { action: string }).action === "confirm"
+          ? "confirmed"
+          : "rejected";
+      successResponse(res, 200, `Enrollment ${action} successfully`, result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminGetSchoolDashboard(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await schoolService.getDashboard(
+        String(req.params.schoolUserId),
+      );
+      successResponse(
+        res,
+        200,
+        "School dashboard fetched successfully",
+        result,
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminGetCurrentTerm(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const term = await schoolTermService.getActiveTerm();
+      if (!term) {
+        successResponse(res, 200, "No active term", {
+          isOpen: false,
+          term: null,
+        });
+        return;
+      }
+      const effectiveTenor = schoolTermService.computeEffectiveTenor(term);
+      successResponse(res, 200, "Current term fetched", {
+        isOpen: true,
+        term: {
+          id: term.id,
+          termId: term.termId,
+          name: term.termName,
+          termCode: term.termCode,
+          sessionName: term.sessionName,
+          portalOpenDate: term.portalOpeningDate,
+          portalCloseDate: term.portalCloseDate,
+          maxTenorMonths: term.maxRepaymentMonths,
+          effectiveTenor,
+          applicationWindows: term.applicationWindows,
+        },
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminListUserNotifications(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const page = Math.max(1, parseInt(String(req.query.page ?? 1)));
+      const limit = Math.min(
+        50,
+        Math.max(1, parseInt(String(req.query.limit ?? 20))),
+      );
+      const result = await notificationService.getForUser(
+        String(req.params.userId),
+        page,
+        limit,
+      );
+      successResponse(res, 200, "Notifications fetched", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminMarkNotificationRead(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const notification = await notificationService.markRead(
+        String(req.params.userId),
+        String(req.params.notificationId),
+      );
+      if (!notification) throw new ApiError(404, "Notification not found");
+      successResponse(res, 200, "Notification marked as read", notification);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminMarkAllNotificationsRead(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await notificationService.markAllRead(
+        String(req.params.userId),
+      );
+      successResponse(res, 200, "All notifications marked as read", result);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async adminReplyToNotification(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { message } = req.body as { message: string };
+      if (!message?.trim()) throw new ApiError(400, "message is required");
+      const result = await notificationService.replyToNotification(
+        String(req.params.userId),
+        String(req.params.notificationId),
+        message.trim(),
+      );
+      successResponse(res, 201, "Reply sent", result);
     } catch (e) {
       next(e);
     }

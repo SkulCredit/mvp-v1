@@ -293,4 +293,66 @@ router.get("/funding-partners/:id", ctrl.getFundingPartner.bind(ctrl));
 router.put("/funding-partners/:id", ctrl.updateFundingPartner.bind(ctrl));
 router.delete("/funding-partners/:id", ctrl.deleteFundingPartner.bind(ctrl));
 
+router.get(
+  "/parents/:parentId/eligibility-status",
+  ctrl.getParentEligibilityStatus.bind(ctrl),
+);
+router.get(
+  "/parents/:parentId/eligibility-profile",
+  ctrl.getParentEligibilityProfile.bind(ctrl),
+);
+router.patch(
+  "/parents/:parentId/eligibility-profile",
+  ctrl.updateParentEligibilityProfile.bind(ctrl),
+);
+router.post(
+  "/parents/:parentId/score-check",
+  ctrl.adminCheckLoanScore.bind(ctrl),
+);
+
+router.get(
+  "/parents/:parentId/loans/:loanId/mandate-preview",
+  ctrl.adminGetMandatePreview.bind(ctrl),
+);
+router.post(
+  "/parents/:parentId/loans/:loanId/confirm-service-charge",
+  ctrl.adminConfirmServiceCharge.bind(ctrl),
+);
+router.post(
+  "/parents/:parentId/loans/:loanId/setup-repayment",
+  ctrl.adminSetupRepayment.bind(ctrl),
+);
+router.post(
+  "/parents/:parentId/loans/:loanId/pay-installment",
+  ctrl.adminPayInstallment.bind(ctrl),
+);
+
+router.get(
+  "/schools/user/:schoolUserId/dashboard",
+  ctrl.adminGetSchoolDashboard.bind(ctrl),
+);
+router.put(
+  "/schools/user/:schoolUserId/loans/:loanId/verify-enrollment",
+  ctrl.adminVerifyEnrollment.bind(ctrl),
+);
+
+router.get("/current-term", ctrl.adminGetCurrentTerm.bind(ctrl));
+
+router.get(
+  "/users/:userId/notifications",
+  ctrl.adminListUserNotifications.bind(ctrl),
+);
+router.put(
+  "/users/:userId/notifications/read-all",
+  ctrl.adminMarkAllNotificationsRead.bind(ctrl),
+);
+router.put(
+  "/users/:userId/notifications/:notificationId/read",
+  ctrl.adminMarkNotificationRead.bind(ctrl),
+);
+router.post(
+  "/users/:userId/notifications/:notificationId/reply",
+  ctrl.adminReplyToNotification.bind(ctrl),
+);
+
 export default router;
