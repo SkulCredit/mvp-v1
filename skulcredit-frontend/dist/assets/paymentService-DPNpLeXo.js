@@ -1,0 +1,1 @@
+import{c as i}from"./index-C5ogdNrH.js";const r={initiatePayment:async({amount:a,metadata:t,callbackUrl:n})=>{const e={amount:Number(a)};return t!==void 0&&(e.metadata=t),n!==void 0&&(e.callbackUrl=n),(await i.post("/payments/initialize",e)).data.data},verifyPayment:async a=>(await i.get(`/payments/verify/${a}`)).data.data};export{r as p};

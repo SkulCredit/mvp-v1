@@ -338,7 +338,8 @@ const NavBar: React.FC<{
   );
 };
 
-const CHILD_PAGE_SIZE = 5;
+const CHILD_PAGE_SIZE_OPTIONS = [10, 30, 50, 100, 500] as const;
+type ChildPageSizeOption = (typeof CHILD_PAGE_SIZE_OPTIONS)[number];
 
 const StepSelectChild: React.FC<{
   children: Child[];
@@ -354,11 +355,19 @@ const StepSelectChild: React.FC<{
   blockedStudentIds = new Set(),
 }) => {
   const [page, setPage] = useState(1);
-  const totalPages = Math.ceil(children.length / CHILD_PAGE_SIZE);
-  const paged = children.slice(
-    (page - 1) * CHILD_PAGE_SIZE,
-    page * CHILD_PAGE_SIZE,
-  );
+  const [pageSize, setPageSize] = useState<ChildPageSizeOption>(10);
+  const [search, setSearch] = useState("");
+
+  const filtered = search.trim()
+    ? children.filter((c) =>
+        `${c.firstName} ${c.lastName} ${c.schoolName ?? ""} ${c.gradeLevel ?? ""}`
+          .toLowerCase()
+          .includes(search.trim().toLowerCase()),
+      )
+    : children;
+
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="space-y-6">
@@ -376,125 +385,192 @@ const StepSelectChild: React.FC<{
           <p className="text-sm font-bold text-gray-700 mb-3">
             Existing Children
           </p>
-          <div className="space-y-3">
-            {paged.map((child) => {
-              const selected = selectedId === child.id;
-              const blocked = blockedStudentIds.has(child.id);
-              return (
-                <div
-                  key={child.id}
-                  onClick={() => !blocked && onSelect(child.id)}
-                  className={`flex items-center gap-3 bg-white rounded-2xl border px-3 sm:px-5 py-3 sm:py-4 transition-all ${
-                    blocked
-                      ? "border-gray-100 opacity-60 cursor-not-allowed bg-gray-50"
-                      : selected
-                        ? "border-[#881337] ring-2 ring-[#881337]/20 cursor-pointer"
-                        : "border-gray-200 hover:border-[#881337]/40 cursor-pointer"
-                  }`}
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </span>
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Search by name, school or grade..."
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm text-gray-700 placeholder:text-gray-400 outline-none focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/10 transition-colors"
+                />
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <label
+                  htmlFor="child-page-size"
+                  className="text-xs text-gray-500 whitespace-nowrap"
                 >
-                  <img
-                    src={
-                      child.photo ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(child.firstName)}&background=881337&color=fff&size=44`
-                    }
-                    alt={child.firstName}
-                    className="w-10 h-10 rounded-full object-cover shrink-0"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(child.firstName)}&background=881337&color=fff&size=44`;
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-900 text-sm truncate">
-                      {child.firstName} {child.lastName}
-                    </p>
-                    {child.schoolName && (
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="w-3 h-3 shrink-0"
-                          aria-hidden="true"
-                        >
-                          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                          <polyline points="9 22 9 12 15 12 15 22" />
-                        </svg>
-                        <span className="truncate">{child.schoolName}</span>
-                      </p>
-                    )}
-                    {child.gradeLevel && (
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="w-3 h-3 shrink-0"
-                          aria-hidden="true"
-                        >
-                          <rect
-                            x="3"
-                            y="3"
-                            width="18"
-                            height="18"
-                            rx="2"
-                            ry="2"
-                          />
-                          <line x1="3" y1="9" x2="21" y2="9" />
-                          <line x1="3" y1="15" x2="21" y2="15" />
-                          <line x1="9" y1="3" x2="9" y2="21" />
-                          <line x1="15" y1="3" x2="15" y2="21" />
-                        </svg>
-                        {child.gradeLevel}
-                      </p>
-                    )}
-                  </div>
-                  {blocked ? (
-                    <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2.5 py-1 text-[11px] font-semibold text-amber-700 whitespace-nowrap">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="w-3 h-3"
-                        aria-hidden="true"
+                  Show
+                </label>
+                <select
+                  id="child-page-size"
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value) as ChildPageSizeOption);
+                    setPage(1);
+                  }}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/10 outline-none cursor-pointer"
+                >
+                  {CHILD_PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-500 whitespace-nowrap">
+                  per page
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[500px] text-sm border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/70 border-b border-gray-100">
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                      Child
+                    </th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                      School
+                    </th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                      Grade
+                    </th>
+                    <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                      Status
+                    </th>
+                    <th className="w-8" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {paged.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-4 py-10 text-center text-sm text-gray-400"
                       >
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="12" />
-                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                      </svg>
-                      Applied this term
-                    </span>
+                        {search
+                          ? `No children matching "${search}"`
+                          : "No children found"}
+                      </td>
+                    </tr>
                   ) : (
-                    <div
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? "border-[#881337]" : "border-gray-300"}`}
-                    >
-                      {selected && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#881337]" />
-                      )}
-                    </div>
+                    paged.map((child) => {
+                      const selected = selectedId === child.id;
+                      const blocked = blockedStudentIds.has(child.id);
+                      return (
+                        <tr
+                          key={child.id}
+                          onClick={() => !blocked && onSelect(child.id)}
+                          className={`transition-colors ${
+                            blocked
+                              ? "opacity-60 cursor-not-allowed bg-gray-50"
+                              : selected
+                                ? "bg-[#881337]/5 cursor-pointer"
+                                : "hover:bg-gray-50 cursor-pointer"
+                          }`}
+                        >
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={
+                                  child.photo ||
+                                  `https://ui-avatars.com/api/?name=${encodeURIComponent(child.firstName)}&background=881337&color=fff&size=36`
+                                }
+                                alt={child.firstName}
+                                className="w-9 h-9 rounded-full object-cover shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(child.firstName)}&background=881337&color=fff&size=36`;
+                                }}
+                              />
+                              <span className="font-bold text-gray-900 text-sm">
+                                {child.firstName} {child.lastName}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                            {child.schoolName ?? (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                            {child.gradeLevel ?? (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-center">
+                            {blocked ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2.5 py-1 text-[11px] font-semibold text-amber-700 whitespace-nowrap">
+                                Applied this term
+                              </span>
+                            ) : (
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap ${
+                                  selected
+                                    ? "bg-[#881337] border-[#881337] text-white"
+                                    : "bg-gray-100 border-gray-200 text-gray-500"
+                                }`}
+                              >
+                                {selected ? "Selected" : "Select"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="pr-3 py-3 text-center">
+                            <div
+                              className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mx-auto ${
+                                selected
+                                  ? "border-[#881337]"
+                                  : "border-gray-300"
+                              }`}
+                            >
+                              {selected && (
+                                <div className="w-2 h-2 rounded-full bg-[#881337]" />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
-                </div>
-              );
-            })}
+                </tbody>
+              </table>
+            </div>
+
+            {filtered.length > 10 && (
+              <div className="px-4 pb-3 pt-1">
+                <Pagination
+                  page={page}
+                  totalPages={totalPages}
+                  total={filtered.length}
+                  limit={pageSize}
+                  onPageChange={setPage}
+                />
+              </div>
+            )}
           </div>
-          {totalPages > 1 && (
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              total={children.length}
-              limit={CHILD_PAGE_SIZE}
-              onPageChange={setPage}
-            />
-          )}
         </div>
       )}
 

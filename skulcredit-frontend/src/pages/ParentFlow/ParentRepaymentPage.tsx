@@ -140,6 +140,9 @@ const STATUS_PILL: Record<
   },
 };
 
+const REPAY_PAGE_SIZE_OPTIONS = [10, 30, 50, 100, 500] as const;
+type RepayPageSizeOption = (typeof REPAY_PAGE_SIZE_OPTIONS)[number];
+
 const RepaymentDashboard: React.FC = () => {
   const navigate = useNavigate();
 
@@ -148,7 +151,8 @@ const RepaymentDashboard: React.FC = () => {
   const [loadError, setLoadError] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [repayPage, setRepayPage] = useState(1);
-  const REPAY_LIMIT = 5;
+  const [repayLimit, setRepayLimit] = useState<RepayPageSizeOption>(10);
+  const [repaySearch, setRepaySearch] = useState("");
 
   const [modal, setModal] = useState<{
     appId: string;
@@ -284,293 +288,389 @@ const RepaymentDashboard: React.FC = () => {
         </p>
       </div>
 
-      {apps.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm text-center py-20 px-6">
-          <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-300 mx-auto mb-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-7 h-7"
-              aria-hidden="true"
-            >
-              <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-              <line x1="1" y1="10" x2="23" y2="10" />
-            </svg>
-          </div>
-          <h3 className="text-base font-bold text-slate-700">
-            No active repayments
-          </h3>
-          <p className="text-slate-500 mt-1.5 text-sm max-w-xs mx-auto">
-            Once an application is disbursed, your repayment schedule will
-            appear here.
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate("/parent/applications")}
-            className="mt-5 inline-flex items-center gap-2 bg-brand text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-brand-hover transition-colors"
-          >
-            View Applications
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {apps
-            .slice((repayPage - 1) * REPAY_LIMIT, repayPage * REPAY_LIMIT)
-            .map((app) => {
-              const total = Number(app.amountApproved ?? app.amountRequested);
-              const paidAmt = (app.schedule ?? []).reduce(
-                (s, r) => s + Number(r.amountPaid ?? 0),
-                0,
-              );
-              const paidCount = (app.schedule ?? []).filter(
-                (s) => s.status === "paid" || s.status === "waived",
-              ).length;
-              const totalInstall = app.schedule?.length ?? 0;
-              const paidPct =
-                total > 0 ? Math.round((paidAmt / total) * 100) : 0;
-              const remaining = total - paidAmt;
-              const hasOverdue = (app.schedule ?? []).some(
-                (s) => s.status === "overdue",
-              );
-              const allPaid = paidCount === totalInstall && totalInstall > 0;
-              const isExpanded = expandedId === app.id;
-              const studentName = app.student
-                ? `${app.student.firstName ?? ""} ${app.student.lastName ?? ""}`.trim()
-                : "—";
+      {(() => {
+        const q = repaySearch.trim().toLowerCase();
+        const filteredApps = q
+          ? apps.filter((a) => {
+              const name =
+                `${a.student?.firstName ?? ""} ${a.student?.lastName ?? ""}`.toLowerCase();
+              const school = (a.catalogSchool?.name ?? "").toLowerCase();
+              const ref = (a.referenceNumber ?? "").toLowerCase();
+              return name.includes(q) || school.includes(q) || ref.includes(q);
+            })
+          : apps;
+        const totalRepay = filteredApps.length;
+        const totalRepayPages = Math.ceil(totalRepay / repayLimit);
+        const pagedApps = filteredApps.slice(
+          (repayPage - 1) * repayLimit,
+          repayPage * repayLimit,
+        );
 
-              return (
-                <div
-                  key={app.id}
-                  className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+        return (
+          <>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </span>
+                <input
+                  type="search"
+                  value={repaySearch}
+                  onChange={(e) => {
+                    setRepaySearch(e.target.value);
+                    setRepayPage(1);
+                  }}
+                  placeholder="Search by student, school, or reference..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors"
+                />
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <label
+                  htmlFor="repay-page-size"
+                  className="text-xs text-slate-500 whitespace-nowrap"
                 >
-                  <div className="px-5 py-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-10 h-10 rounded-full bg-brand/10 text-brand font-bold text-sm flex items-center justify-center shrink-0">
-                          {studentName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .toUpperCase()
-                            .slice(0, 2)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900 truncate">
-                            {studentName}
-                          </p>
-                          <p className="text-xs text-slate-500 truncate">
-                            {app.catalogSchool?.name ?? "—"} ·{" "}
-                            {app.referenceNumber ?? app.id.slice(0, 12)}
-                          </p>
-                        </div>
-                      </div>
+                  Show
+                </label>
+                <select
+                  id="repay-page-size"
+                  value={repayLimit}
+                  onChange={(e) => {
+                    setRepayLimit(
+                      Number(e.target.value) as RepayPageSizeOption,
+                    );
+                    setRepayPage(1);
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 focus:border-brand focus:ring-2 focus:ring-brand/10 outline-none cursor-pointer"
+                >
+                  {REPAY_PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-slate-500 whitespace-nowrap">
+                  per page
+                </span>
+              </div>
+            </div>
 
-                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                        {hasOverdue && (
-                          <span className="text-xs font-semibold bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full">
-                            Overdue
-                          </span>
-                        )}
-                        {allPaid && (
-                          <span className="text-xs font-semibold bg-green-50 text-green-700 border border-green-100 px-2.5 py-1 rounded-full">
-                            Fully Paid
-                          </span>
-                        )}
-                        {!allPaid && (
-                          <>
+            {filteredApps.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm text-center py-20 px-6">
+                <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-300 mx-auto mb-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-7 h-7"
+                    aria-hidden="true"
+                  >
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+                    <line x1="1" y1="10" x2="23" y2="10" />
+                  </svg>
+                </div>
+                <h3 className="text-base font-bold text-slate-700">
+                  {repaySearch
+                    ? "No matching repayments"
+                    : "No active repayments"}
+                </h3>
+                <p className="text-slate-500 mt-1.5 text-sm max-w-xs mx-auto">
+                  {repaySearch
+                    ? "Try adjusting your search term."
+                    : "Once an application is disbursed, your repayment schedule will appear here."}
+                </p>
+                {!repaySearch && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/parent/applications")}
+                    className="mt-5 inline-flex items-center gap-2 bg-brand text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-brand-hover transition-colors"
+                  >
+                    View Applications
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pagedApps.map((app) => {
+                  const total = Number(
+                    app.amountApproved ?? app.amountRequested,
+                  );
+                  const paidAmt = (app.schedule ?? []).reduce(
+                    (s, r) => s + Number(r.amountPaid ?? 0),
+                    0,
+                  );
+                  const paidCount = (app.schedule ?? []).filter(
+                    (s) => s.status === "paid" || s.status === "waived",
+                  ).length;
+                  const totalInstall = app.schedule?.length ?? 0;
+                  const paidPct =
+                    total > 0 ? Math.round((paidAmt / total) * 100) : 0;
+                  const remaining = total - paidAmt;
+                  const hasOverdue = (app.schedule ?? []).some(
+                    (s) => s.status === "overdue",
+                  );
+                  const allPaid =
+                    paidCount === totalInstall && totalInstall > 0;
+                  const isExpanded = expandedId === app.id;
+                  const studentName = app.student
+                    ? `${app.student.firstName ?? ""} ${app.student.lastName ?? ""}`.trim()
+                    : "—";
+
+                  return (
+                    <div
+                      key={app.id}
+                      className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+                    >
+                      <div className="px-5 py-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-10 h-10 rounded-full bg-brand/10 text-brand font-bold text-sm flex items-center justify-center shrink-0">
+                              {studentName
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()
+                                .slice(0, 2)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-900 truncate">
+                                {studentName}
+                              </p>
+                              <p className="text-xs text-slate-500 truncate">
+                                {app.catalogSchool?.name ?? "—"} ·{" "}
+                                {app.referenceNumber ?? app.id.slice(0, 12)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            {hasOverdue && (
+                              <span className="text-xs font-semibold bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full">
+                                Overdue
+                              </span>
+                            )}
+                            {allPaid && (
+                              <span className="text-xs font-semibold bg-green-50 text-green-700 border border-green-100 px-2.5 py-1 rounded-full">
+                                Fully Paid
+                              </span>
+                            )}
+                            {!allPaid && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => openModal(app, "month")}
+                                  className="text-xs font-bold bg-brand text-white px-3 py-1.5 rounded-xl hover:bg-brand-hover transition-colors"
+                                >
+                                  Pay Month
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openModal(app, "liquidate")}
+                                  className="text-xs font-bold border border-brand text-brand px-3 py-1.5 rounded-xl hover:bg-brand/5 transition-colors"
+                                >
+                                  Clear All
+                                </button>
+                              </>
+                            )}
                             <button
                               type="button"
-                              onClick={() => openModal(app, "month")}
-                              className="text-xs font-bold bg-brand text-white px-3 py-1.5 rounded-xl hover:bg-brand-hover transition-colors"
+                              onClick={() =>
+                                setExpandedId(isExpanded ? null : app.id)
+                              }
+                              aria-label={isExpanded ? "Collapse" : "Expand"}
+                              className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors"
                             >
-                              Pay Month
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                aria-hidden="true"
+                              >
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => openModal(app, "liquidate")}
-                              className="text-xs font-bold border border-brand text-brand px-3 py-1.5 rounded-xl hover:bg-brand/5 transition-colors"
-                            >
-                              Clear All
-                            </button>
-                          </>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedId(isExpanded ? null : app.id)
-                          }
-                          aria-label={isExpanded ? "Collapse" : "Expand"}
-                          className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors"
-                        >
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                            aria-hidden="true"
-                          >
-                            <polyline points="6 9 12 15 18 9" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
+                          </div>
+                        </div>
 
-                    <div className="mt-4 grid grid-cols-3 gap-3">
-                      <div>
-                        <p className="text-xs text-slate-500 mb-0.5">Total</p>
-                        <p className="text-sm font-bold text-slate-800">
-                          {fmtAmt(total)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 mb-0.5">Paid</p>
-                        <p className="text-sm font-bold text-green-600">
-                          {fmtAmt(paidAmt)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 mb-0.5">
-                          Remaining
-                        </p>
-                        <p className="text-sm font-bold text-brand">
-                          {fmtAmt(remaining)}
-                        </p>
-                      </div>
-                    </div>
+                        <div className="mt-4 grid grid-cols-3 gap-3">
+                          <div>
+                            <p className="text-xs text-slate-500 mb-0.5">
+                              Total
+                            </p>
+                            <p className="text-sm font-bold text-slate-800">
+                              {fmtAmt(total)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-0.5">
+                              Paid
+                            </p>
+                            <p className="text-sm font-bold text-green-600">
+                              {fmtAmt(paidAmt)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-0.5">
+                              Remaining
+                            </p>
+                            <p className="text-sm font-bold text-brand">
+                              {fmtAmt(remaining)}
+                            </p>
+                          </div>
+                        </div>
 
-                    <div className="mt-3">
-                      <div className="flex justify-between items-center text-xs text-slate-500 mb-1">
-                        <span>
-                          {paidCount} of {totalInstall} paid
-                        </span>
-                        <span className="font-semibold text-brand">
-                          {paidPct}%
-                        </span>
+                        <div className="mt-3">
+                          <div className="flex justify-between items-center text-xs text-slate-500 mb-1">
+                            <span>
+                              {paidCount} of {totalInstall} paid
+                            </span>
+                            <span className="font-semibold text-brand">
+                              {paidPct}%
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-brand transition-all duration-500"
+                              style={{ width: `${paidPct}%` }}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-brand transition-all duration-500"
-                          style={{ width: `${paidPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
 
-                  {isExpanded && (
-                    <div className="border-t border-slate-100">
-                      <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="bg-slate-50/70 border-b border-slate-100">
-                              {["#", "Due Date", "Amount", "Status"].map(
-                                (h, i) => (
-                                  <th
-                                    key={h}
-                                    className={`px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide ${i < 2 ? "text-left" : i === 3 ? "text-center" : "text-right"}`}
-                                  >
-                                    {h}
-                                  </th>
-                                ),
-                              )}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(app.schedule ?? []).map((s, idx) => {
+                      {isExpanded && (
+                        <div className="border-t border-slate-100">
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-slate-50/70 border-b border-slate-100">
+                                  {["#", "Due Date", "Amount", "Status"].map(
+                                    (h, i) => (
+                                      <th
+                                        key={h}
+                                        className={`px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide ${i < 2 ? "text-left" : i === 3 ? "text-center" : "text-right"}`}
+                                      >
+                                        {h}
+                                      </th>
+                                    ),
+                                  )}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(app.schedule ?? []).map((s, idx) => {
+                                  const pill =
+                                    STATUS_PILL[s.status] ??
+                                    STATUS_PILL.upcoming;
+                                  const isLast =
+                                    idx === (app.schedule?.length ?? 0) - 1;
+                                  return (
+                                    <tr
+                                      key={s.id}
+                                      className={`${!isLast ? "border-b border-slate-50" : ""} hover:bg-slate-50/50`}
+                                    >
+                                      <td className="px-5 py-3 text-slate-500 text-sm">
+                                        {s.installmentNumber}
+                                      </td>
+                                      <td className="px-5 py-3 text-slate-700 text-sm">
+                                        {fmtDate(s.dueDate)}
+                                      </td>
+                                      <td className="px-5 py-3 text-right font-semibold text-slate-800 text-sm">
+                                        {fmtAmt(s.totalAmount)}
+                                      </td>
+                                      <td className="px-5 py-3 text-center">
+                                        <span
+                                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pill.bg} ${pill.text}`}
+                                        >
+                                          <span
+                                            className={`w-1.5 h-1.5 rounded-full ${pill.dot}`}
+                                          />
+                                          {pill.label}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <div className="md:hidden divide-y divide-slate-100">
+                            {(app.schedule ?? []).map((s) => {
                               const pill =
                                 STATUS_PILL[s.status] ?? STATUS_PILL.upcoming;
-                              const isLast =
-                                idx === (app.schedule?.length ?? 0) - 1;
                               return (
-                                <tr
+                                <div
                                   key={s.id}
-                                  className={`${!isLast ? "border-b border-slate-50" : ""} hover:bg-slate-50/50`}
+                                  className="px-5 py-3 flex items-center justify-between gap-3"
                                 >
-                                  <td className="px-5 py-3 text-slate-500 text-sm">
-                                    {s.installmentNumber}
-                                  </td>
-                                  <td className="px-5 py-3 text-slate-700 text-sm">
-                                    {fmtDate(s.dueDate)}
-                                  </td>
-                                  <td className="px-5 py-3 text-right font-semibold text-slate-800 text-sm">
-                                    {fmtAmt(s.totalAmount)}
-                                  </td>
-                                  <td className="px-5 py-3 text-center">
-                                    <span
-                                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pill.bg} ${pill.text}`}
-                                    >
-                                      <span
-                                        className={`w-1.5 h-1.5 rounded-full ${pill.dot}`}
-                                      />
-                                      {pill.label}
+                                  <div className="flex items-center gap-2.5">
+                                    <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center shrink-0">
+                                      {s.installmentNumber}
                                     </span>
-                                  </td>
-                                </tr>
+                                    <div>
+                                      <p className="text-sm text-slate-700 font-medium">
+                                        {fmtDate(s.dueDate)}
+                                      </p>
+                                      <p className="text-xs text-slate-500">
+                                        {fmtAmt(s.totalAmount)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <span
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pill.bg} ${pill.text}`}
+                                  >
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full ${pill.dot}`}
+                                    />
+                                    {pill.label}
+                                  </span>
+                                </div>
                               );
                             })}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="md:hidden divide-y divide-slate-100">
-                        {(app.schedule ?? []).map((s) => {
-                          const pill =
-                            STATUS_PILL[s.status] ?? STATUS_PILL.upcoming;
-                          return (
-                            <div
-                              key={s.id}
-                              className="px-5 py-3 flex items-center justify-between gap-3"
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center shrink-0">
-                                  {s.installmentNumber}
-                                </span>
-                                <div>
-                                  <p className="text-sm text-slate-700 font-medium">
-                                    {fmtDate(s.dueDate)}
-                                  </p>
-                                  <p className="text-xs text-slate-500">
-                                    {fmtAmt(s.totalAmount)}
-                                  </p>
-                                </div>
-                              </div>
-                              <span
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pill.bg} ${pill.text}`}
-                              >
-                                <span
-                                  className={`w-1.5 h-1.5 rounded-full ${pill.dot}`}
-                                />
-                                {pill.label}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          <Pagination
-            page={repayPage}
-            totalPages={Math.ceil(apps.length / REPAY_LIMIT)}
-            total={apps.length}
-            limit={REPAY_LIMIT}
-            onPageChange={setRepayPage}
-          />
-        </div>
-      )}
+                  );
+                })}
+                {totalRepay > 10 && (
+                  <Pagination
+                    page={repayPage}
+                    totalPages={totalRepayPages}
+                    total={totalRepay}
+                    limit={repayLimit}
+                    onPageChange={setRepayPage}
+                  />
+                )}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {modal && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4 pb-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="pay-modal-title"
@@ -579,7 +679,7 @@ const RepaymentDashboard: React.FC = () => {
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setModal(null)}
           />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in-up max-h-[90vh] flex flex-col">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <h3
