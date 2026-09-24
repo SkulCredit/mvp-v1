@@ -1,6 +1,8 @@
+import { Op } from "sequelize";
 import { ParentRepository } from "../repositories";
 import { Student, LoanApplication, LoanLedger } from "../models/index";
 import ApiError from "../utils/apiError";
+import schoolTermService from "./schoolTerm.service";
 import applicationService from "../integrations/lendsqr/application.service";
 import { buildInitialStateMachine } from "../models/LoanLedger";
 import { publishLoanBooking } from "../queues/loan.queue";
@@ -52,6 +54,30 @@ class LoanService {
     const student = await Student.findByPk(data.studentId);
     if (!student || student.parentId !== parent.id) {
       throw new ApiError(400, "Invalid student record");
+    }
+
+    const activeTerm = await schoolTermService.getActiveTerm();
+    if (activeTerm) {
+      const existingApplication = await LoanApplication.findOne({
+        where: {
+          studentId: student.id,
+          status: { [Op.notIn]: ["rejected", "cancelled"] },
+          createdAt: {
+            [Op.gte]: new Date(activeTerm.portalOpeningDate),
+            [Op.lt]: new Date(
+              new Date(activeTerm.portalCloseDate).getTime() +
+                24 * 60 * 60 * 1000,
+            ),
+          },
+        },
+      });
+
+      if (existingApplication) {
+        throw new ApiError(
+          409,
+          `You've already submitted an application for ${student.firstName} ${student.lastName} this term (${activeTerm.termName} ${activeTerm.sessionName}). A student's fees can only be financed once per term.`,
+        );
+      }
     }
 
     const referenceNumber = `SKC-${Date.now()}-${Math.random()

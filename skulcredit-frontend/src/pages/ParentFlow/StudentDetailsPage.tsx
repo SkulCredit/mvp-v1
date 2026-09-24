@@ -1722,30 +1722,54 @@ const StudentDetailsPage: React.FC = () => {
   );
 
   useEffect(() => {
-    parentService
-      .getApplications()
-      .then((data) => {
-        const raw = Array.isArray(data)
-          ? (data as Array<{
-              studentId?: string;
-              status?: string;
-              createdAt?: string;
-            }>)
-          : [];
+    // Fetch the active term and all applications concurrently, then compute
+    // which students already have a non-cancelled/rejected application within
+    // the real portal window.
+    Promise.all([
+      parentService.getCurrentTerm() as Promise<{
+        isOpen: boolean;
+        term: {
+          portalOpenDate: string;
+          portalCloseDate: string;
+        } | null;
+      }>,
+      parentService.getApplications(1, 500) as Promise<{
+        applications: Array<{
+          studentId?: string;
+          status?: string;
+          createdAt?: string;
+        }>;
+      }>,
+    ])
+      .then(([termData, appData]) => {
+        const apps = appData?.applications ?? [];
+        if (apps.length === 0) return;
 
-        const now = new Date();
-        const termMonthStart = Math.floor(now.getMonth() / 4) * 4;
-        const termStart = new Date(now.getFullYear(), termMonthStart, 1);
-        const termEnd = new Date(now.getFullYear(), termMonthStart + 4, 1);
         const INACTIVE = new Set(["rejected", "cancelled"]);
-
         const blocked = new Set<string>();
-        for (const app of raw) {
-          if (!app.studentId || !app.createdAt) continue;
-          if (INACTIVE.has(app.status ?? "")) continue;
-          const d = new Date(app.createdAt);
-          if (d >= termStart && d < termEnd) blocked.add(app.studentId);
+
+        if (termData?.isOpen && termData.term) {
+          // Use the real portal window from the backend
+          const termStart = new Date(termData.term.portalOpenDate);
+          const termEnd = new Date(
+            new Date(termData.term.portalCloseDate).getTime() +
+              24 * 60 * 60 * 1000,
+          );
+          for (const app of apps) {
+            if (!app.studentId || !app.createdAt) continue;
+            if (INACTIVE.has(app.status ?? "")) continue;
+            const d = new Date(app.createdAt);
+            if (d >= termStart && d < termEnd) blocked.add(app.studentId);
+          }
+        } else {
+          // Portal is closed — block all students with any active application
+          // so they can't re-apply until the next term opens
+          for (const app of apps) {
+            if (!app.studentId) continue;
+            if (!INACTIVE.has(app.status ?? "")) blocked.add(app.studentId);
+          }
         }
+
         setBlockedStudentIds(blocked);
       })
       .catch(() => {});
@@ -1766,7 +1790,7 @@ const StudentDetailsPage: React.FC = () => {
             gradeLevel?: string;
             tuitionAmount?: number;
             schoolId?: string;
-            school?: { id?: string; schoolName?: string };
+            school?: { id?: string; name?: string };
           }>
         ).map((s) => ({
           id: s.id,
@@ -1775,7 +1799,7 @@ const StudentDetailsPage: React.FC = () => {
           gradeLevel: s.gradeLevel,
           tuitionAmount: s.tuitionAmount ?? 0,
           schoolId: s.school?.id ?? s.schoolId,
-          schoolName: s.school?.schoolName,
+          schoolName: s.school?.name,
           photo: undefined,
         }));
 

@@ -657,28 +657,33 @@ interface VerifyItem {
 }
 
 const VerificationTracker: React.FC<{ items: VerifyItem[] }> = ({ items }) => {
-  const iconFor = (status: VerifyItemStatus) => {
-    if (status === "verified" || status === "passed") {
-      return (
-        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+  const nodeFor = (status: VerifyItemStatus, isLast: boolean) => {
+    const done = status === "verified" || status === "passed";
+    const active = status === "verifying" || status === "checking";
+    const failed = status === "error" || status === "failed";
+
+    let nodeEl: React.ReactNode;
+
+    if (done) {
+      nodeEl = (
+        <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center shrink-0 z-10 shadow-sm">
           <svg
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#16a34a"
-            strokeWidth="2.5"
+            stroke="white"
+            strokeWidth="2.8"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="w-4 h-4"
+            className="w-5 h-5"
             aria-hidden="true"
           >
             <path d="M20 6L9 17l-5-5" />
           </svg>
         </div>
       );
-    }
-    if (status === "verifying" || status === "checking") {
-      return (
-        <div className="w-8 h-8 rounded-full bg-[#8B1C53]/10 flex items-center justify-center shrink-0">
+    } else if (active) {
+      nodeEl = (
+        <div className="w-10 h-10 rounded-full bg-[#8B1C53]/10 border-2 border-[#8B1C53] flex items-center justify-center shrink-0 z-10">
           <svg
             className="w-4 h-4 text-[#8B1C53] animate-spin"
             fill="none"
@@ -701,10 +706,9 @@ const VerificationTracker: React.FC<{ items: VerifyItem[] }> = ({ items }) => {
           </svg>
         </div>
       );
-    }
-    if (status === "error" || status === "failed") {
-      return (
-        <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+    } else if (failed) {
+      nodeEl = (
+        <div className="w-10 h-10 rounded-full bg-red-50 border-2 border-red-400 flex items-center justify-center shrink-0 z-10">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -720,80 +724,66 @@ const VerificationTracker: React.FC<{ items: VerifyItem[] }> = ({ items }) => {
           </svg>
         </div>
       );
+    } else {
+      nodeEl = (
+        <div className="w-10 h-10 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center shrink-0 z-10">
+          <div className="w-2.5 h-2.5 rounded-full bg-gray-300" />
+        </div>
+      );
     }
+
     return (
-      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#9ca3af"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="w-4 h-4"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="8" x2="12" y2="12" />
-          <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
+      <div className="flex flex-col items-center self-stretch">
+        {nodeEl}
+        {!isLast && (
+          <div
+            className={`w-0.5 flex-1 mt-1 mb-1 ${done ? "bg-green-400" : "bg-gray-200"}`}
+          />
+        )}
       </div>
     );
   };
 
-  const labelFor = (status: VerifyItemStatus) => {
+  const labelCls = (status: VerifyItemStatus) => {
     if (status === "verified" || status === "passed")
-      return {
-        text: "Verified",
-        cls: "text-green-600 bg-green-50 border-green-200",
-      };
+      return "text-gray-900 font-bold";
     if (status === "verifying" || status === "checking")
-      return {
-        text: "In Progress",
-        cls: "text-[#8B1C53] bg-[#8B1C53]/5 border-[#8B1C53]/20",
-      };
+      return "text-[#8B1C53] font-bold";
     if (status === "error" || status === "failed")
-      return { text: "Failed", cls: "text-red-600 bg-red-50 border-red-200" };
-    return { text: "Pending", cls: "text-gray-400 bg-gray-50 border-gray-200" };
+      return "text-red-600 font-bold";
+    return "text-gray-400 font-semibold";
+  };
+
+  const sublabelCls = (status: VerifyItemStatus) => {
+    if (status === "verified" || status === "passed") return "text-gray-500";
+    if (status === "verifying" || status === "checking")
+      return "text-[#8B1C53]/70";
+    if (status === "error" || status === "failed") return "text-red-400";
+    return "text-gray-300";
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-3">
-      <div className="flex items-center gap-2 mb-1">
-        <div className="w-7 h-7 rounded-full bg-[#8B1C53]/10 flex items-center justify-center shrink-0">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#8B1C53"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="w-3.5 h-3.5"
-            aria-hidden="true"
-          >
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-        </div>
-        <p className="text-sm font-semibold text-gray-800">
-          Verification Progress
-        </p>
-      </div>
+    <div className="rounded-xl border border-gray-200 bg-white px-5 py-5 flex flex-col">
+      <p className="text-sm font-bold text-gray-800 mb-4">
+        Verification Timeline
+      </p>
       {items.map((item, i) => {
-        const badge = labelFor(item.status);
+        const isLast = i === items.length - 1;
         return (
-          <div key={i} className="flex items-center gap-3">
-            {iconFor(item.status)}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-800 leading-tight">
+          <div key={i} className="flex gap-4 min-h-[56px]">
+            {nodeFor(item.status, isLast)}
+            <div
+              className={`flex flex-col justify-start pt-1.5 pb-4 ${isLast ? "pb-0" : ""}`}
+            >
+              <p className={`text-sm leading-tight ${labelCls(item.status)}`}>
                 {item.label}
               </p>
-              <p className="text-xs text-gray-400 mt-0.5">{item.sublabel}</p>
+              <p
+                className={`text-xs mt-0.5 uppercase tracking-wide ${sublabelCls(item.status)}`}
+              >
+                {item.sublabel}
+              </p>
             </div>
-            <span
-              className={`shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${badge.cls}`}
-            >
-              {badge.text}
-            </span>
           </div>
         );
       })}
@@ -2489,8 +2479,18 @@ const EligibilityTestPage: React.FC = () => {
                   label: "BVN / NIN Verification",
                   sublabel:
                     state.step2.bvnOrNin === "bvn"
-                      ? "Bank Verification Number"
-                      : "National Identification Number",
+                      ? state.step2.bvnStatus === "verified"
+                        ? "just now"
+                        : state.step2.bvnStatus === "error"
+                          ? "verification failed"
+                          : "awaiting submission"
+                      : state.step2.ninStatus === "verified"
+                        ? "just now"
+                        : state.step2.ninStatus === "verifying"
+                          ? "in progress…"
+                          : state.step2.ninStatus === "error"
+                            ? "verification failed"
+                            : "awaiting submission",
                   status:
                     state.step2.bvnOrNin === "bvn"
                       ? state.step2.bvnStatus
@@ -2500,7 +2500,14 @@ const EligibilityTestPage: React.FC = () => {
                 },
                 {
                   label: "Credit Score Check",
-                  sublabel: "Automated credit worthiness assessment",
+                  sublabel:
+                    state.step2.scoreCheckStatus === "passed"
+                      ? "just now"
+                      : state.step2.scoreCheckStatus === "failed"
+                        ? "score below threshold"
+                        : state.step2.scoreCheckStatus === "checking"
+                          ? "in progress…"
+                          : "runs on submit",
                   status:
                     state.step2.scoreCheckStatus === "checking"
                       ? "checking"
@@ -2512,7 +2519,14 @@ const EligibilityTestPage: React.FC = () => {
                 },
                 {
                   label: "Loan Score Evaluation",
-                  sublabel: "Final approval eligibility rating",
+                  sublabel:
+                    state.step2.scoreCheckStatus === "passed"
+                      ? "just now"
+                      : state.step2.scoreCheckStatus === "failed"
+                        ? "not eligible at this time"
+                        : state.step2.scoreCheckStatus === "checking"
+                          ? "in progress…"
+                          : "runs after credit check",
                   status:
                     state.step2.scoreCheckStatus === "passed"
                       ? "passed"

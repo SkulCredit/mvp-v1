@@ -21,7 +21,7 @@ const TypingIndicator: React.FC = () => (
   <div className="flex items-start gap-2.5">
     <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 mt-0.5">
       <img
-        src="/bot-image.jpeg"
+        src="/bot-image.png"
         alt="Support bot"
         className="w-full h-full object-cover"
       />
@@ -132,7 +132,7 @@ const ChatBot: React.FC = () => {
           <div className="flex items-center gap-3 px-5 py-4 bg-brand">
             <div className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center shrink-0">
               <img
-                src="/bot-image.jpeg"
+                src="/bot-image.png"
                 alt="Support bot"
                 className="w-full h-full object-cover"
               />
@@ -190,7 +190,7 @@ const ChatBot: React.FC = () => {
                   <div className="flex items-start gap-2.5">
                     <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 mt-0.5">
                       <img
-                        src="/bot-image.jpeg"
+                        src="/bot-image.png"
                         alt="Support bot"
                         className="w-full h-full object-cover"
                       />

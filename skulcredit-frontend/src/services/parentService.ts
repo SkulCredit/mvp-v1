@@ -128,6 +128,11 @@ export const parentService = {
     return response.data.data;
   },
 
+  getCurrentTerm: async (): Promise<unknown> => {
+    const response = await apiClient.get("/parents/current-term");
+    return response.data.data;
+  },
+
   getApplicationDetails: async (id: string): Promise<unknown> => {
     const response = await apiClient.get(`/parents/applications/${id}`);
     return response.data.data;

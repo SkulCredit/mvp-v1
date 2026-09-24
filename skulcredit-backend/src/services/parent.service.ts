@@ -24,9 +24,6 @@ import paystackService from "../integrations/paystack/paystack.service";
 import identityService, {
   NinVerificationResponse,
 } from "../integrations/lendsqr/identity.service";
-import customerService, {
-  CustomerPayload,
-} from "../integrations/lendsqr/customer.service";
 import localStorageService from "../integrations/storage/local.service";
 import logger from "../config/logger";
 import { buildInitialStateMachine } from "../models/LoanLedger";
@@ -119,40 +116,9 @@ class ParentService {
     },
   ) {
     const parent = await ParentRepository.findOne({ userId });
-    const user = await UserRepository.findById(userId);
     if (!parent) throw new ApiError(404, "Parent profile not found");
-    const customerPayload: CustomerPayload = {
-      phone_number: user!.phoneNumber ?? "",
-      email: user!.email,
-      bvn: kycData.bvn,
-      bvn_phone_number: kycData.bvn ? (user!.phoneNumber ?? "") : undefined,
-      dob: kycData.dob,
-      state: kycData.state,
-      lga: kycData.lga,
-      city: kycData.city,
-      address: kycData.address,
-      photo_url: kycData.photoUrl,
-      account_number: kycData.accountNumber,
-      bank_code: kycData.bankCode,
-      documents: kycData.documents,
-    };
 
-    const lendsqrResponse =
-      await customerService.createCustomer(customerPayload);
-    logger.info(
-      "Lendsqr createCustomer response: " + JSON.stringify(lendsqrResponse),
-    );
-
-    const lendsqrUser =
-      lendsqrResponse.data?.users?.[0] ??
-      lendsqrResponse.data?.user ??
-      (lendsqrResponse.data?.id ? lendsqrResponse.data : null);
-
-    const lendsqrCustomerId = lendsqrUser
-      ? String((lendsqrUser as { id?: unknown }).id ?? "registered")
-      : "registered";
-
-    return parent.update({
+    const updated = await parent.update({
       bvn: kycData.bvn ?? parent.bvn,
       nin: kycData.nin ?? parent.nin,
       dob: kycData.dob ?? null,
@@ -162,7 +128,7 @@ class ParentService {
       addressStreet: kycData.address ?? null,
       profilePhotoUrl: kycData.photoUrl ?? null,
       kycStatus: "approved",
-      lendsqrCustomerId,
+      lendsqrCustomerId: parent.lendsqrCustomerId ?? "registered",
       ...(kycData.relationship !== undefined && {
         relationship: kycData.relationship,
       }),
@@ -176,11 +142,13 @@ class ParentService {
         monthlyIncome: kycData.monthlyIncome,
       }),
     });
+
     NotificationPublisher.accountAction(
       userId,
       "Your identity has been verified and KYC is complete. You can now apply for school fee financing.",
     );
-    return parent;
+
+    return updated;
   }
 
   async verifyNin(nin: string): Promise<NinVerificationResponse["data"]> {
@@ -374,7 +342,14 @@ class ParentService {
         {
           model: CatalogSchool,
           as: "school",
-          attributes: ["id", "name"],
+          attributes: [
+            "id",
+            "name",
+            "isRegistered",
+            "tier",
+            "isActive",
+            "serviceChargeRate",
+          ],
         },
       ],
       order: [["createdAt", "DESC"]],
@@ -391,7 +366,14 @@ class ParentService {
         {
           model: CatalogSchool,
           as: "school",
-          attributes: ["id", "name"],
+          attributes: [
+            "id",
+            "name",
+            "isRegistered",
+            "tier",
+            "isActive",
+            "serviceChargeRate",
+          ],
         },
       ],
     });
@@ -869,46 +851,26 @@ class ParentService {
       ...(photoUrl ? { profilePhotoUrl: photoUrl } : {}),
     });
     if (!parent.lendsqrCustomerId) {
-      const customerPayload: CustomerPayload = {
-        phone_number: user.phoneNumber ?? "",
-        email: user.email,
-        bvn: payload.bvn,
-        bvn_phone_number: payload.bvn ? (user.phoneNumber ?? "") : undefined,
-        dob: payload.dob,
-        state: payload.addressState,
-        lga: payload.addressLga,
-        city: payload.addressCity,
-        address: payload.addressStreet,
-        photo_url: photoUrl ?? undefined,
-        account_number: payload.accountNumber,
-        bank_code: payload.bankCode,
-        documents: uploadedDocUrls,
-      };
-
-      const lendsqrRes = await customerService.createCustomer(customerPayload);
-      logger.info(
-        "Lendsqr createCustomer response: " + JSON.stringify(lendsqrRes),
-      );
-      const lendsqrUser =
-        lendsqrRes.data?.users?.[0] ??
-        lendsqrRes.data?.user ??
-        (lendsqrRes.data?.id ? lendsqrRes.data : null);
-
-      const lendsqrCustomerId = lendsqrUser
-        ? String((lendsqrUser as { id?: unknown }).id ?? "registered")
-        : "registered";
-
       await parent.update({
         bvn: payload.bvn ?? parent.bvn,
         nin: payload.nin ?? parent.nin,
         kycStatus: "approved",
-        lendsqrCustomerId,
+        lendsqrCustomerId: "registered",
       });
     }
 
     const freshParent = await ParentRepository.findOne({ userId }, {
       scope: "withSensitive",
     } as never);
+
+    const activeTerm = await schoolTermService.getActiveTerm();
+
+    if (!activeTerm) {
+      throw new ApiError(
+        403,
+        "The application portal is currently closed. Please check back when the next school term opens.",
+      );
+    }
 
     const createdApplications: (typeof LoanApplication.prototype)[] = [];
 
@@ -926,6 +888,27 @@ class ParentService {
         gradeLevel: payload.gradeLevel,
         tuitionAmount: payload.tuitionAmount,
       });
+
+      const existingApplication = await LoanApplication.findOne({
+        where: {
+          studentId: student.id,
+          status: { [Op.notIn]: ["rejected", "cancelled"] },
+          createdAt: {
+            [Op.gte]: new Date(activeTerm.portalOpeningDate),
+            [Op.lt]: new Date(
+              new Date(activeTerm.portalCloseDate).getTime() +
+                24 * 60 * 60 * 1000,
+            ),
+          },
+        },
+      });
+
+      if (existingApplication) {
+        throw new ApiError(
+          409,
+          `An application for ${student.firstName} ${student.lastName} already exists this term (${activeTerm.termName} ${activeTerm.sessionName}). A student's fees can only be financed once per term.`,
+        );
+      }
 
       const referenceNumber = `SKC-${Date.now()}-${Math.random()
         .toString(36)
