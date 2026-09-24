@@ -1207,6 +1207,9 @@ const ApplicationDetailView: React.FC<{
   );
 };
 
+const PAGE_SIZE_OPTIONS = [10, 30, 50, 100, 500] as const;
+type PageSizeOption = (typeof PAGE_SIZE_OPTIONS)[number];
+
 const MyApplicationsPage: React.FC = () => {
   const navigate = useNavigate();
   const [applications, setApplications] = useState<Application[]>([]);
@@ -1216,9 +1219,9 @@ const MyApplicationsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const PAGE_LIMIT = 10;
+  const [pageLimit, setPageLimit] = useState<PageSizeOption>(10);
 
-  const fetchPage = useCallback((p: number) => {
+  const fetchPage = useCallback((p: number, limit: PageSizeOption) => {
     setLoading(true);
     setFetchError(null);
     (
@@ -1226,7 +1229,7 @@ const MyApplicationsPage: React.FC = () => {
         p: number,
         l: number,
       ) => Promise<unknown>
-    )(p, PAGE_LIMIT)
+    )(p, limit)
       .then((data) => {
         const d = data as {
           applications?: unknown[];
@@ -1249,8 +1252,13 @@ const MyApplicationsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchPage(1);
+    fetchPage(1, pageLimit);
   }, [fetchPage]);
+
+  const handlePageLimitChange = (newLimit: PageSizeOption) => {
+    setPageLimit(newLimit);
+    fetchPage(1, newLimit);
+  };
 
   const handleNewApplication = () => navigate("/parent/details");
 
@@ -1515,10 +1523,7 @@ const MyApplicationsPage: React.FC = () => {
           <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-gray-800 shrink-0">
-                Your Applications{" "}
-                <span className="text-gray-400 font-semibold">
-                  ({filtered.length})
-                </span>
+                Your Applications
               </h3>
               {hasDateFilter && (
                 <span className="text-xs font-medium text-brand truncate">
@@ -1526,6 +1531,44 @@ const MyApplicationsPage: React.FC = () => {
                   {dateRange.to || "any"}
                 </span>
               )}
+            </div>
+
+            <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+              <p className="text-xs text-gray-400">
+                Showing{" "}
+                <span className="font-semibold text-gray-600">
+                  {filtered.length}
+                </span>{" "}
+                of <span className="font-semibold text-gray-600">{total}</span>{" "}
+                applications
+              </p>
+              <div className="flex items-center gap-2 shrink-0">
+                <label
+                  htmlFor="apps-page-size"
+                  className="text-xs text-gray-500 whitespace-nowrap"
+                >
+                  Show
+                </label>
+                <select
+                  id="apps-page-size"
+                  value={pageLimit}
+                  onChange={(e) =>
+                    handlePageLimitChange(
+                      Number(e.target.value) as PageSizeOption,
+                    )
+                  }
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 focus:border-brand focus:ring-2 focus:ring-brand/10 outline-none cursor-pointer"
+                >
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-500 whitespace-nowrap">
+                  per page
+                </span>
+              </div>
             </div>
 
             {filtered.length === 0 ? (
@@ -1582,13 +1625,15 @@ const MyApplicationsPage: React.FC = () => {
             ) : (
               <ApplicationsTable apps={filtered} onRowClick={handleRowClick} />
             )}
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              total={total}
-              limit={PAGE_LIMIT}
-              onPageChange={fetchPage}
-            />
+            {total > 10 && (
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                limit={pageLimit}
+                onPageChange={(p) => fetchPage(p, pageLimit)}
+              />
+            )}
           </div>
           <div className="rounded-2xl border border-pink-200 bg-[#FFF5F8] px-6 py-5 flex items-center justify-between gap-4">
             <div>
