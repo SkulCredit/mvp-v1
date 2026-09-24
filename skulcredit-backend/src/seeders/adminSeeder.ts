@@ -20,14 +20,12 @@ export async function seedAdmin(): Promise<void> {
   const password = process.env["ADMIN_PASSWORD"] ?? "SkulCreditAdmin@123";
   const phone = process.env["ADMIN_PHONE"] ?? "08033333333";
 
-  // ── skip if already exists ────────────────────────────────────────────────
   const existing = await UserRepository.findOne({ email });
   if (existing) {
     logger.info(`Admin account (${email}) already exists — skipping seed`);
     return;
   }
 
-  // ── create ────────────────────────────────────────────────────────────────
   await UserRepository.create({
     email,
     password: await bcrypt.hash(password, 10),

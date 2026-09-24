@@ -402,6 +402,14 @@ const tenorFromPlan = (plan: string): number => {
   return 6;
 };
 
+interface SpouseData {
+  fullName: string;
+  email: string;
+  phone: string;
+  phoneCountry: Country;
+  employerType: string;
+}
+
 interface Step1Data {
   fullName: string;
   email: string;
@@ -423,6 +431,7 @@ interface Step1Data {
   photoPreview: string;
   photoFile: File | null;
   photoUploading: boolean;
+  spouse: SpouseData;
 }
 
 interface UploadedDoc {
@@ -446,14 +455,15 @@ interface Step2Data {
   companyName: string;
   pendingFile: File | null;
   uploadedDocs: UploadedDoc[];
+  scoreCheckStatus: "idle" | "checking" | "passed" | "failed";
 }
 
 interface Step3Data {
-  institutionTypeId: string; 
-  institutionType: string; 
-  schoolId: string; 
-  schoolName: string; 
-  gradeLevel: string; 
+  institutionTypeId: string;
+  institutionType: string;
+  schoolId: string;
+  schoolName: string;
+  gradeLevel: string;
   repaymentPlan: string;
   academicSession: string;
   tuitionAmount: string;
@@ -631,6 +641,166 @@ const SelectWithChevron: React.FC<{
   </div>
 );
 
+type VerifyItemStatus =
+  | "idle"
+  | "verifying"
+  | "verified"
+  | "error"
+  | "checking"
+  | "passed"
+  | "failed";
+
+interface VerifyItem {
+  label: string;
+  sublabel: string;
+  status: VerifyItemStatus;
+}
+
+const VerificationTracker: React.FC<{ items: VerifyItem[] }> = ({ items }) => {
+  const iconFor = (status: VerifyItemStatus) => {
+    if (status === "verified" || status === "passed") {
+      return (
+        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#16a34a"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-4 h-4"
+            aria-hidden="true"
+          >
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        </div>
+      );
+    }
+    if (status === "verifying" || status === "checking") {
+      return (
+        <div className="w-8 h-8 rounded-full bg-[#8B1C53]/10 flex items-center justify-center shrink-0">
+          <svg
+            className="w-4 h-4 text-[#8B1C53] animate-spin"
+            fill="none"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v8z"
+            />
+          </svg>
+        </div>
+      );
+    }
+    if (status === "error" || status === "failed") {
+      return (
+        <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#ef4444"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-4 h-4"
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </div>
+      );
+    }
+    return (
+      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#9ca3af"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-4 h-4"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      </div>
+    );
+  };
+
+  const labelFor = (status: VerifyItemStatus) => {
+    if (status === "verified" || status === "passed")
+      return {
+        text: "Verified",
+        cls: "text-green-600 bg-green-50 border-green-200",
+      };
+    if (status === "verifying" || status === "checking")
+      return {
+        text: "In Progress",
+        cls: "text-[#8B1C53] bg-[#8B1C53]/5 border-[#8B1C53]/20",
+      };
+    if (status === "error" || status === "failed")
+      return { text: "Failed", cls: "text-red-600 bg-red-50 border-red-200" };
+    return { text: "Pending", cls: "text-gray-400 bg-gray-50 border-gray-200" };
+  };
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-3">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-7 h-7 rounded-full bg-[#8B1C53]/10 flex items-center justify-center shrink-0">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#8B1C53"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-3.5 h-3.5"
+            aria-hidden="true"
+          >
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+        </div>
+        <p className="text-sm font-semibold text-gray-800">
+          Verification Progress
+        </p>
+      </div>
+      {items.map((item, i) => {
+        const badge = labelFor(item.status);
+        return (
+          <div key={i} className="flex items-center gap-3">
+            {iconFor(item.status)}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800 leading-tight">
+                {item.label}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">{item.sublabel}</p>
+            </div>
+            <span
+              className={`shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${badge.cls}`}
+            >
+              {badge.text}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const EligibilityTestPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -799,6 +969,13 @@ const EligibilityTestPage: React.FC = () => {
       photoPreview: "",
       photoFile: null,
       photoUploading: false,
+      spouse: {
+        fullName: "",
+        email: "",
+        phone: "",
+        phoneCountry: "NG" as Country,
+        employerType: "",
+      },
     },
     step2: {
       bvnOrNin: "bvn",
@@ -812,6 +989,7 @@ const EligibilityTestPage: React.FC = () => {
       companyName: "",
       pendingFile: null,
       uploadedDocs: [],
+      scoreCheckStatus: "idle",
     },
     step3: {
       institutionTypeId: "",
@@ -977,6 +1155,15 @@ const EligibilityTestPage: React.FC = () => {
     if (!s.addressStreet.trim())
       e.addressStreet = "Street address is required.";
     if (!s.photoUrl && !s.photoFile) e.photo = "Please upload your photo.";
+    if (!s.spouse.fullName.trim())
+      e.spouseFullName = "Spouse full name is required.";
+    if (!s.spouse.email.trim()) e.spouseEmail = "Spouse email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.spouse.email.trim()))
+      e.spouseEmail = "Enter a valid email address.";
+    if (!s.spouse.phone.trim())
+      e.spousePhone = "Spouse phone number is required.";
+    if (!s.spouse.employerType)
+      e.spouseEmployerType = "Spouse employment type is required.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -1043,6 +1230,7 @@ const EligibilityTestPage: React.FC = () => {
 
     if (bvnToCheck && /^\d{11}$/.test(bvnToCheck)) {
       patch("isScoreChecking", true);
+      patch("step2", { ...state.step2, scoreCheckStatus: "checking" });
       try {
         const res = await apiClient.post<{
           data: {
@@ -1064,11 +1252,19 @@ const EligibilityTestPage: React.FC = () => {
             ...prev,
             isScoreChecking: false,
             scoreBlocked: true,
+            step2: { ...prev.step2, scoreCheckStatus: "failed" },
           }));
           return false;
         }
+        setState((prev) => ({
+          ...prev,
+          step2: { ...prev.step2, scoreCheckStatus: "passed" },
+        }));
       } catch {
-
+        setState((prev) => ({
+          ...prev,
+          step2: { ...prev.step2, scoreCheckStatus: "idle" },
+        }));
       } finally {
         patch("isScoreChecking", false);
       }
@@ -1170,7 +1366,7 @@ const EligibilityTestPage: React.FC = () => {
       const studentSaveErrors: string[] = [];
 
       for (const st of state.step4.students) {
-        if (!st.fullName.trim()) continue; 
+        if (!st.fullName.trim()) continue;
         const nameParts = st.fullName.trim().split(/\s+/);
         const firstName = nameParts[0] ?? "";
         const lastName = nameParts.slice(1).join(" ") || firstName;
@@ -1740,7 +1936,6 @@ const EligibilityTestPage: React.FC = () => {
     );
   }
 
-
   return (
     <div className="flex flex-col min-h-full animate-fade-in-up">
       <Toast
@@ -1910,7 +2105,6 @@ const EligibilityTestPage: React.FC = () => {
                   </div>
                 </div>
               ) : (
-  
                 <div
                   className={`rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 py-8 cursor-pointer transition-colors border-gray-300 hover:border-[#8B1C53]/50 bg-white ${errors.photo ? "border-red-400 bg-red-50" : ""}`}
                   onClick={() => photoFileInputRef.current?.click()}
@@ -2020,6 +2214,104 @@ const EligibilityTestPage: React.FC = () => {
                   placeholder="-Select your income range-"
                   options={INCOME_RANGES}
                   error={errors.monthlyIncome}
+                />
+              </Field>
+            </div>
+
+            <div className="rounded-xl border border-[#8B1C53]/20 bg-white p-5 flex flex-col gap-5">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">
+                  Spouse / Partner Details{" "}
+                  <span className="text-red-500">*</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Provide your spouse or partner's information. All fields are
+                  required.
+                </p>
+              </div>
+              <Field
+                label="Spouse Full Name"
+                required
+                error={errors.spouseFullName}
+              >
+                <input
+                  value={state.step1.spouse.fullName}
+                  placeholder="E.g. Amaka Johnson"
+                  onChange={(e) => {
+                    patch("step1", {
+                      ...state.step1,
+                      spouse: {
+                        ...state.step1.spouse,
+                        fullName: e.target.value,
+                      },
+                    });
+                    clearErr("spouseFullName");
+                  }}
+                  className={inputCls(errors.spouseFullName)}
+                />
+              </Field>
+              <Field
+                label="Spouse Email Address"
+                required
+                error={errors.spouseEmail}
+              >
+                <input
+                  type="email"
+                  value={state.step1.spouse.email}
+                  placeholder="E.g. amaka@example.com"
+                  onChange={(e) => {
+                    patch("step1", {
+                      ...state.step1,
+                      spouse: { ...state.step1.spouse, email: e.target.value },
+                    });
+                    clearErr("spouseEmail");
+                  }}
+                  className={inputCls(errors.spouseEmail)}
+                />
+              </Field>
+              <Field
+                label="Spouse Phone Number"
+                required
+                error={errors.spousePhone}
+                hint="Enter country code and phone number"
+              >
+                <PhoneField
+                  value={state.step1.spouse.phone}
+                  country={state.step1.spouse.phoneCountry}
+                  placeholder="Enter spouse phone number"
+                  error={!!errors.spousePhone}
+                  onChange={(v) => {
+                    patch("step1", {
+                      ...state.step1,
+                      spouse: { ...state.step1.spouse, phone: v },
+                    });
+                    clearErr("spousePhone");
+                  }}
+                  onCountryChange={(c) => {
+                    patch("step1", {
+                      ...state.step1,
+                      spouse: { ...state.step1.spouse, phoneCountry: c },
+                    });
+                  }}
+                />
+              </Field>
+              <Field
+                label="Spouse Employment Type"
+                required
+                error={errors.spouseEmployerType}
+              >
+                <SelectWithChevron
+                  value={state.step1.spouse.employerType}
+                  onChange={(v) => {
+                    patch("step1", {
+                      ...state.step1,
+                      spouse: { ...state.step1.spouse, employerType: v },
+                    });
+                    clearErr("spouseEmployerType");
+                  }}
+                  placeholder="-Select employment type-"
+                  options={EMPLOYER_TYPES}
+                  error={errors.spouseEmployerType}
                 />
               </Field>
             </div>
@@ -2191,6 +2483,47 @@ const EligibilityTestPage: React.FC = () => {
                 Verify your identity and upload required documents
               </p>
             </div>
+            <VerificationTracker
+              items={[
+                {
+                  label: "BVN / NIN Verification",
+                  sublabel:
+                    state.step2.bvnOrNin === "bvn"
+                      ? "Bank Verification Number"
+                      : "National Identification Number",
+                  status:
+                    state.step2.bvnOrNin === "bvn"
+                      ? state.step2.bvnStatus
+                      : state.step2.ninStatus === "verifying"
+                        ? "verifying"
+                        : state.step2.ninStatus,
+                },
+                {
+                  label: "Credit Score Check",
+                  sublabel: "Automated credit worthiness assessment",
+                  status:
+                    state.step2.scoreCheckStatus === "checking"
+                      ? "checking"
+                      : state.step2.scoreCheckStatus === "passed"
+                        ? "passed"
+                        : state.step2.scoreCheckStatus === "failed"
+                          ? "failed"
+                          : "idle",
+                },
+                {
+                  label: "Loan Score Evaluation",
+                  sublabel: "Final approval eligibility rating",
+                  status:
+                    state.step2.scoreCheckStatus === "passed"
+                      ? "passed"
+                      : state.step2.scoreCheckStatus === "failed"
+                        ? "failed"
+                        : state.step2.scoreCheckStatus === "checking"
+                          ? "checking"
+                          : "idle",
+                },
+              ]}
+            />
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
               <div className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200">
@@ -2821,7 +3154,6 @@ const EligibilityTestPage: React.FC = () => {
                     </option>
                     {classLevelGroups.map((group) =>
                       group.subLevelGroup ? (
-
                         <optgroup
                           key={group.subLevelGroup}
                           label={group.subLevelGroup}

@@ -1,4 +1,5 @@
 import React, { ReactNode } from "react";
+import ChatBot from "../ChatBot";
 
 interface DashboardLayoutProps {
   sidebar: ReactNode;
@@ -22,6 +23,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {children}
       </main>
     </div>
+    <ChatBot />
   </div>
 );
 
