@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SkulCredit - Pathway to Excel | Education Finance Made Easy</title>
+
+    <meta
+      name="description"
+      content="SkulCredit helps parents cover school fees instantly. We pay your school directly while you repay in simple, flexible installments. Partnering with top schools for uninterrupted education."
+    />
+    <meta
+      name="keywords"
+      content="School fees loan, Education finance, SkulCredit, Pay school fees later, Nigeria education loan, Tuition financing"
+    />
+    <meta name="author" content="SkulCredit" />
+    <meta name="robots" content="index, follow" />
+
+    <link rel="icon" type="image/png" href="/1logo.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script type="module" crossorigin src="/assets/index-CMfDj7lk.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BU88NmXo.css">
+  </head>
+  <body
+    class="bg-[#F8FAFC] text-slate-800 font-sans selection:bg-rose-100 selection:text-rose-900"
+  >
+    <!--
+      ┌─────────────────────────────────────────────────────────────────────┐
+      │  PRE-REACT AUTH MIDDLEWARE                                          │
+      │                                                                     │
+      │  Runs synchronously before React mounts — equivalent to Next.js    │
+      │  edge middleware.  Reads localStorage and makes instant redirects  │
+      │  so the user NEVER sees a flash of the wrong page.                 │
+      │                                                                     │
+      │  Rules (mirrors AppRouter + ProtectedRoute + PublicRoute):          │
+      │                                                                     │
+      │  1. Public paths  + authenticated  → role dashboard                 │
+      │  2. Private paths + unauthenticated → /auth                        │
+      │  3. Private paths + wrong role      → own role dashboard            │
+      │  4. Everything else                 → proceed normally             │
+      └─────────────────────────────────────────────────────────────────────┘
+    -->
+    <script>
+      (function () {
+        var PUBLIC_EXACT = [
+          "/",
+          "/auth",
+          "/auth/parent",
+          "/auth/school",
+          "/auth/admin",
+          "/school/onboarding",
+        ];
+
+        var PUBLIC_PREFIX = [];
+
+        var PRIVATE_PREFIX = [
+          "/parent",
+          "/school/dashboard",
+          "/school/applications",
+          "/school/students",
+          "/school/disbursement",
+          "/school/settings",
+          "/admin",
+        ];
+
+        var ROLE_DASHBOARD = {
+          parent: "/parent/dashboard",
+          school: "/school/dashboard",
+          admin: "/admin/dashboard",
+        };
+
+        var ROLE_PREFIX = {
+          parent: "/parent",
+          school: "/school",
+          admin: "/admin",
+        };
+
+        function isPublic(path) {
+          if (PUBLIC_EXACT.indexOf(path) !== -1) return true;
+          for (var i = 0; i < PUBLIC_PREFIX.length; i++) {
+            if (
+              path === PUBLIC_PREFIX[i] ||
+              path.startsWith(PUBLIC_PREFIX[i] + "/")
+            )
+              return true;
+          }
+          return false;
+        }
+
+        function isPrivate(path) {
+          for (var i = 0; i < PRIVATE_PREFIX.length; i++) {
+            var p = PRIVATE_PREFIX[i];
+            if (path === p || path.startsWith(p + "/")) return true;
+          }
+          return false;
+        }
+
+        function getUser() {
+          try {
+            var raw =
+              localStorage.getItem("sc_user") ||
+              localStorage.getItem("skulcredit_user");
+            return raw ? JSON.parse(raw) : null;
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function redirect(to) {
+          if (window.location.pathname !== to) {
+            window.location.replace(to);
+          }
+        }
+        var pathname = window.location.pathname;
+        if (
+          pathname.startsWith("/_next") ||
+          pathname.startsWith("/api") ||
+          pathname.match(/\.[a-z0-9]+$/i)
+        ) {
+          return;
+        }
+
+        var user = getUser();
+        var isAuth = !!(user && user.role);
+        var isPublicPath = isPublic(pathname);
+        var isPrivatePath = isPrivate(pathname);
+        if (isAuth && isPublicPath) {
+          redirect(ROLE_DASHBOARD[user.role] || "/auth");
+          return;
+        }
+
+        if (!isAuth && isPrivatePath) {
+          redirect("/auth");
+          return;
+        }
+
+        if (isAuth && isPrivatePath) {
+          var allowedPrefix = ROLE_PREFIX[user.role];
+          if (allowedPrefix && !pathname.startsWith(allowedPrefix)) {
+            redirect(ROLE_DASHBOARD[user.role] || "/auth");
+            return;
+          }
+        }
+
+      })();
+    </script>
+
+    <div id="root"></div>
+  </body>
+</html>

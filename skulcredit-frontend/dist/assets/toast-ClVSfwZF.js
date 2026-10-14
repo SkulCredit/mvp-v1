@@ -1,0 +1,1 @@
+import{y as s}from"./index-CMfDj7lk.js";const e={position:"bottom-right",autoClose:3500,hideProgressBar:!1,closeOnClick:!0,pauseOnHover:!0,draggable:!1,theme:"colored"},t=o=>s.success(o,e),a=o=>s.error(o,e);export{a,t};

@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/skulcredit-api
+
+jobs:
+  build-backend:
+    name: Backend — type-check & build
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: skulcredit-backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: skulcredit-backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: TypeScript type-check
+        run: npm run type-check
+
+      - name: Build (TypeScript → JS)
+        run: npm run build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: skulcredit-backend/dist
+          retention-days: 1
+
+  docker-build:
+    name: Docker — build image
+    runs-on: ubuntu-24.04
+    needs: build-backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build API image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./skulcredit-backend
+          file: ./skulcredit-backend/Dockerfile
+          target: prod
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            SKIP_GEOIP_UPDATE=1
+
+      - name: Build Nginx image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./nginx
+          file: ./nginx/Dockerfile
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/skulcredit-nginx:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: skulcredit-backend
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: skulcredit-backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run linter (if configured)
+        run: |
+          if compgen -G ".eslintrc*" > /dev/null || compgen -G "eslint.config*" > /dev/null; then
+            npx eslint src --ext .ts --max-warnings 0
+          else
+            echo "No ESLint config found — skipping lint"
+            exit 0
+          fi
+
+  security-audit:
+    name: Security audit
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: skulcredit-backend
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: skulcredit-backend/package-lock.json
+
+      - name: npm audit (high severity)
+        run: npm audit --audit-level=high --production || true
+
+  ci-gate:
+    name: CI gate
+    runs-on: ubuntu-24.04
+    needs: [build-backend, docker-build]
+    if: always()
+
+    steps:
+      - name: Check required jobs
+        run: |
+          if [[ "${{ needs.build-backend.result }}" != "success" || \
+                "${{ needs.docker-build.result }}"  != "success" ]]; then
+            echo "One or more required CI jobs failed."
+            exit 1
+          fi
+          echo "All required CI jobs passed."

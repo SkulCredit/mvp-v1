@@ -1,0 +1,171 @@
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../config/db";
+import type { KycStatus } from "../types";
+
+export interface ParentAttributes {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  dob: string | null;
+  addressStreet: string | null;
+  addressCity: string | null;
+  addressLga: string | null;
+  addressState: string | null;
+  addressPostalCode: string | null;
+  addressCountry: string | null;
+  profilePhotoUrl: string | null;
+  kycStatus: KycStatus;
+  bvn: string | null;
+  nin: string | null;
+  lendsqrCustomerId: string | null;
+  relationship: string | null;
+  employerType: string | null;
+  yearsInRole: string | null;
+  monthlyIncome: string | null;
+  eligibilityBlockedUntil: string | null;
+  // New fields added in migration 025
+  bankAccountNumber: string | null;
+  bankCode: string | null;
+  bvnPhoneNumber: string | null;
+  spouseFullName: string | null;
+  spouseEmail: string | null;
+  spousePhone: string | null;
+  spouseEmployerType: string | null;
+  employerName: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+type ParentCreationAttributes = Optional<
+  ParentAttributes,
+  | "id"
+  | "middleName"
+  | "dob"
+  | "addressStreet"
+  | "addressCity"
+  | "addressLga"
+  | "addressState"
+  | "addressPostalCode"
+  | "addressCountry"
+  | "profilePhotoUrl"
+  | "kycStatus"
+  | "bvn"
+  | "nin"
+  | "lendsqrCustomerId"
+  | "relationship"
+  | "employerType"
+  | "yearsInRole"
+  | "monthlyIncome"
+  | "eligibilityBlockedUntil"
+  | "bankAccountNumber"
+  | "bankCode"
+  | "bvnPhoneNumber"
+  | "spouseFullName"
+  | "spouseEmail"
+  | "spousePhone"
+  | "spouseEmployerType"
+  | "employerName"
+>;
+
+export class ParentInstance
+  extends Model<ParentAttributes, ParentCreationAttributes>
+  implements ParentAttributes
+{
+  declare id: string;
+  declare userId: string;
+  declare firstName: string;
+  declare lastName: string;
+  declare middleName: string | null;
+  declare dob: string | null;
+  declare addressStreet: string | null;
+  declare addressCity: string | null;
+  declare addressLga: string | null;
+  declare addressState: string | null;
+  declare addressPostalCode: string | null;
+  declare addressCountry: string | null;
+  declare profilePhotoUrl: string | null;
+  declare kycStatus: KycStatus;
+  declare bvn: string | null;
+  declare nin: string | null;
+  declare lendsqrCustomerId: string | null;
+  declare relationship: string | null;
+  declare employerType: string | null;
+  declare yearsInRole: string | null;
+  declare monthlyIncome: string | null;
+  declare eligibilityBlockedUntil: string | null;
+  declare bankAccountNumber: string | null;
+  declare bankCode: string | null;
+  declare bvnPhoneNumber: string | null;
+  declare spouseFullName: string | null;
+  declare spouseEmail: string | null;
+  declare spousePhone: string | null;
+  declare spouseEmployerType: string | null;
+  declare employerName: string | null;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
+}
+
+ParentInstance.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      unique: true,
+      references: { model: "users", key: "id" },
+      onDelete: "CASCADE",
+    },
+    firstName: { type: DataTypes.STRING, allowNull: false },
+    lastName: { type: DataTypes.STRING, allowNull: false },
+    middleName: { type: DataTypes.STRING, allowNull: true },
+    dob: { type: DataTypes.DATEONLY, allowNull: true },
+    addressStreet: { type: DataTypes.STRING, allowNull: true },
+    addressCity: { type: DataTypes.STRING, allowNull: true },
+    addressLga: { type: DataTypes.STRING, allowNull: true },
+    addressState: { type: DataTypes.STRING, allowNull: true },
+    addressPostalCode: { type: DataTypes.STRING, allowNull: true },
+    addressCountry: { type: DataTypes.STRING, allowNull: true },
+    profilePhotoUrl: { type: DataTypes.STRING, allowNull: true },
+    kycStatus: {
+      type: DataTypes.ENUM("pending", "submitted", "approved", "rejected"),
+      defaultValue: "pending",
+    },
+    bvn: { type: DataTypes.STRING, allowNull: true },
+    nin: { type: DataTypes.STRING, allowNull: true },
+    lendsqrCustomerId: { type: DataTypes.STRING, allowNull: true },
+    relationship: { type: DataTypes.STRING, allowNull: true },
+    employerType: { type: DataTypes.STRING, allowNull: true },
+    yearsInRole: { type: DataTypes.STRING, allowNull: true },
+    monthlyIncome: { type: DataTypes.STRING, allowNull: true },
+    eligibilityBlockedUntil: { type: DataTypes.DATEONLY, allowNull: true },
+    bankAccountNumber: { type: DataTypes.STRING(20), allowNull: true },
+    bankCode: { type: DataTypes.STRING(10), allowNull: true },
+    bvnPhoneNumber: { type: DataTypes.STRING(20), allowNull: true },
+    spouseFullName: { type: DataTypes.STRING(200), allowNull: true },
+    spouseEmail: { type: DataTypes.STRING(200), allowNull: true },
+    spousePhone: { type: DataTypes.STRING(50), allowNull: true },
+    spouseEmployerType: { type: DataTypes.STRING(100), allowNull: true },
+    employerName: { type: DataTypes.STRING(200), allowNull: true },
+  },
+  {
+    sequelize,
+    modelName: "Parent",
+    tableName: "parents",
+    timestamps: true,
+    underscored: true,
+    defaultScope: {
+      attributes: { exclude: ["bvn", "nin"] },
+    },
+    scopes: {
+      withSensitive: { attributes: { exclude: [] } },
+    },
+  },
+);
+
+export default ParentInstance;

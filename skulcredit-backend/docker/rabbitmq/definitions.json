@@ -1,0 +1,265 @@
+{
+  "rabbitmq_version": "3.13.0",
+  "vhosts": [
+    { "name": "/" },
+    { "name": "skulcredit_vhost" }
+  ],
+  "users": [
+    {
+      "name":               "skulcredit",
+      "password_hash":      "kI3FJRmUhwFjB+Ph9HadVJlqo4dIH1uO/RHflKgiUtzA6Z6o",
+      "hashing_algorithm":  "rabbit_password_hashing_sha256",
+      "tags":               "administrator",
+      "limits":             {}
+    }
+  ],
+  "permissions": [
+    {
+      "user":      "skulcredit",
+      "vhost":     "/",
+      "configure": ".*",
+      "write":     ".*",
+      "read":      ".*"
+    },
+    {
+      "user":      "skulcredit",
+      "vhost":     "skulcredit_vhost",
+      "configure": ".*",
+      "write":     ".*",
+      "read":      ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name":        "skulcredit.events",
+      "vhost":       "skulcredit_vhost",
+      "type":        "topic",
+      "durable":     true,
+      "auto_delete": false,
+      "internal":    false,
+      "arguments":   {}
+    },
+    {
+      "name":        "skulcredit.events.dlx",
+      "vhost":       "skulcredit_vhost",
+      "type":        "fanout",
+      "durable":     true,
+      "auto_delete": false,
+      "internal":    false,
+      "arguments":   {}
+    }
+  ],
+  "queues": [
+    {
+      "name":        "skulcredit.auth",
+      "vhost":       "skulcredit_vhost",
+      "durable":     true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "skulcredit.events.dlx",
+        "x-message-ttl":          259200000
+      }
+    },
+    {
+      "name":        "skulcredit.parent",
+      "vhost":       "skulcredit_vhost",
+      "durable":     true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "skulcredit.events.dlx",
+        "x-message-ttl":          259200000
+      }
+    },
+    {
+      "name":        "skulcredit.school",
+      "vhost":       "skulcredit_vhost",
+      "durable":     true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "skulcredit.events.dlx",
+        "x-message-ttl":          259200000
+      }
+    },
+    {
+      "name":        "skulcredit.loan",
+      "vhost":       "skulcredit_vhost",
+      "durable":     true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "skulcredit.events.dlx",
+        "x-message-ttl":          259200000
+      }
+    },
+    {
+      "name":        "skulcredit.payment",
+      "vhost":       "skulcredit_vhost",
+      "durable":     true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "skulcredit.events.dlx",
+        "x-message-ttl":          259200000
+      }
+    },
+    {
+      "name":        "skulcredit.disbursement",
+      "vhost":       "skulcredit_vhost",
+      "durable":     true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "skulcredit.events.dlx",
+        "x-message-ttl":          259200000
+      }
+    },
+    {
+      "name":        "skulcredit.admin",
+      "vhost":       "skulcredit_vhost",
+      "durable":     true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "skulcredit.events.dlx",
+        "x-message-ttl":          259200000
+      }
+    },
+    {
+      "name":        "skulcredit.notification",
+      "vhost":       "skulcredit_vhost",
+      "durable":     true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "skulcredit.events.dlx",
+        "x-message-ttl":          259200000
+      }
+    },
+    {
+      "name":        "skulcredit.events.dead_letter",
+      "vhost":       "skulcredit_vhost",
+      "durable":     true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.auth",
+      "destination_type": "queue",
+      "routing_key":      "auth.#",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.parent",
+      "destination_type": "queue",
+      "routing_key":      "parent.#",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.school",
+      "destination_type": "queue",
+      "routing_key":      "school.#",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.loan",
+      "destination_type": "queue",
+      "routing_key":      "loan.#",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.payment",
+      "destination_type": "queue",
+      "routing_key":      "payment.#",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.disbursement",
+      "destination_type": "queue",
+      "routing_key":      "disbursement.#",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.admin",
+      "destination_type": "queue",
+      "routing_key":      "admin.#",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.notification",
+      "destination_type": "queue",
+      "routing_key":      "loan.application.*",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.notification",
+      "destination_type": "queue",
+      "routing_key":      "loan.offer.*",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.notification",
+      "destination_type": "queue",
+      "routing_key":      "payment.repayment.*",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.notification",
+      "destination_type": "queue",
+      "routing_key":      "disbursement.transfer.*",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.notification",
+      "destination_type": "queue",
+      "routing_key":      "school.verification.*",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.notification",
+      "destination_type": "queue",
+      "routing_key":      "auth.account.*",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.notification",
+      "destination_type": "queue",
+      "routing_key":      "notification.#",
+      "arguments":        {}
+    },
+    {
+      "source":           "skulcredit.events.dlx",
+      "vhost":            "skulcredit_vhost",
+      "destination":      "skulcredit.events.dead_letter",
+      "destination_type": "queue",
+      "routing_key":      "",
+      "arguments":        {}
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+import { LendsqrBaseService } from "./base.service";
+
+export interface CustomerPayload {
+  phone_number: string;
+  email: string;
+  bvn?: string;
+  bvn_phone_number?: string;
+  dob?: string; 
+  account_number?: string;
+  bank_code?: string;
+  state?: string;
+  lga?: string;
+  city?: string;
+  address?: string;
+  photo_url?: string;
+  documents?: Array<{
+    url: string;
+    type_id: number;
+    sub_type_id?: number;
+  }>;
+}
+
+export interface LendsqrCustomerUser {
+  id: number;
+  org_id: number;
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+  email: string;
+  bvn: string;
+  dob: string;
+  photo_url: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  lga: string | null;
+  gender: string | null;
+  credit_score: number | null;
+  selfie_bvn_check: string | null;
+  selfie_id_check: string | null;
+  activated: number;
+  blacklisted: number;
+  created_on: string;
+  [key: string]: unknown;
+}
+
+export interface CreateCustomerResponse {
+  status: string;
+  message: string;
+  data: {
+    id?: number;
+    users?: LendsqrCustomerUser[];
+    user?: LendsqrCustomerUser;
+    [key: string]: unknown;
+  };
+  meta: { cost: number; balance: number };
+}
+
+class LendsqrCustomerService extends LendsqrBaseService {
+  createCustomer(payload: CustomerPayload): Promise<CreateCustomerResponse> {
+    return this.client.post<CustomerPayload, CreateCustomerResponse>(
+      "/v2/customers",
+      payload,
+    );
+  }
+
+  getCustomer(customerId: string): Promise<unknown> {
+    return this.client.get(`/v2/customers/${customerId}`);
+  }
+
+  updateCustomer(
+    customerId: string,
+    updateData: Record<string, unknown>,
+  ): Promise<unknown> {
+    return this.client.patch(`/v2/customers/${customerId}`, updateData);
+  }
+
+  activateCustomer(id: number | string): Promise<unknown> {
+    return this.client.put(`/v2/customers/${id}/activate`, {});
+  }
+}
+
+export default new LendsqrCustomerService();

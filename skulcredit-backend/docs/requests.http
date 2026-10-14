@@ -1,0 +1,71 @@
+@baseUrl = http://localhost:8080/api/v1
+# To use the token for protected routes, run Login, copy the token, and paste it here:
+@token = YOUR_TOKEN_HERE
+
+###
+# 1. AUTHENTICATION
+###
+
+# Register Parent
+POST {{baseUrl}}/auth/register/parent
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "newparent@example.com",
+  "password": "password123",
+  "phoneNumber": "08012345678"
+}
+
+###
+
+# Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "parent@example.com",
+  "password": "password123"
+}
+
+###
+# 2. PARENT PORTAL
+###
+
+# Get Dashboard
+# (Make sure to replace YOUR_TOKEN_HERE at the top of the file with the token from the Login response)
+GET {{baseUrl}}/parents/dashboard
+Authorization: Bearer {{token}}
+
+###
+
+# Complete Profile
+PUT {{baseUrl}}/parents/profile
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "address": {
+    "street": "123 Main St",
+    "city": "Lagos",
+    "state": "Lagos",
+    "country": "Nigeria"
+  },
+  "dob": "1980-01-01"
+}
+
+###
+# 3. LOANS
+###
+
+# Apply for Financing
+POST {{baseUrl}}/loans/apply
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "studentId": "64b3c...",
+  "amount": 500000,
+  "tenor": 6
+}

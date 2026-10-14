@@ -1,0 +1,12 @@
+.env
+.env.*
+.env.example
+.env.local
+.env.development
+.env.production
+.agents/
+SQLDOCUMENTATION.md
+TODO.md
+LendsqrAdminRecoveryCodes.txt
+Adjustor-customers-api.md
+ALETPAY-API.md

@@ -1,0 +1,1 @@
+import{c as e}from"./index-CMfDj7lk.js";const s={initiatePayment:async t=>(await e.post("/payments/initialize",t)).data.data,verifyPayment:async t=>(await e.get(`/payments/verify/${t}`)).data.data,generateDisbursementVirtualAccount:async t=>(await e.post("/payments/disbursement-virtual-account",t)).data.data};export{s as p};

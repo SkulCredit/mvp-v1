@@ -1,0 +1,224 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: production
+        type: choice
+        options: [production, staging]
+      api_replicas:
+        description: Number of API replicas
+        required: false
+        default: "2"
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  API_IMAGE: ghcr.io/davidakpele/skulcredit-api
+  NGINX_IMAGE: ghcr.io/davidakpele/skulcredit-nginx
+
+jobs:
+  build-and-push:
+    name: Build & push images
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+
+    outputs:
+      api_image: ${{ steps.meta-api.outputs.tags }}
+      nginx_image: ${{ steps.meta-nginx.outputs.tags }}
+      version: ${{ steps.meta-api.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      # Login MUST happen before any build-push step that has push: true.
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Docker metadata (API)
+        id: meta-api
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.API_IMAGE }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./skulcredit-backend
+          file: ./skulcredit-backend/Dockerfile
+          target: prod
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            SKIP_GEOIP_UPDATE=1
+
+      - name: Docker metadata (Nginx)
+        id: meta-nginx
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.NGINX_IMAGE }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build & push Nginx image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./nginx
+          file: ./nginx/Dockerfile
+          push: true
+          tags: ${{ steps.meta-nginx.outputs.tags }}
+          labels: ${{ steps.meta-nginx.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # 2. Deploy to server over SSH
+  # NOTE: Commented out — no VPS configured yet.
+  #       Uncomment this entire job when a server is ready and add these
+  #       secrets to the GitHub environment (Settings → Environments):
+  #         SSH_PRIVATE_KEY, SERVER_HOST, SERVER_USER, DEPLOY_PATH
+  # ────────────────────────────────────────────────────────────────────────────
+
+  # deploy:
+  #   name: Deploy — ${{ inputs.environment || 'production' }}
+  #   runs-on: ubuntu-24.04
+  #   needs: build-and-push
+  #   environment:
+  #     name: ${{ inputs.environment || 'production' }}
+  #     url: ${{ vars.APP_URL }}
+  #
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4.2.2
+  #
+  #     # ── Write .env file ──────────────────────────────────────────────────
+  #     - name: Write .env file
+  #       run: |
+  #         cat > skulcredit-backend/.env <<'EOF'
+  #         PORT=8080
+  #         NODE_ENV=production
+  #         APP_URL=${{ secrets.APP_URL }}
+  #         DATABASE_URL=${{ secrets.DATABASE_URL }}
+  #         DB_HOST=postgres
+  #         DB_PORT=5432
+  #         DB_NAME=${{ secrets.DB_NAME }}
+  #         DB_USER=${{ secrets.DB_USER }}
+  #         DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+  #         JWT_SECRET=${{ secrets.JWT_SECRET }}
+  #         JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
+  #         JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+  #         JWT_REFRESH_EXPIRES_IN=${{ secrets.JWT_REFRESH_EXPIRES_IN }}
+  #         LENDSQR_API_KEY=${{ secrets.LENDSQR_API_KEY }}
+  #         LENDSQR_BASE_URL=${{ secrets.LENDSQR_BASE_URL }}
+  #         PAYSTACK_SECRET_KEY=${{ secrets.PAYSTACK_SECRET_KEY }}
+  #         PAYSTACK_PUBLIC_KEY=${{ secrets.PAYSTACK_PUBLIC_KEY }}
+  #         CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
+  #         CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}
+  #         CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}
+  #         SMTP_HOST=${{ secrets.SMTP_HOST }}
+  #         SMTP_PORT=${{ secrets.SMTP_PORT }}
+  #         SMTP_USER=${{ secrets.SMTP_USER }}
+  #         SMTP_PASS=${{ secrets.SMTP_PASS }}
+  #         REDIS_URL=redis://redis:6379
+  #         RABBITMQ_URL=amqp://skulcredit:${{ secrets.RABBITMQ_PASSWORD }}@rabbitmq:5672/skulcredit_vhost
+  #         RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
+  #         GRAFANA_USER=${{ secrets.GRAFANA_USER }}
+  #         GRAFANA_PASSWORD=${{ secrets.GRAFANA_PASSWORD }}
+  #         FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+  #         FUNDING_PARTNER_EMAIL=${{ secrets.FUNDING_PARTNER_EMAIL }}
+  #         FUNDING_PARTNER_NAME=${{ secrets.FUNDING_PARTNER_NAME }}
+  #         EOF
+  #
+  #     # ── SSH deploy ───────────────────────────────────────────────────────
+  #     - name: Setup SSH agent
+  #       uses: webfactory/ssh-agent@v0.9.1
+  #       with:
+  #         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+  #
+  #     - name: Add server to known_hosts
+  #       run: ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+  #
+  #     - name: Copy compose files & configs to server
+  #       run: |
+  #         rsync -az --delete \
+  #           --exclude='node_modules' --exclude='.git' \
+  #           --exclude='skulcredit-backend/dist' \
+  #           --exclude='skulcredit-backend/logs/*' \
+  #           --exclude='skulcredit-backend/uploads/*' \
+  #           --include='skulcredit-backend/.env' \
+  #           docker-compose.yml docker-compose.lb.yml \
+  #           skulcredit-backend/.env nginx/ skulcredit-backend/docker/ \
+  #           ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH }}/
+  #
+  #     - name: Deploy on server
+  #       env:
+  #         API_IMAGE: ${{ env.API_IMAGE }}
+  #         NGINX_IMAGE: ${{ env.NGINX_IMAGE }}
+  #         API_REPLICAS: ${{ inputs.api_replicas || '2' }}
+  #         DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+  #         DB_NAME: ${{ secrets.DB_NAME }}
+  #         DB_USER: ${{ secrets.DB_USER }}
+  #         DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+  #         RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+  #       run: |
+  #         ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} bash -s <<ENDSSH
+  #           set -euo pipefail
+  #           cd "$DEPLOY_PATH"
+  #           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+  #           docker pull ${API_IMAGE}:latest
+  #           docker pull ${NGINX_IMAGE}:latest
+  #           export NODE_ENV=production BUILD_TARGET=prod
+  #           export DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASSWORD="$DB_PASSWORD"
+  #           export RABBITMQ_PASSWORD="$RABBITMQ_PASSWORD"
+  #           export API_IMAGE="${API_IMAGE}:latest" NGINX_IMAGE="${NGINX_IMAGE}:latest"
+  #           export API_REPLICAS="$API_REPLICAS"
+  #           docker compose -f docker-compose.yml -f docker-compose.lb.yml up -d --no-recreate postgres redis rabbitmq
+  #           docker compose -f docker-compose.yml -f docker-compose.lb.yml up -d --scale api="$API_REPLICAS" --no-build --remove-orphans api nginx
+  #           docker image prune -f --filter "until=24h"
+  #         ENDSSH
+  #
+  #     - name: Smoke test — health endpoint
+  #       run: |
+  #         sleep 5
+  #         STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${{ secrets.APP_URL }}/api/v1/health" || echo "000")
+  #         [ "$STATUS" = "200" ] || (echo "Smoke test failed: $STATUS" && exit 1)
+  #
+  #     - name: Notify on failure
+  #       if: failure()
+  #       uses: slackapi/slack-github-action@v2.1.0
+  #       with:
+  #         webhook-type: incoming-webhook
+  #         payload: |
+  #           {"text":":x: *SkulCredit deploy FAILED* — <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>\nBranch: `${{ github.ref_name }}`"}
+  #       env:
+  #         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  #       continue-on-error: true
