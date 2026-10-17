@@ -81,7 +81,7 @@ jobs:
           context: ./nginx
           file: ./nginx/Dockerfile
           push: false
-          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/skulcredit-nginx:ci-${{ github.sha }}
+          tags: ${{ env.REGISTRY }}/skulcredit/skulcredit-nginx:ci-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
