@@ -390,6 +390,382 @@ const swaggerSpec: Record<string, unknown> = {
     },
   ],
   paths: {
+      "/finance/dashboard/stats": {
+        get: {
+          summary: "Get finance dashboard KPI stats, charts, portfolio status, pending actions, and recent transactions",
+          tags: ["Finance"],
+          parameters: [
+            { in: "query", name: "period", schema: { type: "string", enum: ["6M", "12M"], default: "12M" } }
+          ],
+          responses: { "200": { description: "Finance dashboard metrics and charts" } },
+        },
+      },
+      "/finance/disbursements": {
+        get: {
+          summary: "List disbursements with status counters and filters",
+          tags: ["Finance"],
+          parameters: [
+            { in: "query", name: "status", schema: { type: "string", enum: ["all", "completed", "processing", "failed", "reversed"] } },
+            { in: "query", name: "search", schema: { type: "string" } },
+            { in: "query", name: "date", schema: { type: "string" } },
+            { in: "query", name: "page", schema: { type: "integer", default: 1 } },
+            { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          ],
+          responses: { "200": { description: "Disbursements history list" } },
+        },
+        post: {
+          summary: "Initiate new disbursement for approved loan",
+          tags: ["Finance"],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["loanApplicationId"],
+                  properties: {
+                    loanApplicationId: { type: "string", format: "uuid" },
+                    notes: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "201": { description: "Disbursement initiated" } },
+        },
+      },
+      "/finance/disbursements/eligible-loans": {
+        get: {
+          summary: "List eligible approved loans awaiting payout",
+          tags: ["Finance"],
+          parameters: [
+            { in: "query", name: "search", schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Eligible loan list" } },
+        },
+      },
+      "/finance/disbursements/{id}": {
+        get: {
+          summary: "Get disbursement details by ID",
+          tags: ["Finance"],
+          parameters: [
+            { in: "path", name: "id", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Disbursement detail" } },
+        },
+      },
+      "/finance/disbursements/{id}/retry": {
+        post: {
+          summary: "Retry a failed disbursement",
+          tags: ["Finance"],
+          parameters: [
+            { in: "path", name: "id", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Disbursement retry queued" } },
+        },
+      },
+      "/finance/disbursements/{id}/reverse": {
+        post: {
+          summary: "Request disbursement reversal",
+          tags: ["Finance"],
+          parameters: [
+            { in: "path", name: "id", required: true, schema: { type: "string" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["reason"],
+                  properties: {
+                    reason: { type: "string", minLength: 3 },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Disbursement reversed" } },
+        },
+      },
+      "/finance/schools/verification": {
+        get: {
+          summary: "List school bank account verification statuses",
+          tags: ["Finance"],
+          parameters: [
+            { in: "query", name: "search", schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "School verification list" } },
+        },
+      },
+      "/finance/schools/verification/{schoolId}/status": {
+        patch: {
+          summary: "Update school bank verification status",
+          tags: ["Finance"],
+          parameters: [
+            { in: "path", name: "schoolId", required: true, schema: { type: "string" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["status"],
+                  properties: {
+                    status: { type: "string", enum: ["Verified", "Re-verification due", "Pending review", "Unverified"] },
+                    reason: { type: "string" },
+                    notes: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Verification status updated" } },
+        },
+      },
+      "/finance/repayments": {
+        get: {
+          summary: "List borrower repayments with status filters and counts",
+          tags: ["Finance"],
+          parameters: [
+            { in: "query", name: "status", schema: { type: "string", enum: ["All", "On track", "Due soon", "Grace period", "Overdue", "Defaulted"] } },
+            { in: "query", name: "search", schema: { type: "string" } },
+            { in: "query", name: "page", schema: { type: "integer", default: 1 } },
+            { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          ],
+          responses: { "200": { description: "Repayments register" } },
+        },
+      },
+      "/finance/repayments/{loanId}": {
+        get: {
+          summary: "Get loan repayment details and schedule history",
+          tags: ["Finance"],
+          parameters: [
+            { in: "path", name: "loanId", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Loan repayment details" } },
+        },
+      },
+      "/finance/repayments/follow-up": {
+        post: {
+          summary: "Trigger collection reminder for a loan",
+          tags: ["Finance"],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["loanId"],
+                  properties: {
+                    loanId: { type: "string" },
+                    actionType: { type: "string", enum: ["call", "sms", "email", "reminder", "general"] },
+                    notes: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Follow-up triggered" } },
+        },
+      },
+      "/finance/repayments/waive-fee": {
+        post: {
+          summary: "Waive late fee on repayment schedule",
+          tags: ["Finance"],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["loanId", "reason"],
+                  properties: {
+                    loanId: { type: "string" },
+                    scheduleId: { type: "string" },
+                    amount: { type: "number" },
+                    reason: { type: "string", minLength: 3 },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Late fee waived" } },
+        },
+      },
+      "/finance/outstanding-balances": {
+        get: {
+          summary: "Get portfolio outstanding aging analysis and breakdown",
+          tags: ["Finance"],
+          responses: { "200": { description: "Outstanding balances analytics" } },
+        },
+      },
+      "/finance/overdue-accounts": {
+        get: {
+          summary: "Get overdue accounts collection queue and metrics",
+          tags: ["Finance"],
+          responses: { "200": { description: "Overdue accounts queue" } },
+        },
+      },
+      "/finance/overdue-accounts/bulk-reminders": {
+        post: {
+          summary: "Dispatch bulk payment reminders",
+          tags: ["Finance"],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["loanIds"],
+                  properties: {
+                    loanIds: { type: "array", items: { type: "string" } },
+                    channel: { type: "string", enum: ["sms", "email", "both"], default: "both" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Bulk reminders queued" } },
+        },
+      },
+      "/finance/collections/follow-up": {
+        get: {
+          summary: "Get collection follow-up queue and worklist",
+          tags: ["Finance"],
+          responses: { "200": { description: "Collection follow-up queue" } },
+        },
+      },
+      "/finance/collections/log-interaction": {
+        post: {
+          summary: "Log borrower contact interaction",
+          tags: ["Finance"],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["loanId", "interactionType", "notes"],
+                  properties: {
+                    loanId: { type: "string" },
+                    interactionType: { type: "string", enum: ["call", "sms", "email", "in_person", "promise_to_pay"] },
+                    notes: { type: "string" },
+                    promiseDate: { type: "string" },
+                    promisedAmount: { type: "number" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Interaction logged" } },
+        },
+      },
+      "/finance/collections/assign": {
+        post: {
+          summary: "Assign follow-up work item to officer",
+          tags: ["Finance"],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["loanId", "officerId"],
+                  properties: {
+                    loanId: { type: "string" },
+                    officerId: { type: "string" },
+                    officerName: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Officer assigned" } },
+        },
+      },
+      "/finance/reports": {
+        get: {
+          summary: "Get financial reports list and portfolio comparison bars",
+          tags: ["Finance"],
+          responses: { "200": { description: "Reports and analytics" } },
+        },
+      },
+      "/finance/reports/{id}/download": {
+        get: {
+          summary: "Download financial report file",
+          tags: ["Finance"],
+          parameters: [
+            { in: "path", name: "id", required: true, schema: { type: "string" } },
+            { in: "query", name: "format", schema: { type: "string", enum: ["CSV", "XLSX", "PDF"], default: "CSV" } },
+          ],
+          responses: { "200": { description: "Report file stream" } },
+        },
+      },
+      "/finance/records/schools": {
+        get: {
+          summary: "Get schools & loan reconciliation records",
+          tags: ["Finance"],
+          responses: { "200": { description: "School records and linked loans" } },
+        },
+      },
+      "/finance/records/investigation": {
+        post: {
+          summary: "Create reconciliation investigation ticket",
+          tags: ["Finance"],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["transactionReference", "issueType", "description"],
+                  properties: {
+                    transactionReference: { type: "string" },
+                    schoolId: { type: "string" },
+                    issueType: { type: "string" },
+                    description: { type: "string", minLength: 3 },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "201": { description: "Investigation ticket created" } },
+        },
+      },
+      "/finance/audit-logs": {
+        get: {
+          summary: "Get finance audit logs and settings configuration",
+          tags: ["Finance"],
+          responses: { "200": { description: "Audit logs and settings" } },
+        },
+      },
+      "/finance/settings": {
+        patch: {
+          summary: "Update finance control settings",
+          tags: ["Finance"],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    autoDisbursementLimit: { type: "number" },
+                    requireTwoPersonApproval: { type: "boolean" },
+                    gracePeriodDays: { type: "number" },
+                    defaultLateFeePercentage: { type: "number" },
+                    reconciliationThreshold: { type: "number" },
+                    notificationEmails: { type: "array", items: { type: "string" } },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Settings updated" } },
+        },
+      },
     "/health": {
       get: {
         summary: "Server health check",

@@ -3,7 +3,13 @@ import { ArrowRight } from "lucide-react";
 import { SCHOOL_PERFORMANCE } from "../mockFinanceData";
 import { SchoolPerformanceRecord } from "../types";
 
-const FinanceSchoolPerformance: React.FC = () => {
+interface Props {
+  schools?: SchoolPerformanceRecord[];
+}
+
+const FinanceSchoolPerformance: React.FC<Props> = ({ schools = SCHOOL_PERFORMANCE }) => {
+  const data = schools && schools.length > 0 ? schools : SCHOOL_PERFORMANCE;
+
   const getVerificationBadge = (status: SchoolPerformanceRecord["verificationStatus"]) => {
     switch (status) {
       case "Verified":
@@ -56,7 +62,7 @@ const FinanceSchoolPerformance: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 text-gray-700">
-            {SCHOOL_PERFORMANCE.map((item) => (
+            {data.map((item) => (
               <tr
                 key={item.id}
                 className="hover:bg-gray-50/70 transition-colors"

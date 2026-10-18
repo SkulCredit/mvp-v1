@@ -1,10 +1,17 @@
 import React from "react";
 import { FINANCE_METRICS } from "../mockFinanceData";
+import { FinancialMetric } from "../types";
 
-const FinanceKPIStats: React.FC = () => {
+interface Props {
+  metrics?: FinancialMetric[];
+}
+
+const FinanceKPIStats: React.FC<Props> = ({ metrics = FINANCE_METRICS }) => {
+  const data = metrics && metrics.length > 0 ? metrics : FINANCE_METRICS;
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {FINANCE_METRICS.map((metric) => (
+      {data.map((metric) => (
         <div
           key={metric.id}
           className="bg-white rounded-2xl border border-gray-100/90 p-5 shadow-xs hover:shadow-sm transition-shadow flex flex-col justify-between"

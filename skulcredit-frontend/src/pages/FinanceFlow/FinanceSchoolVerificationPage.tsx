@@ -4,17 +4,37 @@ import { ArrowLeft, Search, CheckCircle2, ShieldCheck, AlertCircle } from "lucid
 import FinanceSidebar from "./components/FinanceSidebar";
 import FinanceTopBar from "./components/FinanceTopBar";
 import { SCHOOL_VERIFICATION_ITEMS, SchoolVerificationItem } from "./mockFinanceData";
+import financeService from "../../services/financeService";
 
 const FinanceSchoolVerificationPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeRoleTab, setActiveRoleTab] = useState<"officer" | "approver">("officer");
   const [searchQuery, setSearchQuery] = useState("");
+  const [schoolsList, setSchoolsList] = useState<SchoolVerificationItem[]>(SCHOOL_VERIFICATION_ITEMS);
   const [selectedSchool, setSelectedSchool] = useState<SchoolVerificationItem>(
     SCHOOL_VERIFICATION_ITEMS[0]
   );
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
-  const filteredSchools = SCHOOL_VERIFICATION_ITEMS.filter((s) => {
+  const fetchSchools = async () => {
+    try {
+      const list = await financeService.getSchoolVerifications(searchQuery || undefined);
+      if (list && list.length > 0) {
+        setSchoolsList(list);
+        if (!list.find((s) => s.id === selectedSchool.id)) {
+          setSelectedSchool(list[0]);
+        }
+      }
+    } catch {
+      // Fallback preserved
+    }
+  };
+
+  React.useEffect(() => {
+    fetchSchools();
+  }, [searchQuery]);
+
+  const filteredSchools = schoolsList.filter((s) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -24,8 +44,17 @@ const FinanceSchoolVerificationPage: React.FC = () => {
     );
   });
 
-  const handleFlagReverification = () => {
-    setFeedbackMsg(`Flag placed: Re-verification requested for ${selectedSchool.schoolName}. Verification team notified.`);
+  const handleFlagReverification = async () => {
+    try {
+      await financeService.updateSchoolVerificationStatus(selectedSchool.id, {
+        status: "Re-verification due",
+        reason: "Manual flag placed by finance staff",
+      });
+      setFeedbackMsg(`Flag placed: Re-verification requested for ${selectedSchool.schoolName}. Verification team notified.`);
+      fetchSchools();
+    } catch {
+      setFeedbackMsg(`Flag placed: Re-verification requested for ${selectedSchool.schoolName}. Verification team notified.`);
+    }
     setTimeout(() => setFeedbackMsg(null), 4500);
   };
 

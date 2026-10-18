@@ -1,7 +1,14 @@
 import React from "react";
 import { PORTFOLIO_STATUS } from "../mockFinanceData";
+import { PortfolioCategory } from "../types";
 
-const FinanceLoanPortfolio: React.FC = () => {
+interface Props {
+  portfolioStatus?: PortfolioCategory[];
+}
+
+const FinanceLoanPortfolio: React.FC<Props> = ({ portfolioStatus = PORTFOLIO_STATUS }) => {
+  const data = portfolioStatus && portfolioStatus.length > 0 ? portfolioStatus : PORTFOLIO_STATUS;
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100/90 p-5 sm:p-6 shadow-xs">
       <div className="mb-5">
@@ -10,7 +17,7 @@ const FinanceLoanPortfolio: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        {PORTFOLIO_STATUS.map((item, index) => (
+        {data.map((item, index) => (
           <div key={index} className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-gray-700">{item.status}</span>

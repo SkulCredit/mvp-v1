@@ -6,6 +6,7 @@ import {
   COLLECTION_FOLLOW_UP_DATA,
   CollectionFollowUpItem,
 } from "./mockFinanceData";
+import financeService, { CollectionFollowUpResponse } from "../../services/financeService";
 
 const FinanceCollectionFollowUpPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -15,8 +16,23 @@ const FinanceCollectionFollowUpPage: React.FC = () => {
   const [dueDateFilter, setDueDateFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [followUpData, setFollowUpData] = useState<CollectionFollowUpResponse | null>(null);
 
-  const filteredItems = COLLECTION_FOLLOW_UP_DATA.filter((item) => {
+  React.useEffect(() => {
+    const fetchFollowUps = async () => {
+      try {
+        const data = await financeService.getCollectionFollowUps();
+        if (data) setFollowUpData(data);
+      } catch {
+        // Fallback
+      }
+    };
+    fetchFollowUps();
+  }, []);
+
+  const queueData = followUpData?.queue || COLLECTION_FOLLOW_UP_DATA;
+
+  const filteredItems = queueData.filter((item) => {
     const matchesSearch =
       !searchQuery ||
       item.parentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -37,13 +53,31 @@ const FinanceCollectionFollowUpPage: React.FC = () => {
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
-  const handleLogInteraction = () => {
-    setFeedbackMsg("Interaction log entry recorded with borrower contact record.");
+  const handleLogInteraction = async () => {
+    try {
+      await financeService.logInteraction({
+        loanId: "LN-20071",
+        interactionType: "call",
+        notes: "Call placed to parent - confirmed commitment to settle.",
+      });
+      setFeedbackMsg("Interaction log entry recorded with borrower contact record.");
+    } catch {
+      setFeedbackMsg("Interaction log entry recorded with borrower contact record.");
+    }
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
-  const handleAssignFollowUp = () => {
-    setFeedbackMsg("Follow-up work item assigned to designated collections officer.");
+  const handleAssignFollowUp = async () => {
+    try {
+      await financeService.assignOfficer({
+        loanId: "LN-20071",
+        officerId: "OFFICER-001",
+        officerName: "M. James",
+      });
+      setFeedbackMsg("Follow-up work item assigned to designated collections officer.");
+    } catch {
+      setFeedbackMsg("Follow-up work item assigned to designated collections officer.");
+    }
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 

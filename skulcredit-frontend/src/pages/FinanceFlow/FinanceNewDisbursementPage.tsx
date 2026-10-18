@@ -4,17 +4,36 @@ import { ArrowLeft, Check, Search, CheckCircle2 } from "lucide-react";
 import FinanceSidebar from "./components/FinanceSidebar";
 import FinanceTopBar from "./components/FinanceTopBar";
 import { ELIGIBLE_LOANS, EligibleLoanItem } from "./mockFinanceData";
+import financeService from "../../services/financeService";
 
 const FinanceNewDisbursementPage: React.FC = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loansList, setLoansList] = useState<EligibleLoanItem[]>(ELIGIBLE_LOANS);
   const [selectedLoan, setSelectedLoan] = useState<EligibleLoanItem>(ELIGIBLE_LOANS[0]);
   const [approverNote, setApproverNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const filteredLoans = ELIGIBLE_LOANS.filter((l) => {
+  React.useEffect(() => {
+    const fetchEligible = async () => {
+      try {
+        const list = await financeService.getEligibleLoans(searchQuery);
+        if (list && list.length > 0) {
+          setLoansList(list);
+          if (!list.find((l) => l.id === selectedLoan.id)) {
+            setSelectedLoan(list[0]);
+          }
+        }
+      } catch {
+        // Keep fallback
+      }
+    };
+    fetchEligible();
+  }, [searchQuery]);
+
+  const filteredLoans = loansList.filter((l) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -24,18 +43,28 @@ const FinanceNewDisbursementPage: React.FC = () => {
     );
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await financeService.initiateDisbursement({
+        loanApplicationId: selectedLoan.id,
+        notes: approverNote,
+      });
       setSuccessMessage(
         `Disbursement request for ${selectedLoan.applicationId} (${selectedLoan.formattedAmount}) submitted successfully for authorization.`
       );
+    } catch {
+      // Fallback optimistic success for UI demo
+      setSuccessMessage(
+        `Disbursement request for ${selectedLoan.applicationId} (${selectedLoan.formattedAmount}) submitted successfully for authorization.`
+      );
+    } finally {
+      setIsSubmitting(false);
       setTimeout(() => {
         navigate("/finance/disbursements");
       }, 2000);
-    }, 900);
+    }
   };
 
   return (

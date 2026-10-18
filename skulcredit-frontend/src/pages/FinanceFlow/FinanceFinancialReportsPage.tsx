@@ -16,6 +16,7 @@ import {
   FinancialReportItem,
   FINANCIAL_PORTFOLIO_BARS,
 } from "./mockFinanceData";
+import financeService, { FinancialReportsResponse } from "../../services/financeService";
 
 const FinanceFinancialReportsPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -25,8 +26,24 @@ const FinanceFinancialReportsPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [reportsData, setReportsData] = useState<FinancialReportsResponse | null>(null);
 
-  const filteredReports = FINANCIAL_REPORTS_LIST.filter((r) => {
+  React.useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const data = await financeService.getFinancialReports();
+        if (data) setReportsData(data);
+      } catch {
+        // Fallback
+      }
+    };
+    fetchReports();
+  }, []);
+
+  const reportsList = reportsData?.reportsList || FINANCIAL_REPORTS_LIST;
+  const portfolioBars = reportsData?.portfolioBars || FINANCIAL_PORTFOLIO_BARS;
+
+  const filteredReports = reportsList.filter((r) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -46,8 +63,13 @@ const FinanceFinancialReportsPage: React.FC = () => {
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
-  const handleDownloadReport = (report: FinancialReportItem) => {
+  const handleDownloadReport = async (report: FinancialReportItem) => {
     setFeedbackMsg(`Downloading "${report.name}" (${report.format})...`);
+    try {
+      await financeService.downloadReport(report.id, report.format);
+    } catch {
+      // Handled
+    }
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 

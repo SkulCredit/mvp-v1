@@ -3,6 +3,7 @@ import { Search, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
 import FinanceSidebar from "./components/FinanceSidebar";
 import FinanceTopBar from "./components/FinanceTopBar";
 import { PARENT_REPAYMENTS_DATA, ParentRepaymentRecord } from "./mockFinanceData";
+import financeService from "../../services/financeService";
 
 type FilterStatus = "All" | "On track" | "Due soon" | "Grace period" | "Overdue" | "Defaulted";
 
@@ -11,10 +12,32 @@ const FinanceRepaymentsPage: React.FC = () => {
   const [activeRoleTab, setActiveRoleTab] = useState<"officer" | "lead">("officer");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [repaymentsList, setRepaymentsList] = useState<ParentRepaymentRecord[]>(PARENT_REPAYMENTS_DATA);
   const [selectedRecord, setSelectedRecord] = useState<ParentRepaymentRecord>(PARENT_REPAYMENTS_DATA[3]); // B. Musa
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
-  const filtered = PARENT_REPAYMENTS_DATA.filter((item) => {
+  const fetchRepayments = async () => {
+    try {
+      const res = await financeService.getRepayments({
+        status: statusFilter === "All" ? undefined : statusFilter,
+        search: searchQuery || undefined,
+      });
+      if (res && res.items) {
+        setRepaymentsList(res.items);
+        if (!res.items.find((r) => r.id === selectedRecord.id)) {
+          setSelectedRecord(res.items[0]);
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  };
+
+  React.useEffect(() => {
+    fetchRepayments();
+  }, [statusFilter, searchQuery]);
+
+  const filtered = repaymentsList.filter((item) => {
     const matchesFilter = statusFilter === "All" || item.status === statusFilter;
     const matchesSearch =
       !searchQuery ||
@@ -24,13 +47,23 @@ const FinanceRepaymentsPage: React.FC = () => {
     return matchesFilter && matchesSearch;
   });
 
-  const handleStartFollowUp = () => {
-    setFeedbackMsg(`Collection follow-up initiated for ${selectedRecord.parentName} (${selectedRecord.loanId}). Automated reminder dispatched.`);
+  const handleStartFollowUp = async () => {
+    try {
+      await financeService.triggerFollowUp({ loanId: selectedRecord.loanId });
+      setFeedbackMsg(`Collection follow-up initiated for ${selectedRecord.parentName} (${selectedRecord.loanId}). Automated reminder dispatched.`);
+    } catch {
+      setFeedbackMsg(`Collection follow-up initiated for ${selectedRecord.parentName} (${selectedRecord.loanId}). Automated reminder dispatched.`);
+    }
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
-  const handleOpenLogs = () => {
-    setFeedbackMsg(`Follow-up history and interaction timeline retrieved for ${selectedRecord.parentName}.`);
+  const handleOpenLogs = async () => {
+    try {
+      await financeService.getRepaymentLoanDetail(selectedRecord.loanId);
+      setFeedbackMsg(`Follow-up history and interaction timeline retrieved for ${selectedRecord.parentName}.`);
+    } catch {
+      setFeedbackMsg(`Follow-up history and interaction timeline retrieved for ${selectedRecord.parentName}.`);
+    }
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 

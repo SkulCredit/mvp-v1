@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import FinanceSidebar from "./components/FinanceSidebar";
 import FinanceTopBar from "./components/FinanceTopBar";
@@ -10,10 +10,25 @@ import FinanceQuickActions from "./components/FinanceQuickActions";
 import FinanceRecentTransactions from "./components/FinanceRecentTransactions";
 import FinanceSchoolPerformance from "./components/FinanceSchoolPerformance";
 import FinanceCalculationFooter from "./components/FinanceCalculationFooter";
+import financeService, { DashboardStatsData } from "../../services/financeService";
 
 const FinanceDashboardPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dashboardData, setDashboardData] = useState<DashboardStatsData | null>(null);
+
+  const fetchStats = async (period: "6M" | "12M" = "12M") => {
+    try {
+      const data = await financeService.getDashboardStats(period);
+      setDashboardData(data);
+    } catch {
+      // Handled via fallback in service
+    }
+  };
+
+  useEffect(() => {
+    fetchStats("12M");
+  }, []);
 
   return (
     <div className="flex h-screen w-full bg-[#fafafa] font-sans overflow-hidden">
@@ -63,25 +78,31 @@ const FinanceDashboardPage: React.FC = () => {
             </div>
 
             {/* 4 Metric / KPI Cards */}
-            <FinanceKPIStats />
+            <FinanceKPIStats metrics={dashboardData?.metrics} />
 
             {/* Disbursements vs Repayments Chart */}
-            <FinanceDisbursementsChart />
+            <FinanceDisbursementsChart
+              chartData={dashboardData?.chartData}
+              onRangeChange={(range) => fetchStats(range === "12" ? "12M" : "6M")}
+            />
 
             {/* Loan Portfolio Status */}
-            <FinanceLoanPortfolio />
+            <FinanceLoanPortfolio portfolioStatus={dashboardData?.portfolioStatus} />
 
             {/* Pending Actions */}
-            <FinancePendingActions />
+            <FinancePendingActions actions={dashboardData?.pendingActions} />
 
             {/* Quick Actions */}
             <FinanceQuickActions />
 
             {/* Recent Transactions Table */}
-            <FinanceRecentTransactions searchQuery={searchQuery} />
+            <FinanceRecentTransactions
+              searchQuery={searchQuery}
+              transactions={dashboardData?.recentTransactions}
+            />
 
             {/* School Performance Table */}
-            <FinanceSchoolPerformance />
+            <FinanceSchoolPerformance schools={dashboardData?.schoolPerformance} />
 
             {/* Calculation Footnote Info Box */}
             <FinanceCalculationFooter />

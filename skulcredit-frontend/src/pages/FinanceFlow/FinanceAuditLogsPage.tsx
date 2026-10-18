@@ -6,6 +6,7 @@ import {
   FINANCIAL_AUDIT_LOGS,
   FinancialAuditLogItem,
 } from "./mockFinanceData";
+import financeService, { AuditLogsAndSettingsResponse } from "../../services/financeService";
 
 const FinanceAuditLogsPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -15,8 +16,23 @@ const FinanceAuditLogsPage: React.FC = () => {
   const [outcomeFilter, setOutcomeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [auditData, setAuditData] = useState<AuditLogsAndSettingsResponse | null>(null);
 
-  const filteredLogs = FINANCIAL_AUDIT_LOGS.filter((log) => {
+  React.useEffect(() => {
+    const fetchAudit = async () => {
+      try {
+        const data = await financeService.getAuditLogsAndSettings();
+        if (data) setAuditData(data);
+      } catch {
+        // Fallback
+      }
+    };
+    fetchAudit();
+  }, []);
+
+  const logsList = auditData?.logs || FINANCIAL_AUDIT_LOGS;
+
+  const filteredLogs = logsList.filter((log) => {
     const matchesSearch =
       !searchQuery ||
       log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -38,8 +54,15 @@ const FinanceAuditLogsPage: React.FC = () => {
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
-  const handleManagePermissions = () => {
-    setFeedbackMsg("Finance workspace permissions console opened.");
+  const handleManagePermissions = async () => {
+    try {
+      await financeService.updateSettings({
+        requireTwoPersonApproval: true,
+      });
+      setFeedbackMsg("Finance workspace permissions and policy synchronized.");
+    } catch {
+      setFeedbackMsg("Finance workspace permissions console opened.");
+    }
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 

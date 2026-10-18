@@ -3,9 +3,15 @@ import { CheckSquare, ArrowRight, X } from "lucide-react";
 import { PENDING_ACTIONS } from "../mockFinanceData";
 import { PendingAction } from "../types";
 
-const FinancePendingActions: React.FC = () => {
+interface Props {
+  actions?: PendingAction[];
+}
+
+const FinancePendingActions: React.FC<Props> = ({ actions = PENDING_ACTIONS }) => {
   const [selectedAction, setSelectedAction] = useState<PendingAction | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const data = actions && actions.length > 0 ? actions : PENDING_ACTIONS;
 
   const handleActionClick = (action: PendingAction) => {
     setSelectedAction(action);
@@ -39,7 +45,7 @@ const FinancePendingActions: React.FC = () => {
 
       {/* Rows */}
       <div className="divide-y divide-gray-50">
-        {PENDING_ACTIONS.map((item) => (
+        {data.map((item) => (
           <div
             key={item.id}
             className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4"

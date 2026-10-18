@@ -5,12 +5,18 @@ import { FinanceTransaction } from "../types";
 
 interface Props {
   searchQuery?: string;
+  transactions?: FinanceTransaction[];
 }
 
-const FinanceRecentTransactions: React.FC<Props> = ({ searchQuery = "" }) => {
+const FinanceRecentTransactions: React.FC<Props> = ({
+  searchQuery = "",
+  transactions = RECENT_TRANSACTIONS,
+}) => {
   const [selectedTx, setSelectedTx] = useState<FinanceTransaction | null>(null);
 
-  const filtered = RECENT_TRANSACTIONS.filter((tx) => {
+  const txList = transactions && transactions.length > 0 ? transactions : RECENT_TRANSACTIONS;
+
+  const filtered = txList.filter((tx) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -58,7 +64,7 @@ const FinanceRecentTransactions: React.FC<Props> = ({ searchQuery = "" }) => {
         <h3 className="text-sm font-bold text-gray-900">Recent transactions</h3>
         <button
           type="button"
-          onClick={() => setSelectedTx(RECENT_TRANSACTIONS[0])}
+          onClick={() => setSelectedTx(txList[0])}
           className="text-xs font-semibold text-[#700936] hover:text-[#58072a] flex items-center gap-1 transition-colors"
         >
           <span>View all</span>

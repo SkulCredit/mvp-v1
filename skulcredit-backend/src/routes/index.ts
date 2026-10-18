@@ -11,6 +11,7 @@ import catalogRoutes from "./catalog.routes";
 import webhookRoutes from "./webhook.routes";
 import supportRoutes from "./support.routes";
 import csRoutes from "./cs.routes";
+import financeRoutes from "./finance.routes";
 
 const router = Router();
 
@@ -26,6 +27,7 @@ router.use("/catalog", catalogRoutes);
 router.use("/webhooks", webhookRoutes);
 router.use("/support", supportRoutes);
 router.use("/cs", csRoutes);
+router.use("/finance", financeRoutes);
 
 /**
  * @swagger

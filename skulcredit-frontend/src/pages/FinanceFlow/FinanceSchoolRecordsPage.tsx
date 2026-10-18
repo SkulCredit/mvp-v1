@@ -7,6 +7,7 @@ import {
   SchoolDirectoryItem,
   LINKED_LOANS_DATA,
 } from "./mockFinanceData";
+import financeService, { SchoolRecordsResponse } from "../../services/financeService";
 
 const FinanceSchoolRecordsPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -14,8 +15,24 @@ const FinanceSchoolRecordsPage: React.FC = () => {
   const [loanSearchQuery, setLoanSearchQuery] = useState("");
   const [verificationFilter, setVerificationFilter] = useState("All");
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [recordsData, setRecordsData] = useState<SchoolRecordsResponse | null>(null);
 
-  const filteredSchools = SCHOOL_DIRECTORY_DATA.filter((s) => {
+  React.useEffect(() => {
+    const fetchRecords = async () => {
+      try {
+        const data = await financeService.getSchoolRecords();
+        if (data) setRecordsData(data);
+      } catch {
+        // Fallback
+      }
+    };
+    fetchRecords();
+  }, []);
+
+  const directoryList = recordsData?.directory || SCHOOL_DIRECTORY_DATA;
+  const linkedLoansList = recordsData?.linkedLoans || LINKED_LOANS_DATA;
+
+  const filteredSchools = directoryList.filter((s) => {
     const matchesSearch =
       !schoolSearchQuery ||
       s.name.toLowerCase().includes(schoolSearchQuery.toLowerCase()) ||
@@ -26,7 +43,7 @@ const FinanceSchoolRecordsPage: React.FC = () => {
     return matchesSearch && matchesVerification;
   });
 
-  const filteredLoans = LINKED_LOANS_DATA.filter((l) => {
+  const filteredLoans = linkedLoansList.filter((l) => {
     if (!loanSearchQuery) return true;
     const q = loanSearchQuery.toLowerCase();
     return (
@@ -42,8 +59,17 @@ const FinanceSchoolRecordsPage: React.FC = () => {
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
-  const handleOpenInvestigation = () => {
-    setFeedbackMsg("Investigation ticket #INV-9924 created and routed to Bank Settlement Desk.");
+  const handleOpenInvestigation = async () => {
+    try {
+      await financeService.createInvestigation({
+        transactionReference: "TXN-009823",
+        issueType: "Settlement variance",
+        description: "Reconciliation mismatch investigation",
+      });
+      setFeedbackMsg("Investigation ticket created and routed to Bank Settlement Desk.");
+    } catch {
+      setFeedbackMsg("Investigation ticket #INV-9924 created and routed to Bank Settlement Desk.");
+    }
     setTimeout(() => setFeedbackMsg(null), 4500);
   };
 

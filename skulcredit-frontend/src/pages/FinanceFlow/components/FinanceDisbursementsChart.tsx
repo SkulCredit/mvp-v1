@@ -9,6 +9,7 @@ import {
   Tooltip,
 } from "recharts";
 import { CHART_DATA_12_MONTHS, CHART_DATA_6_MONTHS } from "../mockFinanceData";
+import { ChartDataPoint } from "../types";
 import { BarChart3 } from "lucide-react";
 
 const CustomTooltip = ({
@@ -42,10 +43,26 @@ const CustomTooltip = ({
   return null;
 };
 
-const FinanceDisbursementsChart: React.FC = () => {
+interface Props {
+  chartData?: ChartDataPoint[];
+  onRangeChange?: (range: "6" | "12") => void;
+}
+
+const FinanceDisbursementsChart: React.FC<Props> = ({ chartData, onRangeChange }) => {
   const [range, setRange] = useState<"6" | "12">("12");
 
-  const data = range === "12" ? CHART_DATA_12_MONTHS : CHART_DATA_6_MONTHS;
+  const handleRange = (r: "6" | "12") => {
+    setRange(r);
+    if (onRangeChange) {
+      onRangeChange(r);
+    }
+  };
+
+  const data = chartData && chartData.length > 0
+    ? chartData
+    : range === "12"
+    ? CHART_DATA_12_MONTHS
+    : CHART_DATA_6_MONTHS;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100/90 p-5 sm:p-6 shadow-xs">
@@ -81,7 +98,7 @@ const FinanceDisbursementsChart: React.FC = () => {
         <div className="flex items-center bg-gray-50 border border-gray-100 p-1 rounded-xl self-start sm:self-center">
           <button
             type="button"
-            onClick={() => setRange("6")}
+            onClick={() => handleRange("6")}
             className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
               range === "6"
                 ? "bg-[#700936] text-white shadow-xs"
@@ -92,7 +109,7 @@ const FinanceDisbursementsChart: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setRange("12")}
+            onClick={() => handleRange("12")}
             className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
               range === "12"
                 ? "bg-[#700936] text-white shadow-xs"

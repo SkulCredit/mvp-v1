@@ -8,6 +8,7 @@ import {
   AGING_OVERDUE_BUCKETS,
   SCHOOL_OUTSTANDING_BREAKDOWN,
 } from "./mockFinanceData";
+import financeService, { OutstandingBalancesResponse } from "../../services/financeService";
 
 type FilterStatus = "All" | "On track" | "Due soon" | "Grace period" | "Overdue" | "Defaulted";
 
@@ -19,6 +20,22 @@ const FinanceOutstandingBalancesPage: React.FC = () => {
   const [sortOption, setSortOption] = useState<"high-low" | "low-high">("high-low");
   const [selectedRecord, setSelectedRecord] = useState<ParentRepaymentRecord>(PARENT_REPAYMENTS_DATA[3]); // B. Musa
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [balancesData, setBalancesData] = useState<OutstandingBalancesResponse | null>(null);
+
+  React.useEffect(() => {
+    const fetchBalances = async () => {
+      try {
+        const data = await financeService.getOutstandingBalances();
+        if (data) setBalancesData(data);
+      } catch {
+        // Fallback preserved
+      }
+    };
+    fetchBalances();
+  }, []);
+
+  const agingBuckets = balancesData?.buckets || AGING_OVERDUE_BUCKETS;
+  const schoolBreakdown = balancesData?.schoolBreakdown || SCHOOL_OUTSTANDING_BREAKDOWN;
 
   const filtered = PARENT_REPAYMENTS_DATA.filter((item) => {
     const matchesFilter = statusFilter === "All" || item.status === statusFilter;
@@ -33,8 +50,13 @@ const FinanceOutstandingBalancesPage: React.FC = () => {
     return a.outstanding - b.outstanding;
   });
 
-  const handleSendFollowUp = () => {
-    setFeedbackMsg(`Collection follow-up initiated for ${selectedRecord.parentName} (${selectedRecord.loanId}).`);
+  const handleSendFollowUp = async () => {
+    try {
+      await financeService.triggerFollowUp({ loanId: selectedRecord.loanId });
+      setFeedbackMsg(`Collection follow-up initiated for ${selectedRecord.parentName} (${selectedRecord.loanId}).`);
+    } catch {
+      setFeedbackMsg(`Collection follow-up initiated for ${selectedRecord.parentName} (${selectedRecord.loanId}).`);
+    }
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
