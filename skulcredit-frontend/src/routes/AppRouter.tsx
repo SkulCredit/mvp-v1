@@ -162,6 +162,40 @@ const CSParentsPage = React.lazy(() => import("../pages/CustomerServiceFlow/CSPa
 const CSProfilePage = React.lazy(() => import("../pages/CustomerServiceFlow/CSProfilePage"));
 const CSPlaceholderPage = React.lazy(() => import("../pages/CustomerServiceFlow/CSPlaceholderPage"));
 
+const FinanceDashboardPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceDashboardPage"),
+);
+const FinanceNewDisbursementPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceNewDisbursementPage"),
+);
+const FinanceDisbursementsPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceDisbursementsPage"),
+);
+const FinanceSchoolVerificationPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceSchoolVerificationPage"),
+);
+const FinanceRepaymentsPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceRepaymentsPage"),
+);
+const FinanceOutstandingBalancesPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceOutstandingBalancesPage"),
+);
+const FinanceOverdueAccountsPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceOverdueAccountsPage"),
+);
+const FinanceSchoolRecordsPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceSchoolRecordsPage"),
+);
+const FinanceCollectionFollowUpPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceCollectionFollowUpPage"),
+);
+const FinanceFinancialReportsPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceFinancialReportsPage"),
+);
+const FinanceAuditLogsPage = React.lazy(
+  () => import("../pages/FinanceFlow/FinanceAuditLogsPage"),
+);
+
 const AppRouter: React.FC = () => (
   <Router>
     <Suspense fallback={<AuthSpinner />}>
@@ -386,6 +420,25 @@ const AppRouter: React.FC = () => (
           path="/funding-partner/disbursement/:id"
           element={<FundingPartnerDisbursementPage />}
         />
+
+        {/* Finance Flow Routes */}
+        <Route path="/finance" element={<Navigate to="/finance/dashboard" replace />} />
+        <Route path="/finance/dashboard" element={<FinanceDashboardPage />} />
+        <Route path="/finance/disbursements" element={<FinanceDisbursementsPage />} />
+        <Route path="/finance/disbursements/history" element={<FinanceDisbursementsPage />} />
+        <Route path="/finance/disbursements/new" element={<FinanceNewDisbursementPage />} />
+        <Route path="/finance/disbursements/verification" element={<FinanceSchoolVerificationPage />} />
+        <Route path="/finance/repayments" element={<FinanceRepaymentsPage />} />
+        <Route path="/finance/repayments/history" element={<FinanceRepaymentsPage />} />
+        <Route path="/finance/repayments/outstanding" element={<FinanceOutstandingBalancesPage />} />
+        <Route path="/finance/repayments/overdue" element={<FinanceOverdueAccountsPage />} />
+        <Route path="/finance/repayments/follow-up" element={<FinanceCollectionFollowUpPage />} />
+        <Route path="/finance/records/schools" element={<FinanceSchoolRecordsPage />} />
+        <Route path="/finance/records" element={<FinanceSchoolRecordsPage />} />
+        <Route path="/finance/reconciliation" element={<FinanceSchoolRecordsPage />} />
+        <Route path="/finance/reports" element={<FinanceFinancialReportsPage />} />
+        <Route path="/finance/settings" element={<FinanceAuditLogsPage />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />{" "}
       </Routes>
     </Suspense>
