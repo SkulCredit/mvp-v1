@@ -818,7 +818,7 @@ class SchoolService {
           amount:          amountFmt,
           referenceNumber: application.referenceNumber ?? "",
           repaymentLink:   `${frontendUrl}/parent/repayment`,
-        }).catch(() => {});
+        }).catch((err: Error) => logger.error(`[school.service] sendDisbursementConfirmed failed: ${err.message}`));
       }
     } else {
       await application.update({
@@ -849,7 +849,7 @@ class SchoolService {
           referenceNumber:  application.referenceNumber ?? "",
           reason:           note ?? undefined,
           applicationsLink: `${frontendUrl}/parent/applications`,
-        }).catch(() => {});
+        }).catch((err: Error) => logger.error(`[school.service] sendDisbursementFailed failed: ${err.message}`));
       }
     }
 

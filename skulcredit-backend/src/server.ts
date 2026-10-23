@@ -16,39 +16,24 @@ import { seedAcademicSessions } from "./seeders/academicSessionSeeder";
 import { seedSchoolBankAccounts } from "./seeders/schoolBankAccountSeeder";
 import { seedAdmin } from "./seeders/adminSeeder";
 import { seedFundingPartners } from "./seeders/fundingPartnerSeeder";
-
-// Load all models and wire up associations before syncing
 import "./models/index";
 
 const start = async (): Promise<void> => {
   try {
     await connectDB();
 
-    // Run schema migrations FIRST — before sync — so migration-managed tables
-    // (e.g. audit_logs) are in their correct state before Sequelize tries to
-    // inspect or alter them.
-    await runMigrations();
-
-    // Sync all models EXCEPT AuditLog. AuditLog is fully owned by migrations
-    // (017_migrate_audit_logs_schema). We must not let sequelize.sync() try to
-    // ALTER the enum columns — it will fail. We achieve this by syncing the
-    // AuditLog model separately with `{ force: false, alter: false }` so it
-    // only creates the table if it somehow doesn't exist, but never alters it.
     const { AuditLog: AuditLogModel, ...otherModels } = sequelize.models as Record<string, typeof sequelize.models[string]>;
-    void otherModels; // referenced to avoid lint warning
+    void otherModels; 
 
-    // Temporarily stub out AuditLog.sync so sequelize.sync() skips it
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const originalAuditSync = (AuditLogModel as any).sync.bind(AuditLogModel);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (AuditLogModel as any).sync = async () => { /* skip — managed by migrations */ };
+    (AuditLogModel as any).sync = async () => { };
 
     await sequelize.sync({ alter: env.nodeEnv === "development" });
     logger.info("Database tables synced");
 
-    // Restore the real sync method
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (AuditLogModel as any).sync = originalAuditSync;
+
+    await runMigrations();
 
     await seedCatalog();
     await seedSchoolTerms();

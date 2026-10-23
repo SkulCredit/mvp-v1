@@ -256,8 +256,10 @@ class ParentService {
   async initBvnConsent(bvn: string, contact: string): Promise<{ maskedContact: string }> {
     const response = await identityService.initBvnConsent(bvn, contact);
     if (response.status !== "otp") {
+      logger.error(`[parent.service] initBvnConsent failed — bvn=${bvn} status=${response.status} message=${response.message}`);
       throw new ApiError(400, response.message ?? "Failed to send OTP");
     }
+    logger.info(`[parent.service] initBvnConsent success — bvn=${bvn} maskedContact=${response.data}`);
     return { maskedContact: response.data };
   }
 
@@ -283,6 +285,13 @@ class ParentService {
     const parent = await ParentRepository.findOne({ userId });
     const user = await UserRepository.findById(userId);
     if (!parent || !user) throw new ApiError(404, "Parent profile not found");
+
+    // BVN is optional — NIN-only flow has no BVN to check.
+    // Skip the external score call and return a pass so the wizard can proceed.
+    if (!bvn || !/^\d{11}$/.test(bvn)) {
+      logger.info(`[parent.service] checkLoanScore: no valid BVN supplied — skipping Lendsqr call, returning pass`);
+      return evaluateCreditScore(null);
+    }
 
     const payload = {
       product_id: LENDSQR_PRODUCT_ID,

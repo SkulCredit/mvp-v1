@@ -89,9 +89,8 @@ export const initBvnConsentSchema = z.object({
       .string()
       .length(11, "BVN must be exactly 11 digits")
       .regex(/^\d+$/, "BVN must be numeric"),
-    contact: z
-      .string()
-      .min(1, "Contact (phone or email) is required"),
+    // contact is optional — the backend defaults to the authenticated user's email
+    contact: z.string().optional(),
   }),
 });
 

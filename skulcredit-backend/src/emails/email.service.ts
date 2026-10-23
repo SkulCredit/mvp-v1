@@ -70,6 +70,7 @@ class EmailService {
     text: string;
     html: string;
   }): Promise<void> {
+    logger.info(`[EmailService] Sending "${opts.subject}" → ${opts.to}`);
     const info = await this.transporter.sendMail({
       from:    `"SkulCredit Team" <${env.smtp.user ?? 'noreply@skulcredit.com'}>`,
       to:      opts.to,

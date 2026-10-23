@@ -14,6 +14,7 @@ import redis from "../config/redis";
 import { RefreshToken } from "../models/index";
 import { AuthEventPublisher } from "../notifications/auth.event.publisher";
 import emailService from "../emails/email.service";
+import logger from "../config/logger";
 import type { GenerateAccessTokenInput, JwtPayload } from "../types/jwt";
 
 const lockKey = (email: string) => `lockout:${email}`;
@@ -105,7 +106,7 @@ class AuthService {
 
       await t.commit();
 
-      this._sendVerificationOtp(user.id, user.email).catch(() => {});
+      this._sendVerificationOtp(user.id, user.email).catch((err: Error) => logger.error(`[auth.service] _sendVerificationOtp failed: ${err.message}`));
 
       const userJson = user.toJSON() as unknown as Record<string, unknown>;
       delete userJson.password;
@@ -147,7 +148,7 @@ class AuthService {
 
       await t.commit();
 
-      this._sendVerificationOtp(user.id, user.email).catch(() => {});
+      this._sendVerificationOtp(user.id, user.email).catch((err: Error) => logger.error(`[auth.service] _sendVerificationOtp failed: ${err.message}`));
 
       const userJson = user.toJSON() as unknown as Record<string, unknown>;
       delete userJson.password;
@@ -299,6 +300,7 @@ class AuthService {
     const otp = crypto.randomInt(100_000, 1_000_000).toString();
     await redis.set(otpKey(email), `${userId}:${otp}`, "EX", OTP_TTL_SEC);
 
+    logger.info(`[auth.service] Email verification OTP generated → ${email} otp=${otp} ttl=${OTP_TTL_SEC}s`);
     AuthEventPublisher.otpSend({ userId, email, otp });
   }
 
@@ -374,6 +376,7 @@ class AuthService {
     const otp = crypto.randomInt(100_000, 1_000_000).toString();
     await redis.set(pwResetKey(email), otp, "EX", PW_RESET_TTL_SEC);
 
+    logger.info(`[auth.service] Password reset OTP generated → ${email} otp=${otp} ttl=${PW_RESET_TTL_SEC}s`);
     AuthEventPublisher.otpSend({ userId: user.id, email: user.email, otp });
   }
 
@@ -417,6 +420,7 @@ class AuthService {
     const otp = crypto.randomInt(100_000, 1_000_000).toString();
     await redis.set(this.mfaKey(email), `${user.id}:${otp}`, "EX", OTP_TTL_SEC);
 
+    logger.info(`[auth.service] MFA OTP generated → ${email} otp=${otp} ttl=${OTP_TTL_SEC}s`);
     // Send directly via SMTP — bypasses RabbitMQ so it works even if the
     // message queue is down. MFA OTPs are time-critical and must be delivered.
     await emailService.sendOtp({ email: user.email, otp });

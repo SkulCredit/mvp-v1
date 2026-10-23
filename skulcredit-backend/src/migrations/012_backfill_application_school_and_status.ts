@@ -1,6 +1,11 @@
 import { QueryInterface } from "sequelize";
 
 export const up = async (queryInterface: QueryInterface): Promise<void> => {
+  // Guard: if loan_applications doesn't exist yet (fresh DB where sync() runs
+  // after migrations), skip — the backfill is a no-op on an empty table anyway.
+  const tables = await queryInterface.showAllTables();
+  if (!tables.includes("loan_applications")) return;
+
   await queryInterface.sequelize.query(`
     UPDATE loan_applications la
     SET school_id = s.id

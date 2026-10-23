@@ -70,6 +70,7 @@ FundingPartnerContactInstance.init(
     indexes: [
       { fields: ["funding_partner_id"] },
       { fields: ["email"] },
+      { fields: ["email", "funding_partner_id"], unique: true, name: "uq_fp_contact_email_partner" },
     ],
   },
 );

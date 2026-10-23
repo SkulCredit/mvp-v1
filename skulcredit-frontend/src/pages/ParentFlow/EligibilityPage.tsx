@@ -348,7 +348,7 @@ const SubmitCheckIcon: React.FC = () => (
 
 const STEPS = [
   { label: "Parent/Guardian\nInformation", short: "Parent Info" },
-  { label: "BVN/NIN &\nCredit Verification", short: "KYC" },
+  { label: "BVN &\nCredit Verification", short: "KYC" },
   { label: "Select School &\nTuition Plan", short: "School" },
   { label: "Student\nInformation", short: "Students" },
 ] as const;
@@ -1163,17 +1163,10 @@ const EligibilityPage: React.FC = () => {
     }
   };
 
-  /** Stage 1 – send OTP to the customer's registered phone or email. */
+  /** Stage 1 – send OTP to the parent's email (backend auto-uses account email as BVN contact). */
   const handleInitBvnConsent = async () => {
     if (!/^\d{11}$/.test(state.step2.bvn.trim())) {
       setErrors((p) => ({ ...p, bvn: "BVN must be exactly 11 digits." }));
-      return;
-    }
-    if (!state.step2.bvnContact.trim()) {
-      setErrors((p) => ({
-        ...p,
-        bvnContact: "Please enter the phone number or email linked to your BVN.",
-      }));
       return;
     }
     patch("step2", {
@@ -1187,7 +1180,6 @@ const EligibilityPage: React.FC = () => {
     try {
       const { maskedContact } = await parentService.initBvnConsent(
         state.step2.bvn.trim(),
-        state.step2.bvnContact.trim(),
       );
       patch("step2", {
         ...state.step2,
@@ -1196,17 +1188,22 @@ const EligibilityPage: React.FC = () => {
         bvnOtp: "",
       });
       clearErr("bvn");
-      clearErr("bvnContact");
     } catch (err) {
       patch("step2", {
         ...state.step2,
         bvnConsentStage: "error",
         bvnStatus: "error",
       });
-      showToast(
-        (err as { message?: string }).message ??
-          "Could not send OTP. Please check your BVN and try again.",
-      );
+      const msg = (err as { message?: string }).message ?? "";
+      // Lendsqr occasionally has infrastructure issues with BVN scraping.
+      // Show a friendlier message instead of the raw internal error.
+      const friendlyMsg =
+        msg.toLowerCase().includes("selector") ||
+        msg.toLowerCase().includes("element found") ||
+        msg.toLowerCase().includes("loginform")
+          ? "BVN verification is temporarily unavailable. Please try again in a few minutes or contact support."
+          : msg || "Could not send OTP. Please check your BVN and try again.";
+      showToast(friendlyMsg);
     }
   };
 
@@ -1289,17 +1286,12 @@ const EligibilityPage: React.FC = () => {
   const validateStep2 = (): boolean => {
     const e: Record<string, string> = {};
     const s = state.step2;
-    if (s.bvnOrNin === "bvn") {
-      if (!s.bvn.trim()) e.bvn = "BVN is required.";
-      else if (!/^\d{11}$/.test(s.bvn.trim()))
-        e.bvn = "BVN must be exactly 11 digits.";
-    } else {
-      if (!s.nin.trim()) e.nin = "NIN is required.";
-      else if (!/^\d{11}$/.test(s.nin.trim()))
-        e.nin = "NIN must be exactly 11 digits.";
-      else if (s.ninStatus !== "verified")
-        e.nin = "Please verify your NIN before continuing.";
-    }
+    // BVN is the only identity method — NIN endpoint removed by Lendsqr.
+    if (!s.bvn.trim()) e.bvn = "BVN is required.";
+    else if (!/^\d{11}$/.test(s.bvn.trim()))
+      e.bvn = "BVN must be exactly 11 digits.";
+    else if (s.bvnConsentStage !== "verified")
+      e.bvn = "Please complete BVN verification before continuing.";
     if (s.uploadedDocs.length === 0)
       e.uploadedDocs = "Please upload at least one document.";
     if (!s.accountNumber.trim())
@@ -1347,51 +1339,48 @@ const EligibilityPage: React.FC = () => {
 
   const submitStep2 = async (): Promise<boolean> => {
     if (!validateStep2()) return false;
-    const bvnToCheck =
-      state.step2.bvnOrNin === "bvn"
-        ? state.step2.bvn.trim()
-        : ((state.step2.ninData as { bvn?: string } | null)?.bvn ?? "");
+    // Use the verified BVN for the score check.
+    const bvnToCheck = state.step2.bvn.trim();
 
-    if (bvnToCheck && /^\d{11}$/.test(bvnToCheck)) {
-      patch("isScoreChecking", true);
-      patch("step2", { ...state.step2, scoreCheckStatus: "checking" });
-      try {
-        const res = await apiClient.post<{
-          data: {
-            pass: boolean;
-            decision: string;
-            creditScore: string;
-            advisoryAmount: number;
-          };
-        }>("/parents/score-check", {
-          bvn: bvnToCheck,
-          requestedAmount: 100,
-          location: state.step1.addressState || "Lagos",
-        });
+    // Always run score check
+    patch("isScoreChecking", true);
+    patch("step2", { ...state.step2, scoreCheckStatus: "checking" });
+    try {
+      const res = await apiClient.post<{
+        data: {
+          pass: boolean;
+          decision: string;
+          creditScore: string;
+          advisoryAmount: number;
+        };
+      }>("/parents/score-check", {
+        bvn: bvnToCheck,
+        requestedAmount: 100,
+        location: state.step1.addressState || "Lagos",
+      });
 
-        const { pass } = res.data.data;
+      const { pass } = res.data.data;
 
-        if (!pass) {
-          setState((prev) => ({
-            ...prev,
-            isScoreChecking: false,
-            scoreBlocked: true,
-            step2: { ...prev.step2, scoreCheckStatus: "failed" },
-          }));
-          return false;
-        }
+      if (!pass) {
         setState((prev) => ({
           ...prev,
-          step2: { ...prev.step2, scoreCheckStatus: "passed" },
+          isScoreChecking: false,
+          scoreBlocked: true,
+          step2: { ...prev.step2, scoreCheckStatus: "failed" },
         }));
-      } catch {
-        setState((prev) => ({
-          ...prev,
-          step2: { ...prev.step2, scoreCheckStatus: "idle" },
-        }));
-      } finally {
-        patch("isScoreChecking", false);
+        return false;
       }
+      setState((prev) => ({
+        ...prev,
+        step2: { ...prev.step2, scoreCheckStatus: "passed" },
+      }));
+    } catch {
+      setState((prev) => ({
+        ...prev,
+        step2: { ...prev.step2, scoreCheckStatus: "idle" },
+      }));
+    } finally {
+      patch("isScoreChecking", false);
     }
 
     return true;
@@ -1459,9 +1448,8 @@ const EligibilityPage: React.FC = () => {
         profilePhotoUrl: photoUrl || undefined,
       });
 
-      const kycPayload =
-        state.step2.bvnOrNin === "bvn"
-          ? {
+      // BVN is the active identity method — NIN endpoint removed by Lendsqr.
+      const kycPayload = {
               bvn: state.step2.bvn,
               dob: state.step1.dob,
               state: state.step1.addressState,
@@ -1476,29 +1464,7 @@ const EligibilityPage: React.FC = () => {
               monthlyIncome: state.step1.monthlyIncome,
               accountNumber: state.step2.accountNumber || undefined,
               bankCode: state.step2.bankCode || undefined,
-              bvnPhoneNumber: state.step2.bvnData?.mobile || state.step2.bvnContact || undefined,
-              employerName: state.step2.employerName || undefined,
-              spouseFullName: state.step1.spouse.fullName || undefined,
-              spouseEmail: state.step1.spouse.email || undefined,
-              spousePhone: state.step1.spouse.phone || undefined,
-              spouseEmployerType: state.step1.spouse.employerType || undefined,
-            }
-          : {
-              nin: state.step2.nin,
-              dob: state.step1.dob,
-              state: state.step1.addressState,
-              lga: state.step1.addressLga,
-              city: state.step1.addressCity,
-              address: state.step1.addressStreet,
-              photoUrl: photoUrl || undefined,
-              documents: uploadedDocUrls,
-              relationship: state.step1.relationship,
-              employerType: state.step1.employerType,
-              yearsInRole: state.step1.yearsInRole,
-              monthlyIncome: state.step1.monthlyIncome,
-              accountNumber: state.step2.accountNumber || undefined,
-              bankCode: state.step2.bankCode || undefined,
-              bvnPhoneNumber: state.step2.ninData?.mobile || undefined,
+              bvnPhoneNumber: state.step2.bvnData?.mobile || undefined,
               employerName: state.step2.employerName || undefined,
               spouseFullName: state.step1.spouse.fullName || undefined,
               spouseEmail: state.step1.spouse.email || undefined,
@@ -2634,40 +2600,28 @@ const EligibilityPage: React.FC = () => {
             <VerificationTracker
               items={[
                 {
-                  label: "BVN / NIN Verification",
+                  label: "BVN Verification",
                   sublabel:
-                    state.step2.bvnOrNin === "bvn"
-                      ? state.step2.bvnConsentStage === "verified"
-                        ? "just now"
-                        : state.step2.bvnConsentStage === "error"
-                          ? "verification failed"
-                          : state.step2.bvnConsentStage === "verifying"
-                            ? "verifying OTP…"
-                            : state.step2.bvnConsentStage === "otp_sent"
-                              ? "OTP sent — awaiting entry"
-                              : state.step2.bvnConsentStage === "sending"
-                                ? "sending OTP…"
-                                : "awaiting submission"
-                      : state.step2.ninStatus === "verified"
-                        ? "just now"
-                        : state.step2.ninStatus === "verifying"
-                          ? "in progress…"
-                          : state.step2.ninStatus === "error"
-                            ? "verification failed"
-                            : "awaiting submission",
+                    state.step2.bvnConsentStage === "verified"
+                      ? "verified"
+                      : state.step2.bvnConsentStage === "error"
+                        ? "verification failed"
+                        : state.step2.bvnConsentStage === "verifying"
+                          ? "verifying OTP…"
+                          : state.step2.bvnConsentStage === "otp_sent"
+                            ? "OTP sent — awaiting entry"
+                            : state.step2.bvnConsentStage === "sending"
+                              ? "sending OTP…"
+                              : "awaiting submission",
                   status:
-                    state.step2.bvnOrNin === "bvn"
-                      ? state.step2.bvnConsentStage === "verified"
-                        ? "verified"
-                        : state.step2.bvnConsentStage === "error"
-                          ? "error"
-                          : state.step2.bvnConsentStage === "verifying" ||
-                              state.step2.bvnConsentStage === "sending"
-                            ? "verifying"
-                            : "idle"
-                      : state.step2.ninStatus === "verifying"
-                        ? "verifying"
-                        : state.step2.ninStatus,
+                    state.step2.bvnConsentStage === "verified"
+                      ? "verified"
+                      : state.step2.bvnConsentStage === "error"
+                        ? "error"
+                        : state.step2.bvnConsentStage === "verifying" ||
+                            state.step2.bvnConsentStage === "sending"
+                          ? "verifying"
+                          : "idle",
                 },
                 {
                   label: "Credit Score Check",
@@ -2730,408 +2684,186 @@ const EligibilityPage: React.FC = () => {
                 </p>
               </div>
               <p className="text-xs text-gray-500 -mt-2">
-                Verify your identity using your BVN or NIN for faster processing
+                Verify your identity using your BVN. An OTP will be sent to your registered email.
               </p>
-              <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-                {(["bvn", "nin"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() =>
-                      patch("step2", { ...state.step2, bvnOrNin: tab })
-                    }
-                    className={[
-                      "flex-1 py-2.5 text-sm font-semibold transition-colors",
-                      state.step2.bvnOrNin === tab
-                        ? "bg-[#8B1C53] text-white"
-                        : "bg-white text-gray-500 hover:bg-gray-50",
-                    ].join(" ")}
-                  >
-                    {tab.toUpperCase()} Verification
-                  </button>
-                ))}
-              </div>
-              {state.step2.bvnOrNin === "bvn" && (
-                <>
-                  {/* ── Stage 1: BVN + contact input ── */}
-                  {state.step2.bvnConsentStage !== "verified" && (
-                    <Field
-                      label="Bank Verification Number (BVN)"
-                      required
-                      error={errors.bvn}
-                    >
-                      <input
-                        value={state.step2.bvn}
-                        maxLength={11}
-                        inputMode="numeric"
-                        placeholder="Enter your 11-digit BVN"
-                        disabled={
-                          state.step2.bvnConsentStage === "sending" ||
-                          state.step2.bvnConsentStage === "otp_sent" ||
-                          state.step2.bvnConsentStage === "verifying"
-                        }
-                        onChange={(e) => {
-                          patch("step2", {
-                            ...state.step2,
-                            bvn: e.target.value.replace(/\D/g, ""),
-                            bvnConsentStage: "idle",
-                            bvnStatus: "idle",
-                            bvnMaskedContact: "",
-                            bvnOtp: "",
-                            bvnData: null,
-                          });
-                          clearErr("bvn");
-                        }}
-                        className={inputCls(errors.bvn) + (
-                          state.step2.bvnConsentStage === "sending" ||
-                          state.step2.bvnConsentStage === "otp_sent" ||
-                          state.step2.bvnConsentStage === "verifying"
-                            ? " opacity-60 cursor-not-allowed"
-                            : ""
-                        )}
-                      />
-                    </Field>
-                  )}
 
-                  {/* Contact input — only shown in idle/error stage */}
-                  {(state.step2.bvnConsentStage === "idle" ||
-                    state.step2.bvnConsentStage === "error") && (
-                    <Field
-                      label="Phone Number or Email Linked to BVN"
-                      required
-                      error={errors.bvnContact}
-                      hint="We'll send a one-time password to this contact to confirm your consent."
-                    >
-                      <div className="flex gap-2">
-                        <input
-                          value={state.step2.bvnContact}
-                          placeholder="E.g. 08012345678 or you@example.com"
-                          onChange={(e) => {
-                            patch("step2", {
-                              ...state.step2,
-                              bvnContact: e.target.value,
-                            });
-                            clearErr("bvnContact");
-                          }}
-                          className={inputCls(errors.bvnContact)}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleInitBvnConsent}
-                          disabled={
-                            !state.step2.bvn.trim() ||
-                            !state.step2.bvnContact.trim()
-                          }
-                          className="shrink-0 rounded-lg bg-[#8B1C53] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          Send OTP
-                        </button>
-                      </div>
-                    </Field>
-                  )}
-
-                  {/* Sending spinner */}
-                  {state.step2.bvnConsentStage === "sending" && (
-                    <div className="flex items-center gap-3 rounded-xl border border-[#8B1C53]/20 bg-[#fdf0f6] px-4 py-3">
-                      <svg
-                        className="w-4 h-4 text-[#8B1C53] animate-spin shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                      </svg>
-                      <p className="text-sm text-[#8B1C53] font-medium">Sending OTP…</p>
-                    </div>
-                  )}
-
-                  {/* ── Stage 2: OTP entry ── */}
-                  {(state.step2.bvnConsentStage === "otp_sent" ||
-                    state.step2.bvnConsentStage === "verifying") && (
-                    <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-4">
-                      <div className="flex items-start gap-2">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#2563eb"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="w-4 h-4 mt-0.5 shrink-0"
-                          aria-hidden="true"
-                        >
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-                        </svg>
-                        <div>
-                          <p className="text-sm font-semibold text-blue-800">OTP sent!</p>
-                          {state.step2.bvnMaskedContact && (
-                            <p className="text-xs text-blue-600 mt-0.5">
-                              A one-time password was sent to{" "}
-                              <span className="font-mono font-bold">
-                                {state.step2.bvnMaskedContact}
-                              </span>
-                              . Check your SMS or inbox (sender ID: <span className="font-semibold">PFAlert</span>).
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <Field label="Enter OTP" required error={errors.bvnOtp}>
-                        <div className="flex gap-2">
-                          <input
-                            value={state.step2.bvnOtp}
-                            maxLength={8}
-                            inputMode="numeric"
-                            placeholder="Enter the OTP"
-                            disabled={state.step2.bvnConsentStage === "verifying"}
-                            onChange={(e) => {
-                              patch("step2", {
-                                ...state.step2,
-                                bvnOtp: e.target.value.replace(/\D/g, ""),
-                              });
-                              clearErr("bvnOtp");
-                            }}
-                            className={inputCls(errors.bvnOtp) + (
-                              state.step2.bvnConsentStage === "verifying"
-                                ? " opacity-60 cursor-not-allowed"
-                                : ""
-                            )}
-                          />
-                          <button
-                            type="button"
-                            onClick={handleCompleteBvnConsent}
-                            disabled={
-                              !state.step2.bvnOtp.trim() ||
-                              state.step2.bvnConsentStage === "verifying"
-                            }
-                            className="shrink-0 rounded-lg bg-[#8B1C53] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-                          >
-                            {state.step2.bvnConsentStage === "verifying" ? (
-                              <>
-                                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                                </svg>
-                                Verifying…
-                              </>
-                            ) : (
-                              "Verify"
-                            )}
-                          </button>
-                        </div>
-                      </Field>
-                      <button
-                        type="button"
-                        onClick={handleResetBvnConsent}
-                        disabled={state.step2.bvnConsentStage === "verifying"}
-                        className="text-xs text-gray-400 hover:text-[#8B1C53] transition-colors self-start disabled:opacity-40"
-                      >
-                        ← Use a different BVN or contact
-                      </button>
-                    </div>
-                  )}
-
-                  {/* ── Verified state ── */}
-                  {state.step2.bvnConsentStage === "verified" &&
-                    state.step2.bvnData && (
-                      <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {state.step2.bvnData.image_url && (
-                              <img
-                                src={state.step2.bvnData.image_url}
-                                alt="BVN photo"
-                                className="h-12 w-12 rounded-full object-cover border border-green-300 shrink-0"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = "none";
-                                }}
-                              />
-                            )}
-                            <div>
-                              <p className="text-sm font-semibold text-green-700 flex items-center gap-1">
-                                <CheckIcon className="w-4 h-4" /> BVN Verified
-                              </p>
-                              <p className="text-xs text-green-600">
-                                {[
-                                  state.step2.bvnData.first_name,
-                                  state.step2.bvnData.middle_name,
-                                  state.step2.bvnData.last_name,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" ")}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleResetBvnConsent}
-                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#8B1C53] transition-colors"
-                            aria-label="Change BVN"
-                          >
-                            <RefreshIcon /> Change
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-green-700 mt-1">
-                          {state.step2.bvnData.dob && (
-                            <span>
-                              <span className="text-green-500">DOB:</span>{" "}
-                              {state.step2.bvnData.dob}
-                            </span>
-                          )}
-                          {state.step2.bvnData.gender && (
-                            <span>
-                              <span className="text-green-500">Gender:</span>{" "}
-                              {state.step2.bvnData.gender}
-                            </span>
-                          )}
-                          {state.step2.bvnData.mobile && (
-                            <span>
-                              <span className="text-green-500">Phone:</span>{" "}
-                              {state.step2.bvnData.mobile}
-                            </span>
-                          )}
-                          {state.step2.bvnData.state_of_origin && (
-                            <span>
-                              <span className="text-green-500">State:</span>{" "}
-                              {state.step2.bvnData.state_of_origin}
-                            </span>
-                          )}
-                          {state.step2.bvnData.watchlisted === 1 && (
-                            <span className="col-span-2 text-amber-600 font-semibold flex items-center gap-1">
-                              ⚠ This BVN has been watchlisted
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                </>
-              )}
-              {state.step2.bvnOrNin === "nin" && (
+              {/* ── Stage 1: BVN input + Send OTP ── */}
+              {state.step2.bvnConsentStage !== "verified" && (
                 <Field
-                  label="National Identification Number (NIN)"
+                  label="Bank Verification Number (BVN)"
                   required
-                  error={errors.nin}
+                  error={errors.bvn}
                 >
-                  <div
-                    className={`flex rounded-lg border overflow-hidden ${errors.nin ? "border-red-400" : "border-gray-200"}`}
+                  <input
+                    value={state.step2.bvn}
+                    maxLength={11}
+                    inputMode="numeric"
+                    placeholder="Enter your 11-digit BVN"
+                    disabled={
+                      state.step2.bvnConsentStage === "sending" ||
+                      state.step2.bvnConsentStage === "otp_sent" ||
+                      state.step2.bvnConsentStage === "verifying"
+                    }
+                    onChange={(e) => {
+                      patch("step2", {
+                        ...state.step2,
+                        bvn: e.target.value.replace(/\D/g, ""),
+                        bvnConsentStage: "idle",
+                        bvnStatus: "idle",
+                        bvnMaskedContact: "",
+                        bvnOtp: "",
+                        bvnData: null,
+                      });
+                      clearErr("bvn");
+                    }}
+                    className={inputCls(errors.bvn) + (
+                      state.step2.bvnConsentStage === "sending" ||
+                      state.step2.bvnConsentStage === "otp_sent" ||
+                      state.step2.bvnConsentStage === "verifying"
+                        ? " opacity-60 cursor-not-allowed"
+                        : ""
+                    )}
+                  />
+                </Field>
+              )}
+
+              {/* Send OTP button — shown when idle or after error */}
+              {(state.step2.bvnConsentStage === "idle" ||
+                state.step2.bvnConsentStage === "error") && (
+                <button
+                  type="button"
+                  onClick={handleInitBvnConsent}
+                  disabled={!state.step2.bvn.trim() || state.step2.bvn.length !== 11}
+                  className="self-start rounded-lg bg-[#8B1C53] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Send OTP to Email
+                </button>
+              )}
+
+              {/* Sending spinner */}
+              {state.step2.bvnConsentStage === "sending" && (
+                <div className="flex items-center gap-3 rounded-xl border border-[#8B1C53]/20 bg-[#fdf0f6] px-4 py-3">
+                  <svg className="w-4 h-4 text-[#8B1C53] animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  <p className="text-sm text-[#8B1C53] font-medium">Sending OTP to your email…</p>
+                </div>
+              )}
+
+              {/* ── Stage 2: OTP entry ── */}
+              {(state.step2.bvnConsentStage === "otp_sent" ||
+                state.step2.bvnConsentStage === "verifying") && (
+                <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-4">
+                  <div className="flex items-start gap-2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-blue-800">OTP sent to your email!</p>
+                      {state.step2.bvnMaskedContact && (
+                        <p className="text-xs text-blue-600 mt-0.5">
+                          Also sent to the contact linked to your BVN:{" "}
+                          <span className="font-mono font-bold">{state.step2.bvnMaskedContact}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Field label="Enter OTP" required error={errors.bvnOtp}>
+                    <div className="flex gap-2">
+                      <input
+                        value={state.step2.bvnOtp}
+                        maxLength={8}
+                        inputMode="numeric"
+                        placeholder="Enter the OTP"
+                        disabled={state.step2.bvnConsentStage === "verifying"}
+                        onChange={(e) => {
+                          patch("step2", { ...state.step2, bvnOtp: e.target.value.replace(/\D/g, "") });
+                          clearErr("bvnOtp");
+                        }}
+                        className={inputCls(errors.bvnOtp) + (state.step2.bvnConsentStage === "verifying" ? " opacity-60 cursor-not-allowed" : "")}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCompleteBvnConsent}
+                        disabled={!state.step2.bvnOtp.trim() || state.step2.bvnConsentStage === "verifying"}
+                        className="shrink-0 rounded-lg bg-[#8B1C53] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {state.step2.bvnConsentStage === "verifying" ? (
+                          <>
+                            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                            </svg>
+                            Verifying…
+                          </>
+                        ) : "Verify"}
+                      </button>
+                    </div>
+                  </Field>
+                  <button
+                    type="button"
+                    onClick={handleResetBvnConsent}
+                    disabled={state.step2.bvnConsentStage === "verifying"}
+                    className="text-xs text-gray-400 hover:text-[#8B1C53] transition-colors self-start disabled:opacity-40"
                   >
-                    <input
-                      value={state.step2.nin}
-                      maxLength={11}
-                      inputMode="numeric"
-                      placeholder="Enter your 11-digit NIN"
-                      disabled={
-                        state.step2.ninStatus === "verifying" ||
-                        state.step2.ninStatus === "verified"
-                      }
-                      onChange={(e) => {
-                        patch("step2", {
-                          ...state.step2,
-                          nin: e.target.value.replace(/\D/g, ""),
-                          ninStatus: "idle",
-                          ninData: null,
-                        });
-                        clearErr("nin");
-                      }}
-                      className="flex-1 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none disabled:opacity-60"
-                    />
-                    {state.step2.ninStatus === "verified" ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          patch("step2", {
-                            ...state.step2,
-                            nin: "",
-                            ninStatus: "idle",
-                            ninData: null,
-                          })
-                        }
-                        className="shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 hover:text-[#8B1C53] border-l border-gray-200 bg-gray-50 transition-colors flex items-center gap-1"
-                        aria-label="Clear NIN and re-enter"
-                      >
-                        <RefreshIcon /> Change
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleVerifyNin}
-                        disabled={state.step2.ninStatus === "verifying"}
-                        className="shrink-0 px-4 py-2.5 text-sm font-semibold text-gray-500 hover:text-[#8B1C53] border-l border-gray-200 bg-gray-50 transition-colors disabled:opacity-50"
-                      >
-                        {state.step2.ninStatus === "verifying"
-                          ? "Verifying…"
-                          : "Verify"}
-                      </button>
+                    ← Use a different BVN
+                  </button>
+                </div>
+              )}
+
+              {/* ── Verified state ── */}
+              {state.step2.bvnConsentStage === "verified" && state.step2.bvnData && (
+                <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {state.step2.bvnData.image_url && (
+                        <img
+                          src={state.step2.bvnData.image_url}
+                          alt="BVN photo"
+                          className="h-12 w-12 rounded-full object-cover border border-green-300 shrink-0"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      )}
+                      <div>
+                        <p className="text-sm font-semibold text-green-700 flex items-center gap-1">
+                          <CheckIcon className="w-4 h-4" /> BVN Verified
+                        </p>
+                        <p className="text-xs text-green-600">
+                          {[state.step2.bvnData.first_name, state.step2.bvnData.middle_name, state.step2.bvnData.last_name].filter(Boolean).join(" ")}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleResetBvnConsent}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#8B1C53] transition-colors"
+                      aria-label="Change BVN"
+                    >
+                      <RefreshIcon /> Change
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-green-700 mt-1">
+                    {state.step2.bvnData.dob && (
+                      <span><span className="text-green-500">DOB:</span> {state.step2.bvnData.dob}</span>
+                    )}
+                    {state.step2.bvnData.gender && (
+                      <span><span className="text-green-500">Gender:</span> {state.step2.bvnData.gender}</span>
+                    )}
+                    {state.step2.bvnData.mobile && (
+                      <span><span className="text-green-500">Phone:</span> {state.step2.bvnData.mobile}</span>
+                    )}
+                    {state.step2.bvnData.state_of_origin && (
+                      <span><span className="text-green-500">State:</span> {state.step2.bvnData.state_of_origin}</span>
+                    )}
+                    {state.step2.bvnData.watchlisted === 1 && (
+                      <span className="col-span-2 text-amber-600 font-semibold flex items-center gap-1">
+                        ⚠ This BVN has been watchlisted
+                      </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    11-digit NIN from your NIMC slip or National ID card
-                  </p>
-                  {state.step2.ninStatus === "verified" &&
-                    state.step2.ninData && (
-                      <div className="mt-3 rounded-xl border border-green-200 bg-green-50 p-4 flex flex-col gap-2">
-                        <div className="flex items-center gap-2 mb-1">
-                          {state.step2.ninData.image_url && (
-                            <img
-                              src={state.step2.ninData.image_url}
-                              alt="NIN photo"
-                              className="h-12 w-12 rounded-full object-cover border border-green-300 shrink-0"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display =
-                                  "none";
-                              }}
-                            />
-                          )}
-                          <div>
-                            <p className="text-sm font-semibold text-green-700 flex items-center gap-1">
-                              <CheckIcon className="w-4 h-4" /> NIN Verified
-                            </p>
-                            <p className="text-xs text-green-600">
-                              {[
-                                state.step2.ninData.first_name,
-                                state.step2.ninData.middle_name,
-                                state.step2.ninData.last_name,
-                              ]
-                                .filter(Boolean)
-                                .join(" ")}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-green-700">
-                          {state.step2.ninData.dob && (
-                            <span>
-                              <span className="text-green-500">DOB:</span>{" "}
-                              {state.step2.ninData.formatted_dob ||
-                                state.step2.ninData.dob}
-                            </span>
-                          )}
-                          {state.step2.ninData.gender && (
-                            <span>
-                              <span className="text-green-500">Gender:</span>{" "}
-                              {state.step2.ninData.gender}
-                            </span>
-                          )}
-                          {state.step2.ninData.mobile && (
-                            <span>
-                              <span className="text-green-500">Phone:</span>{" "}
-                              {state.step2.ninData.mobile}
-                            </span>
-                          )}
-                          {state.step2.ninData.state_of_residence && (
-                            <span>
-                              <span className="text-green-500">State:</span>{" "}
-                              {state.step2.ninData.state_of_residence}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  {state.step2.ninStatus === "error" && (
-                    <p className="text-xs text-red-500 mt-1">
-                      Verification failed. Please check your NIN and try again.
-                    </p>
-                  )}
-                </Field>
+                </div>
               )}
             </div>
             <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col gap-4">
@@ -3838,11 +3570,7 @@ const EligibilityPage: React.FC = () => {
                 />
                 <Row
                   label="Bank Verification"
-                  value={
-                    state.step2.bvnOrNin === "bvn"
-                      ? "BVN Provided"
-                      : "NIN Provided"
-                  }
+                  value="BVN Verified"
                 />
                 <div className="flex justify-between py-2">
                   <span className="text-sm text-gray-500">Status</span>

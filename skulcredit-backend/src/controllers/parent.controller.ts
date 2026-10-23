@@ -3,6 +3,7 @@ import parentService from "../services/parent.service";
 import schoolTermService from "../services/schoolTerm.service";
 import { successResponse } from "../utils/response";
 import ApiError from "../utils/apiError";
+import logger from "../config/logger";
 
 class ParentController {
   async getProfile(
@@ -93,12 +94,21 @@ class ParentController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const { bvn, contact } = req.body as { bvn: string; contact: string };
+      const { bvn, contact } = req.body as { bvn: string; contact?: string };
+      // Use the authenticated user's email as the BVN contact by default.
+      // Lendsqr sends the OTP to the email/phone registered against the BVN;
+      // passing the parent's account email is the safest fallback.
+      const user = await (await import("../models/index")).User.findByPk(req.user!.userId);
+      const resolvedContact = contact?.trim() || user?.email || "";
+      if (!resolvedContact) {
+        throw new ApiError(400, "Could not determine contact for BVN consent");
+      }
+      logger.info(`[initBvnConsent] bvn=${bvn} contact=${resolvedContact} userId=${req.user!.userId}`);
       successResponse(
         res,
         200,
         "OTP sent to registered contact",
-        await parentService.initBvnConsent(bvn, contact),
+        await parentService.initBvnConsent(bvn, resolvedContact),
       );
     } catch (error) {
       next(error);
@@ -112,6 +122,7 @@ class ParentController {
   ): Promise<void> {
     try {
       const { bvn, otp } = req.body as { bvn: string; otp: string };
+      logger.info(`[completeBvnConsent] bvn=${bvn} userId=${req.user!.userId}`);
       successResponse(
         res,
         200,
@@ -414,16 +425,18 @@ class ParentController {
   ): Promise<void> {
     try {
       const { bvn, requestedAmount, location } = req.body as {
-        bvn: string;
+        bvn?: string;
         requestedAmount?: number;
         location?: string;
       };
-      if (!bvn || !/^\d{11}$/.test(bvn)) {
-        throw new ApiError(400, "Valid 11-digit BVN is required");
+      // BVN is now optional — score check is skipped (returns pass) when no BVN
+      // is available (e.g. NIN-only flow where the NIN data has no linked BVN).
+      if (bvn && !/^\d{11}$/.test(bvn)) {
+        throw new ApiError(400, "BVN must be exactly 11 digits");
       }
       const result = await parentService.checkLoanScore(
         req.user!.userId,
-        bvn,
+        bvn ?? "",
         requestedAmount ?? 100,
         location ?? "Lagos",
       );

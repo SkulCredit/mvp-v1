@@ -1,6 +1,9 @@
 import { QueryInterface, DataTypes, ModelAttributeColumnOptions } from "sequelize";
 
 export async function up(queryInterface: QueryInterface): Promise<void> {
+  const tables = await queryInterface.showAllTables();
+  if (!tables.includes("loan_applications")) return;
+
   const tableDescription = await queryInterface.describeTable("loan_applications");
 
   const addIfMissing = async (

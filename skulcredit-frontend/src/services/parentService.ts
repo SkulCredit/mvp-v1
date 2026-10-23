@@ -127,16 +127,17 @@ export const parentService = {
   },
 
   /**
-   * Stage 1 – send OTP to the customer's registered phone/email.
+   * Stage 1 – initiate BVN consent.
+   * The backend auto-uses the authenticated parent's email as the contact,
+   * so no contact param is needed from the frontend.
    * Returns the masked contact string (e.g. "0808***2636") shown as confirmation.
    */
   initBvnConsent: async (
     bvn: string,
-    contact: string,
   ): Promise<{ maskedContact: string }> => {
     const response = await apiClient.post<{
       data: { maskedContact: string };
-    }>("/parents/bvn-consent/init", { bvn, contact });
+    }>("/parents/bvn-consent/init", { bvn });
     return response.data.data;
   },
 
