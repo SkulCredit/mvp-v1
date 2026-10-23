@@ -94,21 +94,13 @@ class ParentController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const { bvn, contact } = req.body as { bvn: string; contact?: string };
-      // Use the authenticated user's email as the BVN contact by default.
-      // Lendsqr sends the OTP to the email/phone registered against the BVN;
-      // passing the parent's account email is the safest fallback.
-      const user = await (await import("../models/index")).User.findByPk(req.user!.userId);
-      const resolvedContact = contact?.trim() || user?.email || "";
-      if (!resolvedContact) {
-        throw new ApiError(400, "Could not determine contact for BVN consent");
-      }
-      logger.info(`[initBvnConsent] bvn=${bvn} contact=${resolvedContact} userId=${req.user!.userId}`);
+      const { bvn, contact } = req.body as { bvn: string; contact: string };
+      logger.info(`[initBvnConsent] bvn=${bvn} contact=${contact} userId=${req.user!.userId}`);
       successResponse(
         res,
         200,
         "OTP sent to registered contact",
-        await parentService.initBvnConsent(bvn, resolvedContact),
+        await parentService.initBvnConsent(bvn, contact),
       );
     } catch (error) {
       next(error);

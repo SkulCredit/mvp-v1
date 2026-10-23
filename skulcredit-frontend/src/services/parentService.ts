@@ -128,16 +128,16 @@ export const parentService = {
 
   /**
    * Stage 1 – initiate BVN consent.
-   * The backend auto-uses the authenticated parent's email as the contact,
-   * so no contact param is needed from the frontend.
-   * Returns the masked contact string (e.g. "0808***2636") shown as confirmation.
+   * contact must be the phone number or email registered on the customer's BVN at NIBSS —
+   * Lendsqr uses it to route the OTP to the correct registered contact.
    */
   initBvnConsent: async (
     bvn: string,
+    contact: string,
   ): Promise<{ maskedContact: string }> => {
     const response = await apiClient.post<{
       data: { maskedContact: string };
-    }>("/parents/bvn-consent/init", { bvn });
+    }>("/parents/bvn-consent/init", { bvn, contact });
     return response.data.data;
   },
 

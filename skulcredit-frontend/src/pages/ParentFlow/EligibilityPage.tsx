@@ -1163,10 +1163,17 @@ const EligibilityPage: React.FC = () => {
     }
   };
 
-  /** Stage 1 – send OTP to the parent's email (backend auto-uses account email as BVN contact). */
+  /** Stage 1 – send OTP to the phone/email registered on the customer's BVN. */
   const handleInitBvnConsent = async () => {
     if (!/^\d{11}$/.test(state.step2.bvn.trim())) {
       setErrors((p) => ({ ...p, bvn: "BVN must be exactly 11 digits." }));
+      return;
+    }
+    if (!state.step2.bvnContact.trim()) {
+      setErrors((p) => ({
+        ...p,
+        bvnContact: "Please enter the phone number or email linked to your BVN.",
+      }));
       return;
     }
     patch("step2", {
@@ -1180,6 +1187,7 @@ const EligibilityPage: React.FC = () => {
     try {
       const { maskedContact } = await parentService.initBvnConsent(
         state.step2.bvn.trim(),
+        state.step2.bvnContact.trim(),
       );
       patch("step2", {
         ...state.step2,
@@ -1188,6 +1196,7 @@ const EligibilityPage: React.FC = () => {
         bvnOtp: "",
       });
       clearErr("bvn");
+      clearErr("bvnContact");
     } catch (err) {
       patch("step2", {
         ...state.step2,
@@ -1195,14 +1204,12 @@ const EligibilityPage: React.FC = () => {
         bvnStatus: "error",
       });
       const msg = (err as { message?: string }).message ?? "";
-      // Lendsqr occasionally has infrastructure issues with BVN scraping.
-      // Show a friendlier message instead of the raw internal error.
       const friendlyMsg =
         msg.toLowerCase().includes("selector") ||
         msg.toLowerCase().includes("element found") ||
         msg.toLowerCase().includes("loginform")
           ? "BVN verification is temporarily unavailable. Please try again in a few minutes or contact support."
-          : msg || "Could not send OTP. Please check your BVN and try again.";
+          : msg || "Could not send OTP. Please check your BVN and contact, then try again.";
       showToast(friendlyMsg);
     }
   };
@@ -2727,17 +2734,39 @@ const EligibilityPage: React.FC = () => {
                 </Field>
               )}
 
-              {/* Send OTP button — shown when idle or after error */}
+              {/* Send OTP — contact input + button, shown when idle or after error */}
               {(state.step2.bvnConsentStage === "idle" ||
                 state.step2.bvnConsentStage === "error") && (
-                <button
-                  type="button"
-                  onClick={handleInitBvnConsent}
-                  disabled={!state.step2.bvn.trim() || state.step2.bvn.length !== 11}
-                  className="self-start rounded-lg bg-[#8B1C53] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                <Field
+                  label="Phone Number or Email Linked to Your BVN"
+                  required
+                  error={errors.bvnContact}
+                  hint="Enter the phone number or email that is registered on your BVN at the bank — not necessarily your SkulCredit email."
                 >
-                  Send OTP to Email
-                </button>
+                  <div className="flex gap-2">
+                    <input
+                      value={state.step2.bvnContact}
+                      placeholder="E.g. 08012345678 or you@example.com"
+                      onChange={(e) => {
+                        patch("step2", { ...state.step2, bvnContact: e.target.value });
+                        clearErr("bvnContact");
+                      }}
+                      className={inputCls(errors.bvnContact)}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleInitBvnConsent}
+                      disabled={
+                        !state.step2.bvn.trim() ||
+                        state.step2.bvn.length !== 11 ||
+                        !state.step2.bvnContact.trim()
+                      }
+                      className="shrink-0 rounded-lg bg-[#8B1C53] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#7a1848] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Send OTP
+                    </button>
+                  </div>
+                </Field>
               )}
 
               {/* Sending spinner */}
@@ -2747,7 +2776,7 @@ const EligibilityPage: React.FC = () => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
-                  <p className="text-sm text-[#8B1C53] font-medium">Sending OTP to your email…</p>
+                  <p className="text-sm text-[#8B1C53] font-medium">Sending OTP to your registered contact…</p>
                 </div>
               )}
 
