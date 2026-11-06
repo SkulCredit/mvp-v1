@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { successResponse } from "../utils/response";
 import ApiError from "../utils/apiError";
 import storageService from "../storage/storage.service";
-import { Document } from "../models/index";
+import { Document, Parent } from "../models/index";
 import type { DocumentCreationAttributes } from "../models/Document";
 
 class UploadController {
@@ -14,41 +14,46 @@ class UploadController {
     try {
       if (!req.file) throw new ApiError(400, "No file uploaded");
 
-      // req.user is typed in src/types/express.d.ts — no cast needed
       const userId: string | undefined = req.user?.userId;
       const isPhoto = req.file.mimetype.startsWith("image/");
 
+   
+      let parent: InstanceType<typeof Parent> | null = null;
+      if (userId) {
+        parent = await Parent.findOne({ where: { userId } });
+      }
+
       let result;
 
-      if (isPhoto && userId) {
-        // Profile photo — deterministic public_id so Cloudinary overwrites the old image
+      if (isPhoto && parent) {
+
         result = await storageService.uploadBuffer(
           req.file.buffer,
           req.file.originalname,
-          'skulcredit_photos',
-          { public_id: `skulcredit_photos/parent_${userId}`, overwrite: true },
+          "skulcredit_photos",
+          {
+            public_id: `skulcredit_photos/parent_${parent.id}`,
+            overwrite: true,
+          },
         );
       } else {
         result = await storageService.uploadBuffer(
           req.file.buffer,
           req.file.originalname,
-          'skulcredit_documents',
+          "skulcredit_documents",
         );
       }
 
-      // Persist to Document table so the file is trackable / deletable later
-      if (userId) {
+      if (parent) {
         const existingPhoto = isPhoto
           ? await Document.findOne({
-              where: { parentId: userId, category: "photo" },
+              where: { parentId: parent.id, category: "photo" },
             })
           : null;
 
         if (existingPhoto) {
-          // Guard against pre-migration rows that hold a local path.
-          // Cloudinary public_ids never start with 'uploads/', so skip deletion for legacy records.
           const currentPath = existingPhoto.filePath as string | null;
-          if (currentPath && !currentPath.startsWith('uploads/') && !currentPath.startsWith('/uploads/')) {
+          if (currentPath) {
             await storageService.deleteFile(currentPath);
           }
           await existingPhoto.update({
@@ -57,7 +62,7 @@ class UploadController {
           });
         } else {
           await Document.create({
-            parentId: userId,
+            parentId: parent.id,
             category: isPhoto ? "photo" : "kyc_document",
             filePath: result.publicId,
             fileUrl: result.publicUrl,

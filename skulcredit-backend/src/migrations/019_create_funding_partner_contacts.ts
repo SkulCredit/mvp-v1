@@ -43,15 +43,18 @@ export const up = async (queryInterface: QueryInterface): Promise<void> => {
       },
     });
 
-    await queryInterface.addIndex("funding_partner_contacts", ["funding_partner_id"]);
+    await queryInterface.addIndex("funding_partner_contacts", [
+      "funding_partner_id",
+    ]);
     await queryInterface.addIndex("funding_partner_contacts", ["email"]);
   }
 
-  // Always ensure the unique constraint exists — even if the table was
-  // created by sequelize.sync() without it (sync() doesn't add named constraints).
   await queryInterface.sequelize.query(`
     ALTER TABLE funding_partner_contacts
       DROP CONSTRAINT IF EXISTS uq_fp_contact_email_partner
+  `);
+  await queryInterface.sequelize.query(`
+    DROP INDEX IF EXISTS uq_fp_contact_email_partner
   `);
   await queryInterface.addConstraint("funding_partner_contacts", {
     fields: ["email", "funding_partner_id"],

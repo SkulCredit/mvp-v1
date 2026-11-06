@@ -1,18 +1,16 @@
-
-
-import logger from '../config/logger';
-import { LoanLedger, LoanApplication } from '../models/index';
-import { LedgerState, LedgerActor, Settlement } from '../models/LoanLedger';
-import { Op } from 'sequelize';
-
+import logger from "../config/logger";
+import { LoanLedger, LoanApplication, Disbursement } from "../models/index";
+import { LedgerState, LedgerActor, Settlement } from "../models/LoanLedger";
+import { Op } from "sequelize";
+import ledgerService from "./ledger.service";
 
 export type LendsqrEventType =
-  | 'loan.disbursed'
-  | 'loan.approved'
-  | 'loan.declined'
-  | 'loan.repaid'
-  | 'loan.overdue'
-  | string; 
+  | "loan.disbursed"
+  | "loan.approved"
+  | "loan.declined"
+  | "loan.repaid"
+  | "loan.overdue"
+  | string;
 
 export interface LendsqrWebhookPayload {
   event: LendsqrEventType;
@@ -38,40 +36,40 @@ interface StateTransitionPlan {
 
 function resolvePlan(event: LendsqrEventType): StateTransitionPlan | null {
   switch (event) {
-    case 'loan.approved':
+    case "loan.approved":
       return {
-        nextState: 'AUTHORIZED',
-        actor: 'LENDSQR',
-        message: 'Loan approved by Lendsqr',
+        nextState: "AUTHORIZED",
+        actor: "LENDSQR",
+        message: "Loan approved by Lendsqr",
       };
 
-    case 'loan.disbursed':
+    case "loan.disbursed":
       return {
-        nextState: 'DELIVERED',
-        actor: 'LENDSQR',
-        message: 'Loan disbursed successfully',
-        terminalLoanAppStatus: 'disbursed',
+        nextState: "DELIVERED",
+        actor: "LENDSQR",
+        message: "Loan disbursed successfully",
+        terminalLoanAppStatus: "disbursed",
         isSettled: true,
       };
 
-    case 'loan.repaid':
+    case "loan.repaid":
       return {
-        nextState: 'DELIVERED',
-        actor: 'LENDSQR',
-        message: 'Loan fully repaid',
-        terminalLoanAppStatus: 'repaid',
+        nextState: "DELIVERED",
+        actor: "LENDSQR",
+        message: "Loan fully repaid",
+        terminalLoanAppStatus: "repaid",
         isSettled: true,
       };
 
-    case 'loan.declined':
+    case "loan.declined":
       return {
-        nextState: 'FAILED',
-        actor: 'LENDSQR',
-        message: 'Loan declined by Lendsqr',
-        terminalLoanAppStatus: 'rejected',
+        nextState: "FAILED",
+        actor: "LENDSQR",
+        message: "Loan declined by Lendsqr",
+        terminalLoanAppStatus: "rejected",
       };
 
-    case 'loan.overdue':
+    case "loan.overdue":
       return null;
 
     default:
@@ -80,7 +78,6 @@ function resolvePlan(event: LendsqrEventType): StateTransitionPlan | null {
 }
 
 class WebhookService {
-
   async handleLendsqrWebhook(
     payload: LendsqrWebhookPayload,
   ): Promise<{ handled: boolean; message: string }> {
@@ -99,7 +96,10 @@ class WebhookService {
       logger.warn(
         `[webhook] No LoanLedger found for loan_id=${loan_id} (event=${event})`,
       );
-      return { handled: false, message: `No ledger found for loan_id=${loan_id}` };
+      return {
+        handled: false,
+        message: `No ledger found for loan_id=${loan_id}`,
+      };
     }
 
     const updatedPayloads = [
@@ -113,11 +113,18 @@ class WebhookService {
       logger.info(
         `[webhook] No transition mapped for event="${event}" — stored payload only`,
       );
-      return { handled: false, message: `Event "${event}" stored but not acted on` };
+      return {
+        handled: false,
+        message: `Event "${event}" stored but not acted on`,
+      };
     }
 
     const currentState = ledger.status;
-    if (currentState === plan.nextState || currentState === 'DELIVERED' || currentState === 'FAILED') {
+    if (
+      currentState === plan.nextState ||
+      currentState === "DELIVERED" ||
+      currentState === "FAILED"
+    ) {
       logger.info(
         `[webhook] Ledger ${ledger.id} already in state=${currentState} — skipping transition to ${plan.nextState}`,
       );
@@ -125,21 +132,24 @@ class WebhookService {
     }
 
     const now = new Date().toISOString();
-    const settlementUpdate: Partial<{ settlement: Settlement; completedAt: string }> = {};
+    const settlementUpdate: Partial<{
+      settlement: Settlement;
+      completedAt: string;
+    }> = {};
 
     if (plan.isSettled) {
       const settlement: Settlement = {
         settledAt: data.disbursed_at ?? now,
         settlementReference:
           (data.settlement_reference as string | undefined) ??
-          `SET_${Math.random().toString(16).slice(2).padStart(32, '0')}`,
-        status: 'SETTLED',
+          `SET_${Math.random().toString(16).slice(2).padStart(32, "0")}`,
+        status: "SETTLED",
       };
       settlementUpdate.settlement = settlement;
       settlementUpdate.completedAt = now;
     }
 
-    if (plan.nextState === 'FAILED') {
+    if (plan.nextState === "FAILED") {
       settlementUpdate.completedAt = now;
     }
 
@@ -150,18 +160,23 @@ class WebhookService {
     );
 
     if (!alreadyAllowed) {
-      smCopy.allowedTransitions.push({ from: currentState, to: plan.nextState });
+      smCopy.allowedTransitions.push({
+        from: currentState,
+        to: plan.nextState,
+      });
       await ledger.update({ stateMachine: smCopy });
       await ledger.reload();
     }
 
     await ledger.transition(plan.nextState, plan.actor, plan.message, {
       ...(plan.isSettled && settlementUpdate.settlement
-        ? { settlement: settlementUpdate.settlement, completedAt: settlementUpdate.completedAt }
+        ? {
+            settlement: settlementUpdate.settlement,
+            completedAt: settlementUpdate.completedAt,
+          }
         : {}),
-      ...(plan.nextState === 'FAILED' ? { completedAt: now } : {}),
+      ...(plan.nextState === "FAILED" ? { completedAt: now } : {}),
     });
-
 
     if (plan.terminalLoanAppStatus) {
       await LoanApplication.update(
@@ -170,6 +185,46 @@ class WebhookService {
       );
       logger.info(
         `[webhook] LoanApplication ${ledger.loanApplicationId} status → ${plan.terminalLoanAppStatus}`,
+      );
+    }
+
+    try {
+      if (event === "loan.disbursed") {
+        const disbursement = await Disbursement.findOne({
+          where: { loanApplicationId: ledger.loanApplicationId },
+        });
+        if (disbursement) {
+          const loan = await LoanApplication.findByPk(ledger.loanApplicationId);
+          const serviceChargeAmount = loan?.serviceChargeAmount
+            ? Number(loan.serviceChargeAmount)
+            : 0;
+
+          await ledgerService.postDisbursement({
+            loanApplicationId: ledger.loanApplicationId,
+            disbursementId: disbursement.id,
+            disbursementRef:
+              disbursement.disbursementReference ??
+              `DSB-${disbursement.id.slice(0, 8)}`,
+            paystackRef: disbursement.paystackReference ?? undefined,
+            principalAmount: Number(disbursement.amount),
+            serviceChargeAmount,
+            actor: "LENDSQR",
+            effectiveDate: data.disbursed_at
+              ? new Date(data.disbursed_at)
+              : new Date(),
+          });
+          logger.info(
+            `[webhook] Disbursement ledger journal posted for loan=${ledger.loanApplicationId}`,
+          );
+        } else {
+          logger.warn(
+            `[webhook] No Disbursement record found for loan=${ledger.loanApplicationId} — ledger posting skipped`,
+          );
+        }
+      }
+    } catch (ledgerErr) {
+      logger.error(
+        `[webhook] Ledger posting failed for loan=${ledger.loanApplicationId} event=${event} (non-fatal): ${ledgerErr}`,
       );
     }
 
@@ -190,12 +245,12 @@ class WebhookService {
   async getLedgersByParentId(parentId: string) {
     const applications = await LoanApplication.findAll({
       where: { parentId },
-      attributes: ['id'],
+      attributes: ["id"],
     });
     const ids = applications.map((a) => a.id);
     return LoanLedger.findAll({
       where: { loanApplicationId: { [Op.in]: ids } },
-      order: [['createdAt', 'DESC']],
+      order: [["createdAt", "DESC"]],
     });
   }
 }

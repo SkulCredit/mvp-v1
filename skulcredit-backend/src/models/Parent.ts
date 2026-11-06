@@ -25,7 +25,6 @@ export interface ParentAttributes {
   yearsInRole: string | null;
   monthlyIncome: string | null;
   eligibilityBlockedUntil: string | null;
-  // New fields added in migration 025
   bankAccountNumber: string | null;
   bankCode: string | null;
   bvnPhoneNumber: string | null;

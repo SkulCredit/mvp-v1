@@ -6,7 +6,11 @@ import parentService from "../services/parent.service";
 import schoolService from "../services/school.service";
 import notificationService from "../notifications/notification.service";
 import { successResponse } from "../utils/response";
-import { SchoolBankAccount, CatalogSchool, LoanApplication } from "../models/index";
+import {
+  SchoolBankAccount,
+  CatalogSchool,
+  LoanApplication,
+} from "../models/index";
 import { ParentRepository, UserRepository } from "../repositories";
 import ApiError from "../utils/apiError";
 
@@ -166,6 +170,23 @@ class AdminController {
     }
   }
 
+  async updateStaffUser(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      successResponse(
+        res,
+        200,
+        "User updated",
+        await adminService.updateStaffUser(String(req.params.id), req.body),
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+
   async createStaffUser(
     req: Request,
     res: Response,
@@ -185,7 +206,11 @@ class AdminController {
       if (!email || !password)
         throw new ApiError(400, "email and password are required");
 
-      const allowedRoles = ["admin", "customer_service", "customer_service_manager"];
+      const allowedRoles = [
+        "admin",
+        "customer_service",
+        "customer_service_manager",
+      ];
       const assignedRole = allowedRoles.includes(role ?? "")
         ? (role as "admin" | "customer_service" | "customer_service_manager")
         : "admin";
@@ -315,7 +340,10 @@ class AdminController {
         res,
         200,
         "School updated",
-        await adminService.updateSchool(String(req.params.id), req.body as never),
+        await adminService.updateSchool(
+          String(req.params.id),
+          req.body as never,
+        ),
       );
     } catch (e) {
       next(e);
@@ -328,7 +356,12 @@ class AdminController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      successResponse(res, 201, "School created", await adminService.createSchool(req.body as never));
+      successResponse(
+        res,
+        201,
+        "School created",
+        await adminService.createSchool(req.body as never),
+      );
     } catch (e) {
       next(e);
     }
@@ -1689,7 +1722,8 @@ class AdminController {
         contactId?: string;
         note?: string;
       };
-      if (!fundingPartnerId) throw new ApiError(400, "fundingPartnerId is required");
+      if (!fundingPartnerId)
+        throw new ApiError(400, "fundingPartnerId is required");
       successResponse(
         res,
         200,
@@ -2130,33 +2164,84 @@ class AdminController {
     }
   }
 
-  async getSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getSettings(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      successResponse(res, 200, "Settings fetched", await adminService.getAllSettings());
-    } catch (e) { next(e); }
+      successResponse(
+        res,
+        200,
+        "Settings fetched",
+        await adminService.getAllSettings(),
+      );
+    } catch (e) {
+      next(e);
+    }
   }
 
-  async getSettingsSection(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getSettingsSection(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const section = String(req.params.section);
-      const VALID = ["security", "database", "notifications", "platform", "audit"];
-      if (!VALID.includes(section)) throw new ApiError(400, `Invalid section: ${section}`);
-      successResponse(res, 200, "Settings fetched", await adminService.getSection(section));
-    } catch (e) { next(e); }
+      const VALID = [
+        "security",
+        "database",
+        "notifications",
+        "platform",
+        "audit",
+      ];
+      if (!VALID.includes(section))
+        throw new ApiError(400, `Invalid section: ${section}`);
+      successResponse(
+        res,
+        200,
+        "Settings fetched",
+        await adminService.getSection(section),
+      );
+    } catch (e) {
+      next(e);
+    }
   }
 
-  async updateSettingsSection(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateSettingsSection(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const section = String(req.params.section);
-      const VALID = ["security", "database", "notifications", "platform", "audit"];
-      if (!VALID.includes(section)) throw new ApiError(400, `Invalid section: ${section}`);
+      const VALID = [
+        "security",
+        "database",
+        "notifications",
+        "platform",
+        "audit",
+      ];
+      if (!VALID.includes(section))
+        throw new ApiError(400, `Invalid section: ${section}`);
       const user = (req as any).user;
       const updatedBy = user?.email ?? user?.id ?? "admin";
-      successResponse(res, 200, "Settings updated", await adminService.upsertSection(section, req.body, updatedBy));
-    } catch (e) { next(e); }
+      successResponse(
+        res,
+        200,
+        "Settings updated",
+        await adminService.upsertSection(section, req.body, updatedBy),
+      );
+    } catch (e) {
+      next(e);
+    }
   }
 
-  async exportDatabase(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async exportDatabase(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const child = adminService.exportDatabase();
       const stderrChunks: Buffer[] = [];
@@ -2169,65 +2254,156 @@ class AdminController {
         }
       });
       res.setHeader("Content-Type", "application/octet-stream");
-      res.setHeader("Content-Disposition", 'attachment; filename="skulcredit.sql"');
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="skulcredit.sql"',
+      );
       child.stdout!.pipe(res);
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
-  async backupDatabase(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async backupDatabase(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      successResponse(res, 200, "Backup completed", await adminService.backupDatabase());
-    } catch (e) { next(e); }
+      successResponse(
+        res,
+        200,
+        "Backup completed",
+        await adminService.backupDatabase(),
+      );
+    } catch (e) {
+      next(e);
+    }
   }
 
-  async testEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async testEmail(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       await adminService.testEmail(req.body);
       successResponse(res, 200, "Test email sent", {});
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
-  async exportAuditLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async exportAuditLogs(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const { AuditLog } = await import("../models/index");
       const logs = await AuditLog.findAll({ order: [["createdAt", "DESC"]] });
-      const header = "id,category,action,eventStatus,severity,actorId,actorRole,method,path,statusCode,ipAddress,createdAt\n";
-      const rows = logs.map((l) => [
-        l.id, l.category, l.action, l.eventStatus, l.severity,
-        l.actorId ?? "", l.actorRole, l.method ?? "", l.path ?? "",
-        l.statusCode ?? "", l.ipAddress ?? "",
-        l.createdAt?.toISOString() ?? "",
-      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+      const header =
+        "id,category,action,eventStatus,severity,actorId,actorRole,method,path,statusCode,ipAddress,createdAt\n";
+      const rows = logs
+        .map((l) =>
+          [
+            l.id,
+            l.category,
+            l.action,
+            l.eventStatus,
+            l.severity,
+            l.actorId ?? "",
+            l.actorRole,
+            l.method ?? "",
+            l.path ?? "",
+            l.statusCode ?? "",
+            l.ipAddress ?? "",
+            l.createdAt?.toISOString() ?? "",
+          ]
+            .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+            .join(","),
+        )
+        .join("\n");
       res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", 'attachment; filename="audit-logs.csv"');
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="audit-logs.csv"',
+      );
       res.send(header + rows);
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
-  async getAdminProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getAdminProfile(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const userId = (req as any).user?.userId;
-      successResponse(res, 200, "Profile fetched", await adminService.getAdminProfile(userId));
-    } catch (e) { next(e); }
+      successResponse(
+        res,
+        200,
+        "Profile fetched",
+        await adminService.getAdminProfile(userId),
+      );
+    } catch (e) {
+      next(e);
+    }
   }
 
-  async updateAdminProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateAdminProfile(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const userId = (req as any).user?.userId;
-      const { fullName, phone, avatarUrl } = req.body as { fullName?: string; phone?: string; avatarUrl?: string };
-      successResponse(res, 200, "Profile updated", await adminService.updateAdminProfile(userId, { fullName, phone, avatarUrl }));
-    } catch (e) { next(e); }
+      const { fullName, phone, avatarUrl } = req.body as {
+        fullName?: string;
+        phone?: string;
+        avatarUrl?: string;
+      };
+      successResponse(
+        res,
+        200,
+        "Profile updated",
+        await adminService.updateAdminProfile(userId, {
+          fullName,
+          phone,
+          avatarUrl,
+        }),
+      );
+    } catch (e) {
+      next(e);
+    }
   }
 
-  async updateAdminPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateAdminPassword(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const userId = (req as any).user?.userId;
-      const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
-      if (!currentPassword || !newPassword) throw new ApiError(400, "currentPassword and newPassword are required");
-      if (newPassword.length < 8) throw new ApiError(400, "New password must be at least 8 characters");
-      await adminService.updateAdminPassword(userId, currentPassword, newPassword);
+      const { currentPassword, newPassword } = req.body as {
+        currentPassword: string;
+        newPassword: string;
+      };
+      if (!currentPassword || !newPassword)
+        throw new ApiError(400, "currentPassword and newPassword are required");
+      if (newPassword.length < 8)
+        throw new ApiError(400, "New password must be at least 8 characters");
+      await adminService.updateAdminPassword(
+        userId,
+        currentPassword,
+        newPassword,
+      );
       successResponse(res, 200, "Password updated", {});
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
   async createMandate(
@@ -2241,7 +2417,9 @@ class AdminController {
       // Look up the application's parent to get the userId
       const application = await LoanApplication.findByPk(id);
       if (!application) throw new ApiError(404, "Application not found");
-      const parent = await ParentRepository.findOne({ id: application.parentId });
+      const parent = await ParentRepository.findOne({
+        id: application.parentId,
+      });
       if (!parent) throw new ApiError(404, "Parent not found");
       successResponse(
         res,
@@ -2267,7 +2445,9 @@ class AdminController {
       const id = String(req.params.id);
       const application = await LoanApplication.findByPk(id);
       if (!application) throw new ApiError(404, "Application not found");
-      const parent = await ParentRepository.findOne({ id: application.parentId });
+      const parent = await ParentRepository.findOne({
+        id: application.parentId,
+      });
       if (!parent) throw new ApiError(404, "Parent not found");
       successResponse(
         res,
@@ -2289,13 +2469,19 @@ class AdminController {
       const id = String(req.params.id);
       const application = await LoanApplication.findByPk(id);
       if (!application) throw new ApiError(404, "Application not found");
-      const parent = await ParentRepository.findOne({ id: application.parentId });
+      const parent = await ParentRepository.findOne({
+        id: application.parentId,
+      });
       if (!parent) throw new ApiError(404, "Parent not found");
       successResponse(
         res,
         200,
         "Mandate deactivated",
-        await parentService.updateMandateStatus(parent.userId, id, "deactivate"),
+        await parentService.updateMandateStatus(
+          parent.userId,
+          id,
+          "deactivate",
+        ),
       );
     } catch (e) {
       next(e);
@@ -2311,7 +2497,9 @@ class AdminController {
       const id = String(req.params.id);
       const application = await LoanApplication.findByPk(id);
       if (!application) throw new ApiError(404, "Application not found");
-      const parent = await ParentRepository.findOne({ id: application.parentId });
+      const parent = await ParentRepository.findOne({
+        id: application.parentId,
+      });
       if (!parent) throw new ApiError(404, "Parent not found");
       successResponse(
         res,
@@ -2333,7 +2521,9 @@ class AdminController {
       const id = String(req.params.id);
       const application = await LoanApplication.findByPk(id);
       if (!application) throw new ApiError(404, "Application not found");
-      const parent = await ParentRepository.findOne({ id: application.parentId });
+      const parent = await ParentRepository.findOne({
+        id: application.parentId,
+      });
       if (!parent) throw new ApiError(404, "Parent not found");
       const user = await UserRepository.findOne({ id: parent.userId });
       if (!user) throw new ApiError(404, "User not found");

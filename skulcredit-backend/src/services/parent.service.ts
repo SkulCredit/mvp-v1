@@ -178,7 +178,6 @@ class ParentService {
       }),
     });
 
-    // Persist KYC documents to the documents table (JSON flow)
     if (kycData.documents && kycData.documents.length > 0) {
       for (const doc of kycData.documents) {
         await Document.create({
@@ -192,9 +191,9 @@ class ParentService {
       }
     }
 
-    // Adjutor customer registration (non-blocking)
     try {
-      const isRegistered = parent.lendsqrCustomerId && parent.lendsqrCustomerId !== "registered";
+      const isRegistered =
+        parent.lendsqrCustomerId && parent.lendsqrCustomerId !== "registered";
       if (!isRegistered) {
         const user = await UserRepository.findOne({ id: userId });
         if (user) {
@@ -202,8 +201,8 @@ class ParentService {
           const phone234 = rawPhone.startsWith("0")
             ? "234" + rawPhone.slice(1)
             : rawPhone.startsWith("+")
-            ? rawPhone.slice(1)
-            : rawPhone;
+              ? rawPhone.slice(1)
+              : rawPhone;
           const adjutorPayload = {
             phone_number: phone234,
             email: user.email,
@@ -222,7 +221,9 @@ class ParentService {
               sub_type_id: d.sub_type_id,
             })),
           };
-          const response = await lendsqrCustomerService.createCustomer(adjutorPayload) as any;
+          const response = (await lendsqrCustomerService.createCustomer(
+            adjutorPayload,
+          )) as any;
           const adjutorId =
             response?.data?.users?.[0]?.id ??
             response?.data?.id ??
@@ -230,14 +231,20 @@ class ParentService {
           if (adjutorId != null) {
             await lendsqrCustomerService.activateCustomer(adjutorId);
             await parent.update({ lendsqrCustomerId: String(adjutorId) });
-            logger.info(`Adjutor customer registered and activated for parent ${parent.id}: adjutorId=${adjutorId}`);
+            logger.info(
+              `Adjutor customer registered and activated for parent ${parent.id}: adjutorId=${adjutorId}`,
+            );
           } else {
-            logger.warn(`Adjutor customer created but no ID returned for parent ${parent.id}`);
+            logger.warn(
+              `Adjutor customer created but no ID returned for parent ${parent.id}`,
+            );
           }
         }
       }
     } catch (adjutorErr) {
-      logger.error(`Adjutor registration failed for parent ${parent.id} (non-fatal): ${adjutorErr}`);
+      logger.error(
+        `Adjutor registration failed for parent ${parent.id} (non-fatal): ${adjutorErr}`,
+      );
     }
 
     eventNotifier.notifyKycVerified(userId);
@@ -253,20 +260,33 @@ class ParentService {
     return response.data;
   }
 
-  async initBvnConsent(bvn: string, contact: string): Promise<{ maskedContact: string }> {
+  async initBvnConsent(
+    bvn: string,
+    contact: string,
+  ): Promise<{ maskedContact: string }> {
     const response = await identityService.initBvnConsent(bvn, contact);
     if (response.status !== "otp") {
-      logger.error(`[parent.service] initBvnConsent failed — bvn=${bvn} status=${response.status} message=${response.message}`);
+      logger.error(
+        `[parent.service] initBvnConsent failed — bvn=${bvn} status=${response.status} message=${response.message}`,
+      );
       throw new ApiError(400, response.message ?? "Failed to send OTP");
     }
-    logger.info(`[parent.service] initBvnConsent success — bvn=${bvn} maskedContact=${response.data}`);
+    logger.info(
+      `[parent.service] initBvnConsent success — bvn=${bvn} maskedContact=${response.data}`,
+    );
     return { maskedContact: response.data };
   }
 
-  async completeBvnConsent(bvn: string, otp: string): Promise<BvnVerificationData> {
+  async completeBvnConsent(
+    bvn: string,
+    otp: string,
+  ): Promise<BvnVerificationData> {
     const response = await identityService.completeBvnConsent(bvn, otp);
     if (response.status !== "success" || !response.data) {
-      throw new ApiError(400, response.message ?? "BVN consent verification failed");
+      throw new ApiError(
+        400,
+        response.message ?? "BVN consent verification failed",
+      );
     }
     return response.data;
   }
@@ -286,10 +306,10 @@ class ParentService {
     const user = await UserRepository.findById(userId);
     if (!parent || !user) throw new ApiError(404, "Parent profile not found");
 
-    // BVN is optional — NIN-only flow has no BVN to check.
-    // Skip the external score call and return a pass so the wizard can proceed.
     if (!bvn || !/^\d{11}$/.test(bvn)) {
-      logger.info(`[parent.service] checkLoanScore: no valid BVN supplied — skipping Lendsqr call, returning pass`);
+      logger.info(
+        `[parent.service] checkLoanScore: no valid BVN supplied — skipping Lendsqr call, returning pass`,
+      );
       return evaluateCreditScore(null);
     }
 
@@ -432,7 +452,10 @@ class ParentService {
       tuitionAmount: 0,
       ...studentData,
     } as never);
-    eventNotifier.notifyStudentAdded(userId, `${studentData.firstName} ${studentData.lastName}`);
+    eventNotifier.notifyStudentAdded(
+      userId,
+      `${studentData.firstName} ${studentData.lastName}`,
+    );
     return student;
   }
 
@@ -895,17 +918,16 @@ class ParentService {
       const photoResult = await storageService.uploadBuffer(
         file.buffer,
         file.originalname,
-        'skulcredit_photos',
+        "skulcredit_photos",
         { public_id: `skulcredit_photos/parent_${userId}`, overwrite: true },
       );
       const existingPhoto = await Document.findOne({
         where: { parentId: parent.id, category: "photo" },
       });
       if (existingPhoto) {
-        // Guard against pre-migration rows that hold a local path (e.g. 'uploads/photos/abc.jpg').
-        // Cloudinary public_ids never start with 'uploads/', so skip deletion for legacy records.
+        // Delete the previous photo file (local storage paths start with "uploads/")
         const currentPath = existingPhoto.filePath as string | null;
-        if (currentPath && !currentPath.startsWith('uploads/') && !currentPath.startsWith('/uploads/')) {
+        if (currentPath) {
           await storageService.deleteFile(currentPath);
         }
         await existingPhoto.update({
@@ -936,7 +958,10 @@ class ParentService {
     }> = [];
 
     for (const doc of payload.kycDocuments) {
-      const docResult = await storageService.uploadMulterFile(doc, 'skulcredit_documents');
+      const docResult = await storageService.uploadMulterFile(
+        doc,
+        "skulcredit_documents",
+      );
 
       await Document.create({
         parentId: parent.id,
@@ -1134,29 +1159,20 @@ class ParentService {
     if (parent.kycStatus !== "approved") {
       const missing: string[] = [];
 
-      if (!parent.bvn && !parent.nin)
-        missing.push("BVN or NIN verification");
-      if (!parent.dob)
-        missing.push("Date of birth");
+      if (!parent.bvn && !parent.nin) missing.push("BVN or NIN verification");
+      if (!parent.dob) missing.push("Date of birth");
       if (!parent.addressState || !parent.addressCity || !parent.addressStreet)
         missing.push("Residential address (state, city, street)");
-      if (!parent.profilePhotoUrl)
-        missing.push("Profile photo");
-      if (!parent.relationship)
-        missing.push("Relationship to student");
-      if (!parent.employerType)
-        missing.push("Employment type");
-      if (!parent.yearsInRole)
-        missing.push("Years in current role");
-      if (!parent.monthlyIncome)
-        missing.push("Monthly income range");
+      if (!parent.profilePhotoUrl) missing.push("Profile photo");
+      if (!parent.relationship) missing.push("Relationship to student");
+      if (!parent.employerType) missing.push("Employment type");
+      if (!parent.yearsInRole) missing.push("Years in current role");
+      if (!parent.monthlyIncome) missing.push("Monthly income range");
       if (!parent.bankAccountNumber || !parent.bankCode)
         missing.push("Bank account details (account number and bank)");
 
       const missingMsg =
-        missing.length > 0
-          ? ` Missing: ${missing.join("; ")}.`
-          : "";
+        missing.length > 0 ? ` Missing: ${missing.join("; ")}.` : "";
 
       throw new ApiError(
         400,
@@ -1284,22 +1300,24 @@ class ParentService {
     UserRepository.findById(userId)
       .then((user) => {
         if (!user?.email) return;
-        const planLabel      = formatTenorLabel(payload.tenor);
+        const planLabel = formatTenorLabel(payload.tenor);
         const amountFormatted = formatNaira(payload.tuitionAmount);
 
-        emailService.sendApplicationReceived({
-          email:           user.email,
-          parentName:      parent.firstName,
-          referenceNumber: application.referenceNumber ?? "",
-          studentName:     `${student.firstName} ${student.lastName}`,
-          schoolName:      catalogSchool?.name ?? manualSchoolName ?? "—",
-          repaymentPlan:   planLabel,
-          totalAmount:     amountFormatted,
-        }).catch((err) =>
-          logger.warn(
-            `[parent.service] Parent confirmation email failed: ${(err as Error).message}`,
-          ),
-        );
+        emailService
+          .sendApplicationReceived({
+            email: user.email,
+            parentName: parent.firstName,
+            referenceNumber: application.referenceNumber ?? "",
+            studentName: `${student.firstName} ${student.lastName}`,
+            schoolName: catalogSchool?.name ?? manualSchoolName ?? "—",
+            repaymentPlan: planLabel,
+            totalAmount: amountFormatted,
+          })
+          .catch((err) =>
+            logger.warn(
+              `[parent.service] Parent confirmation email failed: ${(err as Error).message}`,
+            ),
+          );
 
         if (!isManualSchool && catalogSchool) {
           this._sendSchoolVerificationEmail({
@@ -1676,9 +1694,11 @@ class ParentService {
       registeredSchool?.bankAccountName ??
       "N/A";
 
-    const amountFmt       = formatNaira(app.amountRequested);
-    const serviceChargeFmt = app.serviceChargeAmount ? formatNaira(app.serviceChargeAmount) : "N/A";
-    const tenorLabel      = formatTenorLabel(app.tenor);
+    const amountFmt = formatNaira(app.amountRequested);
+    const serviceChargeFmt = app.serviceChargeAmount
+      ? formatNaira(app.serviceChargeAmount)
+      : "N/A";
+    const tenorLabel = formatTenorLabel(app.tenor);
 
     const schedule = await RepaymentSchedule.findAll({
       where: { loanApplicationId: app.id },
@@ -1687,29 +1707,29 @@ class ParentService {
 
     const scheduleRows = schedule.map((s) => ({
       installment: s.installmentNumber,
-      dueDate:     String(s.dueDate),
-      amount:      formatNaira(s.totalAmount),
+      dueDate: String(s.dueDate),
+      amount: formatNaira(s.totalAmount),
     }));
 
     for (const recipient of recipients) {
       await emailService.sendFundingRequest({
-        email:            recipient.email,
-        recipientName:    recipient.name,
-        referenceNumber:  app.referenceNumber ?? app.id,
-        parentName:       `${parent.firstName} ${parent.lastName}`,
-        studentName:      `${student?.firstName ?? "—"} ${student?.lastName ?? ""}`,
-        admissionNumber:  student?.studentId ?? "N/A",
-        gradeLevel:       student?.gradeLevel ?? "N/A",
-        schoolName:       catalogSchool?.name ?? "N/A",
-        schoolTier:       catalogSchool?.tier ? `Tier ${catalogSchool.tier}` : "N/A",
-        repaymentPlan:    tenorLabel,
+        email: recipient.email,
+        recipientName: recipient.name,
+        referenceNumber: app.referenceNumber ?? app.id,
+        parentName: `${parent.firstName} ${parent.lastName}`,
+        studentName: `${student?.firstName ?? "—"} ${student?.lastName ?? ""}`,
+        admissionNumber: student?.studentId ?? "N/A",
+        gradeLevel: student?.gradeLevel ?? "N/A",
+        schoolName: catalogSchool?.name ?? "N/A",
+        schoolTier: catalogSchool?.tier ? `Tier ${catalogSchool.tier}` : "N/A",
+        repaymentPlan: tenorLabel,
         serviceChargePaid: serviceChargeFmt,
         amountToDisburse: amountFmt,
-        bankName:         bankName,
-        accountNumber:    accountNumber,
-        accountName:      accountName,
+        bankName: bankName,
+        accountNumber: accountNumber,
+        accountName: accountName,
         scheduleRows,
-        adminLink:        disbursementUrl,
+        adminLink: disbursementUrl,
       });
       logger.info(
         `[parent.service] Funding partner email sent to ${recipient.email} for application ${app.id}`,
@@ -1763,16 +1783,16 @@ class ParentService {
       const loginThenVerifyLink = `${frontendUrl}/auth/school?next=${encodeURIComponent("/school/applications")}`;
 
       await emailService.sendSchoolVerificationRegistered({
-        email:           schoolUser.email,
-        schoolName:      catalogSchool.name,
-        studentName:     `${student.firstName} ${student.lastName}`,
+        email: schoolUser.email,
+        schoolName: catalogSchool.name,
+        studentName: `${student.firstName} ${student.lastName}`,
         admissionNumber: student.studentId ?? "N/A",
-        gradeLevel:      student.gradeLevel ?? "N/A",
-        parentName:      `${parent.firstName} ${parent.lastName}`,
-        tuitionAmount:   formatNaira(application.amountRequested),
+        gradeLevel: student.gradeLevel ?? "N/A",
+        parentName: `${parent.firstName} ${parent.lastName}`,
+        tuitionAmount: formatNaira(application.amountRequested),
         referenceNumber: application.referenceNumber ?? "",
         verifyLink,
-        loginLink:       loginThenVerifyLink,
+        loginLink: loginThenVerifyLink,
       });
 
       logger.info(
@@ -1801,13 +1821,13 @@ class ParentService {
       }
 
       await emailService.sendSchoolVerificationUnregistered({
-        email:           contactEmail,
-        schoolName:      catalogSchool.name,
-        studentName:     `${student.firstName} ${student.lastName}`,
+        email: contactEmail,
+        schoolName: catalogSchool.name,
+        studentName: `${student.firstName} ${student.lastName}`,
         admissionNumber: student.studentId ?? "N/A",
-        gradeLevel:      student.gradeLevel ?? "N/A",
-        parentName:      `${parent.firstName} ${parent.lastName}`,
-        tuitionAmount:   formatNaira(application.amountRequested),
+        gradeLevel: student.gradeLevel ?? "N/A",
+        parentName: `${parent.firstName} ${parent.lastName}`,
+        tuitionAmount: formatNaira(application.amountRequested),
         referenceNumber: application.referenceNumber ?? "",
       });
 
@@ -1817,12 +1837,6 @@ class ParentService {
     }
   }
 
-  /**
-   * Records a repayment installment payment.
-   * Verifies via Aletpay for bank-transfer payments.
-   * Card payments use a CARD-{timestamp} synthetic reference that bypasses
-   * Aletpay verification; amount is derived from the selected schedule rows.
-   */
   async payInstallment(
     userId: string,
     applicationId: string,
@@ -1841,14 +1855,11 @@ class ParentService {
     });
     if (!application) throw new ApiError(404, "Application not found");
 
-    // Resolve the reference — prefer Aletpay transactionReference, fall back to legacy paystackReference
     const ref = payload.transactionReference ?? payload.paystackReference;
     if (!ref) throw new ApiError(400, "A transaction reference is required");
 
     let amountPaid: number;
 
-    // ── Step 1: fetch schedules early so the expected amount is available
-    //   for both the Aletpay tolerance check and the CARD-* fallback.
     const schedules = await RepaymentSchedule.findAll({
       where: {
         id: { [Op.in]: payload.scheduleIds },
@@ -1867,7 +1878,6 @@ class ParentService {
     );
 
     if (ref.startsWith("CARD-")) {
-      // Synthetic card reference — skip Aletpay; amount derived from schedules below
       amountPaid = 0;
     } else {
       const txn = await aletpayService.getTransaction(ref);
@@ -1878,7 +1888,9 @@ class ParentService {
           `Payment verification failed — transaction status: ${txn.status}`,
         );
       }
-      amountPaid = Number(txn.amountSent ?? (txn as Record<string, unknown>).amount ?? 0);
+      amountPaid = Number(
+        txn.amountSent ?? (txn as Record<string, unknown>).amount ?? 0,
+      );
 
       // ── Finding #2: tolerance check — reject if transferred amount differs
       //   from expected schedule total by more than ₦1.
@@ -1890,14 +1902,10 @@ class ParentService {
       }
     }
 
-    // If Aletpay returned zero amount (or card payment), derive from schedules
     if (amountPaid === 0) {
       amountPaid = expectedTotal;
     }
 
-    // ── Finding #1: idempotency guard — use findOrCreate so a race between
-    //   the 30-second auto-poll and a manual button tap never causes a
-    //   UniqueConstraintError on paystackReference.
     let repayment: Repayment;
     try {
       const [record] = await Repayment.findOrCreate({
@@ -1918,9 +1926,15 @@ class ParentService {
       repayment = record;
     } catch (err) {
       if (err instanceof UniqueConstraintError) {
-        // Another concurrent request already created this repayment — fetch it.
-        const existing = await Repayment.findOne({ where: { paystackReference: ref } });
-        if (!existing) throw new ApiError(500, "Repayment reference conflict; please try again.");
+     
+        const existing = await Repayment.findOne({
+          where: { paystackReference: ref },
+        });
+        if (!existing)
+          throw new ApiError(
+            500,
+            "Repayment reference conflict; please try again.",
+          );
         repayment = existing;
       } else {
         throw err;
@@ -1975,8 +1989,14 @@ class ParentService {
   ) {
     const parent = await ParentRepository.findOne({ userId });
     if (!parent) throw new ApiError(404, "Parent profile not found");
-    if (!parent.lendsqrCustomerId || parent.lendsqrCustomerId === "registered") {
-      throw new ApiError(400, "Parent is not registered in Adjutor — complete KYC first");
+    if (
+      !parent.lendsqrCustomerId ||
+      parent.lendsqrCustomerId === "registered"
+    ) {
+      throw new ApiError(
+        400,
+        "Parent is not registered in Adjutor — complete KYC first",
+      );
     }
     const application = await LoanApplication.findOne({
       where: { id: applicationId, parentId: parent.id },
@@ -1985,15 +2005,14 @@ class ParentService {
     if (!parent.bankAccountNumber || !parent.bankCode) {
       throw new ApiError(400, "Parent bank account details are incomplete");
     }
-    const mandateRes = await directDebitService.createMandate({
+    const mandateRes = (await directDebitService.createMandate({
       account_number: parent.bankAccountNumber,
       bank_code: parent.bankCode,
       amount: Number(application.amountApproved ?? application.amountRequested),
       start_date: new Date().toISOString().split("T")[0],
       user_id: parent.lendsqrCustomerId,
-    }) as any;
-    const mandateId =
-      mandateRes?.data?.id ?? mandateRes?.id;
+    })) as any;
+    const mandateId = mandateRes?.data?.id ?? mandateRes?.id;
     const mandateRef =
       mandateRes?.data?.reference ?? mandateRes?.reference ?? null;
     await application.update({
@@ -2008,7 +2027,10 @@ class ParentService {
   async getMandatesForParent(userId: string) {
     const parent = await ParentRepository.findOne({ userId });
     if (!parent) throw new ApiError(404, "Parent profile not found");
-    if (!parent.lendsqrCustomerId || parent.lendsqrCustomerId === "registered") {
+    if (
+      !parent.lendsqrCustomerId ||
+      parent.lendsqrCustomerId === "registered"
+    ) {
       throw new ApiError(400, "Parent is not registered in Adjutor");
     }
     return directDebitService.getMandates(parent.lendsqrCustomerId);

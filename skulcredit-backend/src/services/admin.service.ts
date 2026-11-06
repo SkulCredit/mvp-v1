@@ -42,32 +42,65 @@ import ApiError from "../utils/apiError";
 import emailService from "../emails/email.service";
 import { formatNaira, formatTenorLabel } from "../utils/format";
 import env from "../config/env";
+import ledgerService from "./ledger.service";
+import logger from "../config/logger";
 
 const DEFAULT_SETTINGS: Record<string, unknown> = {
   security: {
-    twoFa: true, twoFaMethod: "totp", jwtExpiry: "24", refreshExpiry: "30",
-    sessionTimeout: "60", maxAttempts: "5", lockout: "15", minPwLen: "8",
-    reqUpper: true, reqNum: true, reqSym: true, ipWhitelist: false, ipList: "",
+    twoFa: true,
+    twoFaMethod: "totp",
+    jwtExpiry: "24",
+    refreshExpiry: "30",
+    sessionTimeout: "60",
+    maxAttempts: "5",
+    lockout: "15",
+    minPwLen: "8",
+    reqUpper: true,
+    reqNum: true,
+    reqSym: true,
+    ipWhitelist: false,
+    ipList: "",
     forcedRoles: ["super_admin", "admin"],
   },
   database: {
-    backupEnabled: true, backupSchedule: "daily", backupTime: "02:00",
-    backupRetention: "30", backupDest: "s3", s3Bucket: "skulcredit-backups",
+    backupEnabled: true,
+    backupSchedule: "daily",
+    backupTime: "02:00",
+    backupRetention: "30",
+    backupDest: "s3",
+    s3Bucket: "skulcredit-backups",
   },
   notifications: {
-    emailNotifs: true, smsNotifs: false, inAppNotifs: true, alertApp: true,
-    alertDisb: true, alertRepay: true, alertKyc: true, alertLogin: true,
-    smtpHost: "smtp.gmail.com", smtpPort: "587", smtpUser: "noreply@skulcredit.com",
+    emailNotifs: true,
+    smsNotifs: false,
+    inAppNotifs: true,
+    alertApp: true,
+    alertDisb: true,
+    alertRepay: true,
+    alertKyc: true,
+    alertLogin: true,
+    smtpHost: "smtp.gmail.com",
+    smtpPort: "587",
+    smtpUser: "noreply@skulcredit.com",
     smtpFrom: "SkulCredit",
   },
   platform: {
-    maintenance: false, maintMsg: "We are performing scheduled maintenance.",
-    newAppsOn: true, disbOn: true, platformName: "SkulCredit", brand: "#7A0E42",
-    supportEmail: "support@skulcredit.com", supportPhone: "+234 800 000 0000",
-    maxLoan: "5000000", defCharge: "23.5",
+    maintenance: false,
+    maintMsg: "We are performing scheduled maintenance.",
+    newAppsOn: true,
+    disbOn: true,
+    platformName: "SkulCredit",
+    brand: "#7A0E42",
+    supportEmail: "support@skulcredit.com",
+    supportPhone: "+234 800 000 0000",
+    maxLoan: "5000000",
+    defCharge: "23.5",
   },
   audit: {
-    auditRetention: "365", logAdmin: true, logApi: false, logExports: true,
+    auditRetention: "365",
+    logAdmin: true,
+    logApi: false,
+    logExports: true,
   },
 };
 
@@ -97,9 +130,7 @@ function periodRange(period?: string): { from: Date; to: Date } {
   return { from, to };
 }
 
-
 class AdminService {
-
   async getDashboard() {
     const [
       totalParents,
@@ -141,7 +172,6 @@ class AdminService {
       },
     };
   }
-
 
   async getApplicationStats(
     period?: string,
@@ -187,7 +217,6 @@ class AdminService {
     }));
   }
 
-
   async getRevenueStats(
     period?: string,
     groupBy: "day" | "month" | "year" = "month",
@@ -228,7 +257,6 @@ class AdminService {
       applicationCount: Number(r.application_count),
     }));
   }
-
 
   async getMarketProjection() {
     const [
@@ -276,16 +304,28 @@ class AdminService {
     };
   }
 
-
   async listUsers(role?: string, search?: string) {
-    const where: Record<string, unknown> = {};
-    if (role) where.role = role;
+    const STAFF_ROLES = [
+      "admin",
+      "customer_service",
+      "customer_service_manager",
+    ];
+    const where: Record<string, unknown> = {
+      role: role ? role : { [Op.in]: STAFF_ROLES },
+    };
     if (search) {
       where.email = { [Op.iLike]: `%${search}%` };
     }
     return User.findAll({
       where,
       attributes: { exclude: ["password"] },
+      include: [
+        {
+          model: AdminProfile,
+          as: "adminProfile",
+          attributes: ["fullName", "phone"],
+        },
+      ],
       order: [["createdAt", "DESC"]],
     });
   }
@@ -293,6 +333,13 @@ class AdminService {
   async getUser(id: string) {
     const user = await User.findByPk(id, {
       attributes: { exclude: ["password"] },
+      include: [
+        {
+          model: AdminProfile,
+          as: "adminProfile",
+          attributes: ["fullName", "phone"],
+        },
+      ],
     });
     if (!user) throw new ApiError(404, "User not found");
     return user;
@@ -313,6 +360,60 @@ class AdminService {
     return user.update({ email, isEmailVerified: false });
   }
 
+  async updateStaffUser(
+    id: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phoneNumber?: string;
+      role?: string;
+    },
+  ) {
+    const user = await User.findByPk(id);
+    if (!user) throw new ApiError(404, "User not found");
+
+    const STAFF_ROLES = [
+      "admin",
+      "customer_service",
+      "customer_service_manager",
+    ];
+
+    if (data.email && data.email !== user.email) {
+      const existing = await User.findOne({ where: { email: data.email } });
+      if (existing) throw new ApiError(409, "Email already in use");
+      await user.update({ email: data.email });
+    }
+
+    if (data.phoneNumber !== undefined) {
+      await user.update({ phoneNumber: data.phoneNumber });
+    }
+
+    if (data.role && STAFF_ROLES.includes(data.role)) {
+      await user.update({
+        role: data.role as
+          | "admin"
+          | "customer_service"
+          | "customer_service_manager",
+      });
+    }
+
+    const fullName =
+      [data.firstName, data.lastName].filter(Boolean).join(" ") || null;
+    if (
+      fullName !== null ||
+      data.firstName !== undefined ||
+      data.lastName !== undefined
+    ) {
+      await AdminProfile.upsert({
+        userId: id,
+        fullName,
+        phone: data.phoneNumber ?? null,
+      } as never);
+    }
+
+    return this.getUser(id);
+  }
 
   async listParents(search?: string, kycStatus?: string, page = 1, limit = 20) {
     const where: Record<string, unknown> = {};
@@ -378,9 +479,15 @@ class AdminService {
               attributes: ["id", "firstName", "lastName", "studentId"],
             },
           ],
-          order: [["createdAt", "DESC"]],
         },
         { model: Document, as: "documents" },
+      ],
+      order: [
+        [
+          { model: LoanApplication, as: "loanApplications" },
+          "createdAt",
+          "DESC",
+        ],
       ],
     } as never);
     if (!parent) throw new ApiError(404, "Parent not found");
@@ -414,7 +521,6 @@ class AdminService {
       },
     );
   }
-
 
   async getSchools(status?: string) {
     const where = status ? { status } : {};
@@ -458,17 +564,22 @@ class AdminService {
     return school.update({ status: "rejected" });
   }
 
-  async createSchoolLoginAccess(id: string): Promise<{ email: string; password: string; schoolName: string }> {
+  async createSchoolLoginAccess(
+    id: string,
+  ): Promise<{ email: string; password: string; schoolName: string }> {
     const school = await School.findByPk(id, {
       include: [{ model: User, as: "user", attributes: { exclude: [] } }],
     } as never);
     if (!school) throw new ApiError(404, "School not found");
 
-    const schoolWithUser = school as typeof school & { user: typeof User.prototype };
+    const schoolWithUser = school as typeof school & {
+      user: typeof User.prototype;
+    };
     const user = schoolWithUser.user;
     if (!user) throw new ApiError(400, "School has no associated user account");
 
-    const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+    const charset =
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
     let password = "";
     for (let i = 0; i < 16; i++) {
       password += charset[Math.floor(Math.random() * charset.length)];
@@ -479,7 +590,7 @@ class AdminService {
     await user.update({ password: hashed, isActive: true });
 
     return {
-      email:      user.email,
+      email: user.email,
       password,
       schoolName: school.schoolName,
     };
@@ -517,19 +628,23 @@ class AdminService {
       if (v === undefined || v === "") continue;
       if (k === "status") {
         if (!allowedStatuses.includes(v as string)) {
-          throw new ApiError(400, `status must be one of: ${allowedStatuses.join(", ")}`);
+          throw new ApiError(
+            400,
+            `status must be one of: ${allowedStatuses.join(", ")}`,
+          );
         }
       }
       schoolUpdate[k] = v;
     }
 
-    if (Object.keys(schoolUpdate).length) await school.update(schoolUpdate as never);
+    if (Object.keys(schoolUpdate).length)
+      await school.update(schoolUpdate as never);
 
     if ((email || phoneNumber) && school.userId) {
       const user = await User.findByPk(school.userId);
       if (user) {
         const userUpdate: Record<string, string> = {};
-        if (email)       userUpdate.email       = email;
+        if (email) userUpdate.email = email;
         if (phoneNumber) userUpdate.phoneNumber = phoneNumber;
         await user.update(userUpdate);
       }
@@ -599,7 +714,6 @@ class AdminService {
     return school.update({ status: status as never });
   }
 
-
   async listCatalogSchools(search?: string, isRegistered?: boolean) {
     const where: Record<string, unknown> = {};
     if (search) where.name = { [Op.iLike]: `%${search}%` };
@@ -647,7 +761,6 @@ class AdminService {
     if (!school) throw new ApiError(404, "Catalog school not found");
     return school.update(payload as never);
   }
-
 
   async listClassLevels(schoolId?: string, institutionTypeId?: string) {
     const where: Record<string, unknown> = {};
@@ -697,7 +810,6 @@ class AdminService {
     await level.destroy();
   }
 
-
   async listInstitutionTypes() {
     return CatalogInstitutionType.findAll({ order: [["sortOrder", "ASC"]] });
   }
@@ -720,7 +832,6 @@ class AdminService {
     if (!type) throw new ApiError(404, "Institution type not found");
     await type.destroy();
   }
-
 
   async listStudents(
     parentId?: string,
@@ -798,7 +909,6 @@ class AdminService {
     }
     await student.destroy();
   }
-
 
   async getLoanApplications(filters?: {
     status?: string;
@@ -946,7 +1056,6 @@ class AdminService {
     return app.update({ adminNote });
   }
 
-
   async getLoanLedger(loanApplicationId: string) {
     const ledger = await LoanLedger.findOne({
       where: { loanApplicationId },
@@ -979,7 +1088,6 @@ class AdminService {
     } as never);
     return { total: count, page, limit, data: rows };
   }
-
 
   async getLoanOffer(loanApplicationId: string) {
     const offer = await LoanOffer.findOne({ where: { loanApplicationId } });
@@ -1018,9 +1126,17 @@ class AdminService {
     return offer.update(update as never);
   }
 
-
-  async listDisbursementRequests(statusFilter: string, page: number, limit: number) {
-    const disbursableStatuses = ["approved", "disbursed", "repaid", "cancelled"];
+  async listDisbursementRequests(
+    statusFilter: string,
+    page: number,
+    limit: number,
+  ) {
+    const disbursableStatuses = [
+      "approved",
+      "disbursed",
+      "repaid",
+      "cancelled",
+    ];
     let where: Record<string, unknown>;
     if (statusFilter === "all") {
       where = { status: { [Op.in]: disbursableStatuses } };
@@ -1082,7 +1198,8 @@ class AdminService {
 
     const allPartnerIds = new Set<string>();
     for (const row of rows) {
-      const d = (row as never as { disbursement?: { initiatedBy?: string } }).disbursement;
+      const d = (row as never as { disbursement?: { initiatedBy?: string } })
+        .disbursement;
       if (d?.initiatedBy) allPartnerIds.add(d.initiatedBy);
     }
 
@@ -1149,9 +1266,17 @@ class AdminService {
 
       const schoolRec = r.school;
       const bankDetails = primaryBank
-        ? { bankName: primaryBank.bankName, accountName: primaryBank.accountName, accountNumber: primaryBank.accountNumber }
-        : (schoolRec?.bankName && schoolRec?.bankAccountNumber)
-          ? { bankName: schoolRec.bankName, accountName: schoolRec.bankAccountName ?? '', accountNumber: schoolRec.bankAccountNumber }
+        ? {
+            bankName: primaryBank.bankName,
+            accountName: primaryBank.accountName,
+            accountNumber: primaryBank.accountNumber,
+          }
+        : schoolRec?.bankName && schoolRec?.bankAccountNumber
+          ? {
+              bankName: schoolRec.bankName,
+              accountName: schoolRec.bankAccountName ?? "",
+              accountNumber: schoolRec.bankAccountNumber,
+            }
           : null;
 
       return {
@@ -1207,7 +1332,12 @@ class AdminService {
     };
   }
 
-  async assignDisbursementPartner(loanId: string, fundingPartnerId: string, contactId?: string, note?: string) {
+  async assignDisbursementPartner(
+    loanId: string,
+    fundingPartnerId: string,
+    contactId?: string,
+    note?: string,
+  ) {
     const app = await LoanApplication.findByPk(loanId);
     if (!app) throw new ApiError(404, "Loan application not found");
 
@@ -1217,7 +1347,8 @@ class AdminService {
 
     const partner = await FundingPartner.findByPk(fundingPartnerId);
     if (!partner) throw new ApiError(404, "Funding partner not found");
-    if (partner.status !== "active") throw new ApiError(400, "Funding partner is not active");
+    if (partner.status !== "active")
+      throw new ApiError(400, "Funding partner is not active");
 
     let recipientEmail = partner.email;
     let recipientName = partner.name;
@@ -1226,16 +1357,19 @@ class AdminService {
       const contact = await FundingPartnerContact.findOne({
         where: { id: contactId, fundingPartnerId, status: "active" },
       });
-      if (!contact) throw new ApiError(404, "Funding partner contact not found");
+      if (!contact)
+        throw new ApiError(404, "Funding partner contact not found");
       recipientEmail = contact.email;
       recipientName = contact.fullName;
     } else {
       const primaryContact = await FundingPartnerContact.findOne({
         where: { fundingPartnerId, isPrimary: true, status: "active" },
       });
-      const fallbackContact = primaryContact ?? await FundingPartnerContact.findOne({
-        where: { fundingPartnerId, status: "active" },
-      });
+      const fallbackContact =
+        primaryContact ??
+        (await FundingPartnerContact.findOne({
+          where: { fundingPartnerId, status: "active" },
+        }));
       if (fallbackContact) {
         recipientEmail = fallbackContact.email;
         recipientName = fallbackContact.fullName;
@@ -1252,13 +1386,17 @@ class AdminService {
         {
           model: CatalogSchool,
           as: "catalogSchool",
-          include: [{ model: SchoolBankAccount, as: "bankAccounts" }] as never[],
+          include: [
+            { model: SchoolBankAccount, as: "bankAccounts" },
+          ] as never[],
         },
         { model: School, as: "school" },
         {
           model: Parent,
           as: "parent",
-          include: [{ model: User, as: "user", attributes: ["email"] }] as never[],
+          include: [
+            { model: User, as: "user", attributes: ["email"] },
+          ] as never[],
         },
       ],
     } as never);
@@ -1305,11 +1443,15 @@ class AdminService {
       fa.catalogSchool?.bankAccounts?.find((b) => b.isPrimary) ??
       fa.catalogSchool?.bankAccounts?.[0];
     const bankName = primaryBank?.bankName ?? fa.school?.bankName ?? "N/A";
-    const accountNumber = primaryBank?.accountNumber ?? fa.school?.bankAccountNumber ?? "N/A";
-    const accountName = primaryBank?.accountName ?? fa.school?.bankAccountName ?? "N/A";
+    const accountNumber =
+      primaryBank?.accountNumber ?? fa.school?.bankAccountNumber ?? "N/A";
+    const accountName =
+      primaryBank?.accountName ?? fa.school?.bankAccountName ?? "N/A";
 
     const amountFmt = formatNaira(fa.amountRequested);
-    const serviceChargeFmt = fa.serviceChargeAmount ? formatNaira(fa.serviceChargeAmount) : "N/A";
+    const serviceChargeFmt = fa.serviceChargeAmount
+      ? formatNaira(fa.serviceChargeAmount)
+      : "N/A";
     const tenorLabel = formatTenorLabel(fa.tenor);
 
     const scheduleRows_raw = await RepaymentSchedule.findAll({
@@ -1326,39 +1468,55 @@ class AdminService {
     const disbursementUrl = `${frontendUrl}/funding-partner/disbursement/${loanId}`;
 
     await sequelize.transaction(async (t) => {
-      const existing = await Disbursement.findOne({ where: { loanApplicationId: loanId }, transaction: t });
+      const existing = await Disbursement.findOne({
+        where: { loanApplicationId: loanId },
+        transaction: t,
+      });
       if (existing) {
-        await existing.update({ status: "processing", initiatedBy: fundingPartnerId } as never, { transaction: t });
+        await existing.update(
+          { status: "processing", initiatedBy: fundingPartnerId } as never,
+          { transaction: t },
+        );
       } else {
-        await Disbursement.create({
-          loanApplicationId: loanId,
-          schoolId: fa.schoolId ?? "",
-          parentId: fa.parentId,
-          amount: Number(fa.amountApproved ?? fa.amountRequested),
-          status: "processing",
-          initiatedBy: fundingPartnerId,
-        } as never, { transaction: t });
+        await Disbursement.create(
+          {
+            loanApplicationId: loanId,
+            schoolId: fa.schoolId ?? "",
+            parentId: fa.parentId,
+            amount: Number(fa.amountApproved ?? fa.amountRequested),
+            status: "processing",
+            initiatedBy: fundingPartnerId,
+          } as never,
+          { transaction: t },
+        );
       }
 
-      await ApplicationEvent.create({
-        loanApplicationId: loanId,
-        actor: "admin",
-        actorId: fundingPartnerId,
-        status: "disbursement_initiated",
-        note: note ?? null,
-      } as never, { transaction: t });
+      await ApplicationEvent.create(
+        {
+          loanApplicationId: loanId,
+          actor: "admin",
+          actorId: fundingPartnerId,
+          status: "disbursement_initiated",
+          note: note ?? null,
+        } as never,
+        { transaction: t },
+      );
     });
 
     await emailService.sendFundingRequest({
       email: recipientEmail,
       recipientName: recipientName,
       referenceNumber: fa.referenceNumber ?? fa.id,
-      parentName: `${fa.parent?.firstName ?? ""} ${fa.parent?.lastName ?? ""}`.trim(),
-      studentName: `${fa.student?.firstName ?? ""} ${fa.student?.lastName ?? ""}`.trim(),
+      parentName:
+        `${fa.parent?.firstName ?? ""} ${fa.parent?.lastName ?? ""}`.trim(),
+      studentName:
+        `${fa.student?.firstName ?? ""} ${fa.student?.lastName ?? ""}`.trim(),
       admissionNumber: fa.student?.studentId ?? "N/A",
       gradeLevel: fa.student?.gradeLevel ?? "N/A",
       schoolName: fa.catalogSchool?.name ?? "N/A",
-      schoolTier: fa.catalogSchool?.tier ? `Tier ${fa.catalogSchool.tier}` : "N/A",
+      schoolTier: fa.catalogSchool?.tier
+        ? `Tier ${fa.catalogSchool.tier}`
+        : "N/A",
       repaymentPlan: tenorLabel,
       serviceChargePaid: serviceChargeFmt,
       amountToDisburse: amountFmt,
@@ -1467,9 +1625,37 @@ class AdminService {
     const d = await Disbursement.findByPk(id);
     if (!d) throw new ApiError(404, "Disbursement not found");
     await d.update({ status: status as never, ...extras } as never);
+
+    if (status === "successful") {
+      try {
+        const loan = await LoanApplication.findByPk(d.loanApplicationId);
+        const serviceChargeAmount = loan?.serviceChargeAmount
+          ? Number(loan.serviceChargeAmount)
+          : 0;
+
+        await ledgerService.postDisbursement({
+          loanApplicationId: d.loanApplicationId,
+          disbursementId: d.id,
+          disbursementRef: d.disbursementReference ?? `DSB-${d.id.slice(0, 8)}`,
+          paystackRef:
+            extras?.paystackReference ?? d.paystackReference ?? undefined,
+          principalAmount: Number(d.amount),
+          serviceChargeAmount,
+          actor: "SYSTEM",
+          effectiveDate: new Date(),
+        });
+        logger.info(
+          `[admin.service] Disbursement ledger journal posted — disbursement=${d.id} loan=${d.loanApplicationId}`,
+        );
+      } catch (ledgerErr) {
+        logger.error(
+          `[admin.service] Ledger posting failed for disbursement=${d.id} (non-fatal): ${ledgerErr}`,
+        );
+      }
+    }
+
     return d;
   }
-
 
   async listRepayments(filters?: {
     loanApplicationId?: string;
@@ -1542,14 +1728,36 @@ class AdminService {
     recordedBy?: string;
     receiptNumber?: string;
   }) {
-    return Repayment.create({
+    const repayment = (await Repayment.create({
       ...payload,
       currency: "NGN",
       status: "successful",
       paidAt: payload.paidAt ? new Date(payload.paidAt) : new Date(),
-    } as never);
-  }
+    } as never)) as InstanceType<typeof Repayment>;
 
+    try {
+      await ledgerService.postRepayment({
+        loanApplicationId: payload.loanApplicationId,
+        repaymentId: (repayment as any).id,
+        receiptNumber: payload.receiptNumber ?? undefined,
+        totalAmount: payload.amount,
+        principalComponent: payload.amount,
+        actor: "ADMIN",
+        actorId: payload.recordedBy ?? undefined,
+        actorName: "Admin",
+        effectiveDate: payload.paidAt ? new Date(payload.paidAt) : new Date(),
+      });
+      logger.info(
+        `[admin.service] Repayment ledger journal posted — repayment=${(repayment as any).id} loan=${payload.loanApplicationId}`,
+      );
+    } catch (ledgerErr) {
+      logger.error(
+        `[admin.service] Ledger posting failed for manual repayment ${(repayment as any).id} (non-fatal): ${ledgerErr}`,
+      );
+    }
+
+    return repayment;
+  }
 
   async getRepaymentSchedule(loanApplicationId: string) {
     const schedule = await RepaymentSchedule.findAll({
@@ -1577,7 +1785,6 @@ class AdminService {
       ...(payload.paidAt ? { paidAt: new Date(payload.paidAt) } : {}),
     } as never);
   }
-
 
   async listDocuments(
     parentId?: string,
@@ -1619,7 +1826,6 @@ class AdminService {
     if (!doc) throw new ApiError(404, "Document not found");
     await doc.destroy();
   }
-
 
   async listSchoolRequests(status?: string, page = 1, limit = 20) {
     const where = status ? { status } : {};
@@ -1666,7 +1872,6 @@ class AdminService {
     });
   }
 
-
   async listApplicationEvents(loanApplicationId: string) {
     return ApplicationEvent.findAll({
       where: { loanApplicationId },
@@ -1683,7 +1888,6 @@ class AdminService {
   }) {
     return ApplicationEvent.create(payload as never);
   }
-
 
   async listNotifications(
     userId?: string,
@@ -1748,7 +1952,6 @@ class AdminService {
     await n.destroy();
   }
 
-
   async listDeviceTokens(userId?: string) {
     const where = userId ? { userId } : {};
     return DeviceToken.findAll({
@@ -1762,7 +1965,6 @@ class AdminService {
     if (!token) throw new ApiError(404, "Device token not found");
     await token.destroy();
   }
-
 
   async listSchoolTerms(schoolId?: string) {
     const where = schoolId ? { schoolId } : {};
@@ -1798,7 +2000,14 @@ class AdminService {
     return FundingPartner.findAll({
       where,
       order: [["name", "ASC"]],
-      include: [{ model: FundingPartnerContact, as: "contacts", where: { status: "active" }, required: false }],
+      include: [
+        {
+          model: FundingPartnerContact,
+          as: "contacts",
+          where: { status: "active" },
+          required: false,
+        },
+      ],
     });
   }
 
@@ -1857,11 +2066,17 @@ class AdminService {
   }
 
   async getAllSettings() {
-    const SECTIONS = ["security", "database", "notifications", "platform", "audit"];
+    const SECTIONS = [
+      "security",
+      "database",
+      "notifications",
+      "platform",
+      "audit",
+    ];
     const rows = await SystemSetting.findAll();
     const map: Record<string, unknown> = {};
     for (const section of SECTIONS) {
-      const row = rows.find(r => r.section === section);
+      const row = rows.find((r) => r.section === section);
       map[section] = row ? row.settings : DEFAULT_SETTINGS[section];
     }
     return map;
@@ -1869,10 +2084,16 @@ class AdminService {
 
   async getSection(section: string) {
     const row = await SystemSetting.findOne({ where: { section } });
-    return row ? row.settings : (DEFAULT_SETTINGS as Record<string, unknown>)[section] ?? {};
+    return row
+      ? row.settings
+      : ((DEFAULT_SETTINGS as Record<string, unknown>)[section] ?? {});
   }
 
-  async upsertSection(section: string, settings: Record<string, unknown>, updatedBy?: string) {
+  async upsertSection(
+    section: string,
+    settings: Record<string, unknown>,
+    updatedBy?: string,
+  ) {
     const [row, created] = await SystemSetting.findOrCreate({
       where: { section },
       defaults: { section, settings, updatedBy: updatedBy ?? null },
@@ -1884,31 +2105,51 @@ class AdminService {
   }
 
   exportDatabase() {
-    const child = spawn("pg_dump", [
-      "-h", env.db.host,
-      "-p", String(env.db.port),
-      "-U", env.db.user,
-      "-d", env.db.name,
-      "--no-password",
-    ], {
-      env: { ...process.env, PGPASSWORD: env.db.password },
-    });
+    const child = spawn(
+      "pg_dump",
+      [
+        "-h",
+        env.db.host,
+        "-p",
+        String(env.db.port),
+        "-U",
+        env.db.user,
+        "-d",
+        env.db.name,
+        "--no-password",
+      ],
+      {
+        env: { ...process.env, PGPASSWORD: env.db.password },
+      },
+    );
     return child;
   }
 
-  backupDatabase(): Promise<{ filename: string; size: number; timestamp: string }> {
+  backupDatabase(): Promise<{
+    filename: string;
+    size: number;
+    timestamp: string;
+  }> {
     return new Promise((resolve, reject) => {
       const filename = `/tmp/skulcredit-backup-${Date.now()}.sql`;
       const writeStream = fs.createWriteStream(filename);
-      const child = spawn("pg_dump", [
-        "-h", env.db.host,
-        "-p", String(env.db.port),
-        "-U", env.db.user,
-        "-d", env.db.name,
-        "--no-password",
-      ], {
-        env: { ...process.env, PGPASSWORD: env.db.password },
-      });
+      const child = spawn(
+        "pg_dump",
+        [
+          "-h",
+          env.db.host,
+          "-p",
+          String(env.db.port),
+          "-U",
+          env.db.user,
+          "-d",
+          env.db.name,
+          "--no-password",
+        ],
+        {
+          env: { ...process.env, PGPASSWORD: env.db.password },
+        },
+      );
       child.stdout.pipe(writeStream);
       child.on("error", reject);
       child.on("close", (code) => {
@@ -1949,7 +2190,9 @@ class AdminService {
   }
 
   async getAdminProfile(userId: string) {
-    const user = await User.findByPk(userId, { attributes: ["id", "email", "phoneNumber", "createdAt"] });
+    const user = await User.findByPk(userId, {
+      attributes: ["id", "email", "phoneNumber", "createdAt"],
+    });
     if (!user) throw new ApiError(404, "User not found");
     const profile = await AdminProfile.findOne({ where: { userId } });
     return {
@@ -1963,7 +2206,10 @@ class AdminService {
     };
   }
 
-  async updateAdminProfile(userId: string, data: { fullName?: string; phone?: string; avatarUrl?: string }) {
+  async updateAdminProfile(
+    userId: string,
+    data: { fullName?: string; phone?: string; avatarUrl?: string },
+  ) {
     const user = await User.findByPk(userId);
     if (!user) throw new ApiError(404, "User not found");
     const [profile] = await AdminProfile.findOrCreate({
@@ -1973,12 +2219,17 @@ class AdminService {
     await profile.update({
       fullName: data.fullName !== undefined ? data.fullName : profile.fullName,
       phone: data.phone !== undefined ? data.phone : profile.phone,
-      avatarUrl: data.avatarUrl !== undefined ? data.avatarUrl : profile.avatarUrl,
+      avatarUrl:
+        data.avatarUrl !== undefined ? data.avatarUrl : profile.avatarUrl,
     });
     return this.getAdminProfile(userId);
   }
 
-  async updateAdminPassword(userId: string, currentPassword: string, newPassword: string) {
+  async updateAdminPassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
     const user = await User.findByPk(userId);
     if (!user) throw new ApiError(404, "User not found");
     const valid = await bcrypt.compare(currentPassword, user.password);

@@ -30,6 +30,8 @@ import SupportTicketMessage from "./SupportTicketMessage";
 import SupportTicketTag from "./SupportTicketTag";
 import AuditLog from "./AuditLog";
 import SystemSetting from "./SystemSetting";
+import LedgerAccount from "./LedgerAccount";
+import FinancialLedgerEntry from "./FinancialLedgerEntry";
 
 User.hasOne(Parent, { foreignKey: "userId", as: "parentProfile" });
 User.hasOne(School, { foreignKey: "userId", as: "schoolProfile" });
@@ -180,11 +182,20 @@ CatalogSchoolClassLevel.belongsTo(CatalogInstitutionType, {
 
 SupportTicket.belongsTo(User, { foreignKey: "userId", as: "user" });
 User.hasMany(SupportTicket, { foreignKey: "userId", as: "supportTickets" });
-SupportTicket.hasMany(SupportTicketMessage, { foreignKey: "ticketId", as: "messages" });
+SupportTicket.hasMany(SupportTicketMessage, {
+  foreignKey: "ticketId",
+  as: "messages",
+});
 SupportTicket.hasMany(SupportTicketTag, { foreignKey: "ticketId", as: "tags" });
-SupportTicketMessage.belongsTo(SupportTicket, { foreignKey: "ticketId", as: "ticket" });
+SupportTicketMessage.belongsTo(SupportTicket, {
+  foreignKey: "ticketId",
+  as: "ticket",
+});
 SupportTicketMessage.belongsTo(User, { foreignKey: "authorId", as: "author" });
-SupportTicketTag.belongsTo(SupportTicket, { foreignKey: "ticketId", as: "ticket" });
+SupportTicketTag.belongsTo(SupportTicket, {
+  foreignKey: "ticketId",
+  as: "ticket",
+});
 SupportTicketTag.belongsTo(User, { foreignKey: "userId", as: "taggedUser" });
 SupportTicketTag.belongsTo(User, { foreignKey: "taggedBy", as: "tagger" });
 AcademicTerm.belongsTo(AcademicSession, {
@@ -212,6 +223,29 @@ FundingPartnerContact.belongsTo(FundingPartner, {
 
 User.hasOne(AdminProfile, { foreignKey: "userId", as: "adminProfile" });
 AdminProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+// ── Financial Ledger associations ─────────────────────────────────────────────
+// LedgerAccount has many entries (one account row per chart-of-accounts code;
+// many entries post against it over time).
+LedgerAccount.hasMany(FinancialLedgerEntry, {
+  foreignKey: "accountId",
+  as: "entries",
+});
+FinancialLedgerEntry.belongsTo(LedgerAccount, {
+  foreignKey: "accountId",
+  as: "account",
+});
+
+// LoanApplication has many ledger entries (full history of every journal
+// line that touched this loan).
+LoanApplication.hasMany(FinancialLedgerEntry, {
+  foreignKey: "loanApplicationId",
+  as: "ledgerEntries",
+});
+FinancialLedgerEntry.belongsTo(LoanApplication, {
+  foreignKey: "loanApplicationId",
+  as: "loanApplication",
+});
 
 export {
   User,
@@ -246,4 +280,6 @@ export {
   SupportTicketTag,
   AuditLog,
   SystemSetting,
+  LedgerAccount,
+  FinancialLedgerEntry,
 };

@@ -20,7 +20,10 @@ type FundingPartnerContactCreationAttributes = Optional<
 >;
 
 export class FundingPartnerContactInstance
-  extends Model<FundingPartnerContactAttributes, FundingPartnerContactCreationAttributes>
+  extends Model<
+    FundingPartnerContactAttributes,
+    FundingPartnerContactCreationAttributes
+  >
   implements FundingPartnerContactAttributes
 {
   declare id: string;
@@ -70,7 +73,10 @@ FundingPartnerContactInstance.init(
     indexes: [
       { fields: ["funding_partner_id"] },
       { fields: ["email"] },
-      { fields: ["email", "funding_partner_id"], unique: true, name: "uq_fp_contact_email_partner" },
+      // NOTE: the unique constraint on (email, funding_partner_id) is intentionally
+      // NOT defined here. It is managed exclusively by migration
+      // 019_create_funding_partner_contacts so that sequelize.sync() never races
+      // with the migration runner to create/drop it.
     ],
   },
 );

@@ -21,6 +21,7 @@ router.get("/users", ctrl.listUsers.bind(ctrl));
 router.get("/users/:id", ctrl.getUser.bind(ctrl));
 router.patch("/users/:id/toggle-active", ctrl.toggleUserActive.bind(ctrl));
 router.patch("/users/:id/email", ctrl.resetUserEmail.bind(ctrl));
+router.patch("/users/:id", ctrl.updateStaffUser.bind(ctrl));
 router.post("/users", ctrl.createStaffUser.bind(ctrl));
 
 router.get("/parents", ctrl.listParents.bind(ctrl));
@@ -31,7 +32,10 @@ router.get("/schools", ctrl.getSchools.bind(ctrl));
 router.post("/schools", ctrl.createSchool.bind(ctrl));
 router.get("/schools/:id", ctrl.getSchool.bind(ctrl));
 router.patch("/schools/:id", ctrl.updateSchool.bind(ctrl));
-router.post("/schools/:id/create-access", ctrl.createSchoolLoginAccess.bind(ctrl));
+router.post(
+  "/schools/:id/create-access",
+  ctrl.createSchoolLoginAccess.bind(ctrl),
+);
 router.put("/schools/:id/approve", ctrl.approveSchool.bind(ctrl));
 router.put("/schools/:id/reject", ctrl.rejectSchool.bind(ctrl));
 router.patch("/schools/:id/status", ctrl.updateSchoolStatus.bind(ctrl));
@@ -89,7 +93,10 @@ router.get(
 router.patch("/loan-offers/:id/status", ctrl.updateLoanOfferStatus.bind(ctrl));
 
 router.get("/disbursement-requests", ctrl.listDisbursementRequests.bind(ctrl));
-router.post("/loans/:id/assign-disbursement", ctrl.assignDisbursementPartner.bind(ctrl));
+router.post(
+  "/loans/:id/assign-disbursement",
+  ctrl.assignDisbursementPartner.bind(ctrl),
+);
 router.get("/disbursements", ctrl.listDisbursements.bind(ctrl));
 router.get("/disbursements/:id", ctrl.getDisbursement.bind(ctrl));
 router.patch(
@@ -190,18 +197,48 @@ router.put(
 
 router.get("/current-term", ctrl.adminGetCurrentTerm.bind(ctrl));
 
-router.get("/support/tickets",     supportController.listTickets.bind(supportController));
-router.get("/support/tickets/stats", supportController.getStats.bind(supportController));
-router.get("/support/tickets/:id", supportController.getTicket.bind(supportController));
-router.patch("/support/tickets/:id", supportController.updateTicket.bind(supportController));
-router.delete("/support/tickets/:id", supportController.deleteTicket.bind(supportController));
+router.get(
+  "/support/tickets",
+  supportController.listTickets.bind(supportController),
+);
+router.get(
+  "/support/tickets/stats",
+  supportController.getStats.bind(supportController),
+);
+router.get(
+  "/support/tickets/:id",
+  supportController.getTicket.bind(supportController),
+);
+router.patch(
+  "/support/tickets/:id",
+  supportController.updateTicket.bind(supportController),
+);
+router.delete(
+  "/support/tickets/:id",
+  supportController.deleteTicket.bind(supportController),
+);
 
-router.get("/audit-logs",                    auditLogController.listLogs.bind(auditLogController));
-router.get("/audit-logs/distribution",       auditLogController.getActionDistribution.bind(auditLogController));
-router.get("/audit-logs/severity-distribution", auditLogController.getSeverityDistribution.bind(auditLogController));
-router.get("/audit-logs/recent-failures",    auditLogController.getRecentFailures.bind(auditLogController));
-router.get("/audit-logs/:id",                auditLogController.getLog.bind(auditLogController));
-router.delete("/audit-logs/:id",             auditLogController.deleteLog.bind(auditLogController));
+router.get("/audit-logs", auditLogController.listLogs.bind(auditLogController));
+router.get(
+  "/audit-logs/distribution",
+  auditLogController.getActionDistribution.bind(auditLogController),
+);
+router.get(
+  "/audit-logs/severity-distribution",
+  auditLogController.getSeverityDistribution.bind(auditLogController),
+);
+router.get(
+  "/audit-logs/recent-failures",
+  auditLogController.getRecentFailures.bind(auditLogController),
+);
+router.get(
+  "/audit-logs/:id",
+  auditLogController.getLog.bind(auditLogController),
+);
+router.delete(
+  "/audit-logs/:id",
+  auditLogController.deleteLog.bind(auditLogController),
+);
 
 router.post("/settings/database/export", ctrl.exportDatabase.bind(ctrl));
 router.post("/settings/database/backup", ctrl.backupDatabase.bind(ctrl));
@@ -230,14 +267,27 @@ router.post(
 
 router.get("/profile", ctrl.getAdminProfile.bind(ctrl));
 router.put("/profile", ctrl.updateAdminProfile.bind(ctrl));
-router.post("/profile/avatar", uploadPhoto("admin").single("avatar"), uploadController.uploadDocument.bind(uploadController));
+router.post(
+  "/profile/avatar",
+  uploadPhoto("admin").single("avatar"),
+  uploadController.uploadDocument.bind(uploadController),
+);
 router.put("/profile/password", ctrl.updateAdminPassword.bind(ctrl));
 
 // Direct debit mandate management
 router.post("/applications/:id/mandate", ctrl.createMandate.bind(ctrl));
-router.patch("/applications/:id/mandate/activate", ctrl.activateMandate.bind(ctrl));
-router.patch("/applications/:id/mandate/deactivate", ctrl.deactivateMandate.bind(ctrl));
+router.patch(
+  "/applications/:id/mandate/activate",
+  ctrl.activateMandate.bind(ctrl),
+);
+router.patch(
+  "/applications/:id/mandate/deactivate",
+  ctrl.deactivateMandate.bind(ctrl),
+);
 router.patch("/applications/:id/mandate/cancel", ctrl.cancelMandate.bind(ctrl));
-router.get("/applications/:id/mandates", ctrl.getApplicationMandates.bind(ctrl));
+router.get(
+  "/applications/:id/mandates",
+  ctrl.getApplicationMandates.bind(ctrl),
+);
 
 export default router;

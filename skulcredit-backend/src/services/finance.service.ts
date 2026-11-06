@@ -15,6 +15,8 @@ import {
   SystemSetting,
 } from "../models";
 import ApiError from "../utils/apiError";
+import ledgerService from "./ledger.service";
+import logger from "../config/logger";
 
 export class FinanceService {
   private formatNGN(amount: number): string {
@@ -45,7 +47,9 @@ export class FinanceService {
 
     const totalOutstandingSum =
       (await RepaymentSchedule.sum("outstandingBalance", {
-        where: { status: { [Op.in]: ["upcoming", "due", "overdue", "partially_paid"] } },
+        where: {
+          status: { [Op.in]: ["upcoming", "due", "overdue", "partially_paid"] },
+        },
       })) || 0;
 
     const activeLoansCount = await LoanApplication.count({
@@ -56,23 +60,34 @@ export class FinanceService {
       {
         id: "total-disbursed",
         label: "Total disbursed",
-        value: totalDisbursedSum > 0 ? this.formatMillions(totalDisbursedSum) : "₦851.0M",
+        value:
+          totalDisbursedSum > 0
+            ? this.formatMillions(totalDisbursedSum)
+            : "₦851.0M",
         numericValue: totalDisbursedSum > 0 ? totalDisbursedSum : 851000000,
-        subtext: "Total payout across partner schools (18,450 loans) · Sep 2026",
+        subtext:
+          "Total payout across partner schools (18,450 loans) · Sep 2026",
         icon: "disbursed",
       },
       {
         id: "repayments-received",
         label: "Repayments received",
-        value: totalRepaymentsSum > 0 ? this.formatMillions(totalRepaymentsSum) : "₦658.0M",
+        value:
+          totalRepaymentsSum > 0
+            ? this.formatMillions(totalRepaymentsSum)
+            : "₦658.0M",
         numericValue: totalRepaymentsSum > 0 ? totalRepaymentsSum : 658000000,
-        subtext: "Confirmed collection payout in period · 82.5% of billing · Sep 2026",
+        subtext:
+          "Confirmed collection payout in period · 82.5% of billing · Sep 2026",
         icon: "repayment",
       },
       {
         id: "portfolio-outstanding",
         label: "Portfolio outstanding",
-        value: totalOutstandingSum > 0 ? this.formatMillions(totalOutstandingSum) : "₦412.5M",
+        value:
+          totalOutstandingSum > 0
+            ? this.formatMillions(totalOutstandingSum)
+            : "₦412.5M",
         numericValue: totalOutstandingSum > 0 ? totalOutstandingSum : 412500000,
         subtext: "Unsettled loans on active books across schools",
         icon: "outstanding",
@@ -80,7 +95,8 @@ export class FinanceService {
       {
         id: "active-loans",
         label: "Active loans",
-        value: activeLoansCount > 0 ? activeLoansCount.toLocaleString() : "2,184",
+        value:
+          activeLoansCount > 0 ? activeLoansCount.toLocaleString() : "2,184",
         numericValue: activeLoansCount > 0 ? activeLoansCount : 2184,
         subtext: "Active repayment schedules · 98.2% on standard track",
         icon: "loans",
@@ -104,53 +120,97 @@ export class FinanceService {
 
     const chartData6M = chartData12M.slice(-6);
 
-    const disbursedLoans = await LoanApplication.count({ where: { status: "disbursed" } });
-    const underReviewLoans = await LoanApplication.count({ where: { status: "under_review" } });
-    const infoLoans = await LoanApplication.count({ where: { status: "info_requested" } });
-    const approvedLoans = await LoanApplication.count({ where: { status: "approved" } });
-    const cancelledLoans = await LoanApplication.count({ where: { status: "cancelled" } });
+    const disbursedLoans = await LoanApplication.count({
+      where: { status: "disbursed" },
+    });
+    const underReviewLoans = await LoanApplication.count({
+      where: { status: "under_review" },
+    });
+    const infoLoans = await LoanApplication.count({
+      where: { status: "info_requested" },
+    });
+    const approvedLoans = await LoanApplication.count({
+      where: { status: "approved" },
+    });
+    const cancelledLoans = await LoanApplication.count({
+      where: { status: "cancelled" },
+    });
 
     const totalPortfolioLoans =
-      disbursedLoans + underReviewLoans + infoLoans + approvedLoans + cancelledLoans || 2184;
+      disbursedLoans +
+        underReviewLoans +
+        infoLoans +
+        approvedLoans +
+        cancelledLoans || 2184;
 
     const portfolioStatus = [
       {
         status: "Disbursed",
         count: disbursedLoans > 0 ? disbursedLoans : 2118,
-        percentage: Number(((disbursedLoans > 0 ? disbursedLoans / totalPortfolioLoans : 0.97) * 100).toFixed(1)),
+        percentage: Number(
+          (
+            (disbursedLoans > 0 ? disbursedLoans / totalPortfolioLoans : 0.97) *
+            100
+          ).toFixed(1),
+        ),
         color: "#700936",
       },
       {
         status: "Under review",
         count: underReviewLoans > 0 ? underReviewLoans : 312,
-        percentage: Number(((underReviewLoans > 0 ? underReviewLoans / totalPortfolioLoans : 0.143) * 100).toFixed(1)),
+        percentage: Number(
+          (
+            (underReviewLoans > 0
+              ? underReviewLoans / totalPortfolioLoans
+              : 0.143) * 100
+          ).toFixed(1),
+        ),
         color: "#f472b6",
       },
       {
         status: "Pending documentation",
         count: infoLoans > 0 ? infoLoans : 122,
-        percentage: Number(((infoLoans > 0 ? infoLoans / totalPortfolioLoans : 0.056) * 100).toFixed(1)),
+        percentage: Number(
+          (
+            (infoLoans > 0 ? infoLoans / totalPortfolioLoans : 0.056) * 100
+          ).toFixed(1),
+        ),
         color: "#f9a8d4",
       },
       {
         status: "Approved",
         count: approvedLoans > 0 ? approvedLoans : 64,
-        percentage: Number(((approvedLoans > 0 ? approvedLoans / totalPortfolioLoans : 0.029) * 100).toFixed(1)),
+        percentage: Number(
+          (
+            (approvedLoans > 0 ? approvedLoans / totalPortfolioLoans : 0.029) *
+            100
+          ).toFixed(1),
+        ),
         color: "#fbcfe8",
       },
       {
         status: "Cancelled",
         count: cancelledLoans > 0 ? cancelledLoans : 11,
-        percentage: Number(((cancelledLoans > 0 ? cancelledLoans / totalPortfolioLoans : 0.005) * 100).toFixed(1)),
+        percentage: Number(
+          (
+            (cancelledLoans > 0
+              ? cancelledLoans / totalPortfolioLoans
+              : 0.005) * 100
+          ).toFixed(1),
+        ),
         color: "#cbd5e1",
       },
     ];
 
-    const failedDisbursementsCount = await Disbursement.count({ where: { status: "failed" } });
+    const failedDisbursementsCount = await Disbursement.count({
+      where: { status: "failed" },
+    });
     const pendingDisbursementsCount = await LoanApplication.count({
       where: { status: "approved", disbursementStatus: "pending" },
     });
-    const overdueSchedulesCount = await RepaymentSchedule.count({ where: { status: "overdue" } });
+    const overdueSchedulesCount = await RepaymentSchedule.count({
+      where: { status: "overdue" },
+    });
 
     const pendingActions = [
       {
@@ -191,12 +251,18 @@ export class FinanceService {
       limit: 3,
       order: [["createdAt", "DESC"]],
       include: [
-        { model: LoanApplication, as: "loanApplication", attributes: ["id", "referenceNumber"] },
+        {
+          model: LoanApplication,
+          as: "loanApplication",
+          attributes: ["id", "referenceNumber"],
+        },
         { model: School, as: "school", attributes: ["id", "name"] },
         {
           model: Parent,
           as: "parent",
-          include: [{ model: User, as: "user", attributes: ["firstName", "lastName"] }],
+          include: [
+            { model: User, as: "user", attributes: ["firstName", "lastName"] },
+          ],
         },
       ],
     });
@@ -205,11 +271,17 @@ export class FinanceService {
       limit: 2,
       order: [["createdAt", "DESC"]],
       include: [
-        { model: LoanApplication, as: "loanApplication", attributes: ["id", "referenceNumber"] },
+        {
+          model: LoanApplication,
+          as: "loanApplication",
+          attributes: ["id", "referenceNumber"],
+        },
         {
           model: Parent,
           as: "parent",
-          include: [{ model: User, as: "user", attributes: ["firstName", "lastName"] }],
+          include: [
+            { model: User, as: "user", attributes: ["firstName", "lastName"] },
+          ],
         },
       ],
     });
@@ -219,33 +291,53 @@ export class FinanceService {
       for (const d of recentDisbursements) {
         const dAny = d as any;
         const parentUser = dAny.parent?.user;
-        const parentName = parentUser ? `${parentUser.firstName} ${parentUser.lastName}` : "Parent";
+        const parentName = parentUser
+          ? `${parentUser.firstName} ${parentUser.lastName}`
+          : "Parent";
         const schoolName = dAny.school?.name || "Partner School";
         recentTransactions.push({
-          id: dAny.disbursementReference || `DSB-${d.id.slice(0, 6).toUpperCase()}`,
+          id:
+            dAny.disbursementReference ||
+            `DSB-${d.id.slice(0, 6).toUpperCase()}`,
           type: "Disbursement",
           schoolOrParent: schoolName,
-          loanOrAppId: dAny.loanApplication?.referenceNumber || `APP-${d.loanApplicationId.slice(0, 5).toUpperCase()}`,
+          loanOrAppId:
+            dAny.loanApplication?.referenceNumber ||
+            `APP-${d.loanApplicationId.slice(0, 5).toUpperCase()}`,
           amount: Number(d.amount),
           date: new Date(d.createdAt).toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
             year: "numeric",
           }),
-          status: d.status === "successful" ? "Completed" : d.status === "failed" ? "Failed" : "Processing",
-          statusVariant: d.status === "successful" ? "green" : d.status === "failed" ? "red" : "yellow",
+          status:
+            d.status === "successful"
+              ? "Completed"
+              : d.status === "failed"
+                ? "Failed"
+                : "Processing",
+          statusVariant:
+            d.status === "successful"
+              ? "green"
+              : d.status === "failed"
+                ? "red"
+                : "yellow",
         });
       }
 
       for (const r of recentRepayments) {
         const rAny = r as any;
         const parentUser = rAny.parent?.user;
-        const parentName = parentUser ? `Parent · ${parentUser.firstName} ${parentUser.lastName}` : "Parent";
+        const parentName = parentUser
+          ? `Parent · ${parentUser.firstName} ${parentUser.lastName}`
+          : "Parent";
         recentTransactions.push({
           id: rAny.receiptNumber || `RPM-${r.id.slice(0, 6).toUpperCase()}`,
           type: "Repayment",
           schoolOrParent: parentName,
-          loanOrAppId: rAny.loanApplication?.referenceNumber || `LN-${r.loanApplicationId.slice(0, 5).toUpperCase()}`,
+          loanOrAppId:
+            rAny.loanApplication?.referenceNumber ||
+            `LN-${r.loanApplicationId.slice(0, 5).toUpperCase()}`,
           amount: Number(r.amount),
           date: new Date(r.createdAt).toLocaleDateString("en-GB", {
             day: "2-digit",
@@ -401,12 +493,18 @@ export class FinanceService {
       offset,
       order: [["createdAt", "DESC"]],
       include: [
-        { model: LoanApplication, as: "loanApplication", attributes: ["id", "referenceNumber"] },
+        {
+          model: LoanApplication,
+          as: "loanApplication",
+          attributes: ["id", "referenceNumber"],
+        },
         { model: School, as: "school", attributes: ["id", "name"] },
         {
           model: Parent,
           as: "parent",
-          include: [{ model: User, as: "user", attributes: ["firstName", "lastName"] }],
+          include: [
+            { model: User, as: "user", attributes: ["firstName", "lastName"] },
+          ],
         },
       ],
     });
@@ -425,14 +523,16 @@ export class FinanceService {
         r.status === "successful"
           ? "Completed"
           : r.status === "failed"
-          ? "Failed"
-          : r.status === "reversed"
-          ? "Reversed"
-          : "Processing";
+            ? "Failed"
+            : r.status === "reversed"
+              ? "Reversed"
+              : "Processing";
 
       return {
         id: r.id,
-        reference: r.disbursementReference || `DSB-${r.id.slice(0, 6).toUpperCase()}/${r.loanApplication?.referenceNumber || "APP-30918"}`,
+        reference:
+          r.disbursementReference ||
+          `DSB-${r.id.slice(0, 6).toUpperCase()}/${r.loanApplication?.referenceNumber || "APP-30918"}`,
         date: new Date(r.createdAt).toLocaleDateString("en-GB", {
           day: "2-digit",
           month: "short",
@@ -442,10 +542,17 @@ export class FinanceService {
         bankAccount: r.recipientAccountNumber
           ? `•••• ${r.recipientAccountNumber.slice(-4)}`
           : "•••• 4821",
-        parentName: parentUser ? `${parentUser.firstName[0]}. ${parentUser.lastName}` : "A. Okoro",
+        parentName: parentUser
+          ? `${parentUser.firstName[0]}. ${parentUser.lastName}`
+          : "A. Okoro",
         amount: Number(r.amount),
-        transactionRef: r.paystackReference || `TRX-${r.id.slice(0, 6).toUpperCase()}`,
-        status: statusLabel as "Completed" | "Processing" | "Failed" | "Reversed",
+        transactionRef:
+          r.paystackReference || `TRX-${r.id.slice(0, 6).toUpperCase()}`,
+        status: statusLabel as
+          | "Completed"
+          | "Processing"
+          | "Failed"
+          | "Reversed",
       };
     });
 
@@ -554,7 +661,9 @@ export class FinanceService {
         {
           model: Parent,
           as: "parent",
-          include: [{ model: User, as: "user", attributes: ["firstName", "lastName"] }],
+          include: [
+            { model: User, as: "user", attributes: ["firstName", "lastName"] },
+          ],
         },
         {
           model: CatalogSchool,
@@ -567,16 +676,23 @@ export class FinanceService {
     if (loans.length > 0) {
       return loans.map((l: any) => {
         const pUser = l.parent?.user;
-        const parentName = pUser ? `${pUser.firstName[0]}. ${pUser.lastName}` : "Parent";
+        const parentName = pUser
+          ? `${pUser.firstName[0]}. ${pUser.lastName}`
+          : "Parent";
         const schoolName = l.catalogSchool?.name || "Partner School";
-        const primaryAccount = l.catalogSchool?.bankAccounts?.find((b: any) => b.isPrimary) || l.catalogSchool?.bankAccounts?.[0];
-        const bankAccount = primaryAccount ? `••••${primaryAccount.accountNumber.slice(-4)}` : "••••4821";
+        const primaryAccount =
+          l.catalogSchool?.bankAccounts?.find((b: any) => b.isPrimary) ||
+          l.catalogSchool?.bankAccounts?.[0];
+        const bankAccount = primaryAccount
+          ? `••••${primaryAccount.accountNumber.slice(-4)}`
+          : "••••4821";
         const verified = primaryAccount ? primaryAccount.isVerified : true;
         const amount = Number(l.amountApproved || l.amountRequested);
 
         return {
           id: l.id,
-          applicationId: l.referenceNumber || `APP-${l.id.slice(0, 5).toUpperCase()}`,
+          applicationId:
+            l.referenceNumber || `APP-${l.id.slice(0, 5).toUpperCase()}`,
           parentName,
           schoolName,
           bankAccount,
@@ -642,7 +758,13 @@ export class FinanceService {
         {
           model: Parent,
           as: "parent",
-          include: [{ model: User, as: "user", attributes: ["firstName", "lastName", "email"] }],
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["firstName", "lastName", "email"],
+            },
+          ],
         },
       ],
     });
@@ -663,11 +785,36 @@ export class FinanceService {
         date: "10 Oct 2026 · 11:38",
         transactionRef: "TRX-792481",
         steps: [
-          { step: "Eligible loan", status: "completed", title: "Select application", timestamp: "10 Oct 11:30" },
-          { step: "School bank verification", status: "completed", title: "Account verified", timestamp: "10 Oct 11:32" },
-          { step: "Finance officer check", status: "completed", title: "Approved by M. James", timestamp: "10 Oct 11:35" },
-          { step: "Approver sign-off", status: "completed", title: "Authorized by A. Bello", timestamp: "10 Oct 11:37" },
-          { step: "Gateway settlement", status: "completed", title: "Settled via Paystack", timestamp: "10 Oct 11:38" },
+          {
+            step: "Eligible loan",
+            status: "completed",
+            title: "Select application",
+            timestamp: "10 Oct 11:30",
+          },
+          {
+            step: "School bank verification",
+            status: "completed",
+            title: "Account verified",
+            timestamp: "10 Oct 11:32",
+          },
+          {
+            step: "Finance officer check",
+            status: "completed",
+            title: "Approved by M. James",
+            timestamp: "10 Oct 11:35",
+          },
+          {
+            step: "Approver sign-off",
+            status: "completed",
+            title: "Authorized by A. Bello",
+            timestamp: "10 Oct 11:37",
+          },
+          {
+            step: "Gateway settlement",
+            status: "completed",
+            title: "Settled via Paystack",
+            timestamp: "10 Oct 11:38",
+          },
         ],
       };
     }
@@ -676,18 +823,29 @@ export class FinanceService {
     const parentUser = dAny.parent?.user;
     return {
       id: d.id,
-      reference: d.disbursementReference || `DSB-${d.id.slice(0, 6).toUpperCase()}`,
-      status: d.status === "successful" ? "Completed" : d.status === "failed" ? "Failed" : d.status,
+      reference:
+        d.disbursementReference || `DSB-${d.id.slice(0, 6).toUpperCase()}`,
+      status:
+        d.status === "successful"
+          ? "Completed"
+          : d.status === "failed"
+            ? "Failed"
+            : d.status,
       amount: Number(d.amount),
       formattedAmount: this.formatNGN(Number(d.amount)),
       schoolName: dAny.school?.name || "Greenfield International School",
-      bankAccount: d.recipientAccountNumber ? `•••• ${d.recipientAccountNumber.slice(-4)}` : "•••• 4821",
+      bankAccount: d.recipientAccountNumber
+        ? `•••• ${d.recipientAccountNumber.slice(-4)}`
+        : "•••• 4821",
       recipientBank: d.recipientBankName || "Access Bank Plc",
       recipientAccountName: d.recipientAccountName || "School Account",
       recipientAccountNumber: d.recipientAccountNumber || "0049281721",
-      parentName: parentUser ? `${parentUser.firstName} ${parentUser.lastName}` : "Parent",
+      parentName: parentUser
+        ? `${parentUser.firstName} ${parentUser.lastName}`
+        : "Parent",
       date: new Date(d.createdAt).toLocaleString("en-GB"),
-      transactionRef: d.paystackReference || `TRX-${d.id.slice(0, 6).toUpperCase()}`,
+      transactionRef:
+        d.paystackReference || `TRX-${d.id.slice(0, 6).toUpperCase()}`,
       failureReason: d.failureReason,
       reversedAt: d.reversedAt,
       reversalReason: d.reversalReason,
@@ -698,7 +856,10 @@ export class FinanceService {
   /**
    * 5. Initiate Disbursement Request
    */
-  async initiateDisbursement(data: { loanApplicationId: string; notes?: string }, userId: string) {
+  async initiateDisbursement(
+    data: { loanApplicationId: string; notes?: string },
+    userId: string,
+  ) {
     const loan = await LoanApplication.findByPk(data.loanApplicationId, {
       include: [
         {
@@ -714,21 +875,30 @@ export class FinanceService {
     }
 
     if (loan.status !== "approved") {
-      throw new ApiError(400, "Only approved loan applications can be disbursed");
+      throw new ApiError(
+        400,
+        "Only approved loan applications can be disbursed",
+      );
     }
 
     const catalogSchool = (loan as any).catalogSchool;
     const primaryAccount =
-      catalogSchool?.bankAccounts?.find((b: any) => b.isPrimary) || catalogSchool?.bankAccounts?.[0];
+      catalogSchool?.bankAccounts?.find((b: any) => b.isPrimary) ||
+      catalogSchool?.bankAccounts?.[0];
 
     if (!primaryAccount || !primaryAccount.isVerified) {
-      throw new ApiError(400, "School bank account is not verified. Verification sign-off required.");
+      throw new ApiError(
+        400,
+        "School bank account is not verified. Verification sign-off required.",
+      );
     }
 
     const amount = Number(loan.amountApproved || loan.amountRequested);
     const disbursementRef = `DSB-${Date.now().toString().slice(-6)}/${loan.referenceNumber || loan.id.slice(0, 6).toUpperCase()}`;
 
-    const existing = await Disbursement.findOne({ where: { loanApplicationId: loan.id } });
+    const existing = await Disbursement.findOne({
+      where: { loanApplicationId: loan.id },
+    });
     let disbursement: any;
 
     if (existing) {
@@ -762,7 +932,8 @@ export class FinanceService {
       reference: disbursement.disbursementReference,
       amount,
       status: "Processing",
-      message: "Disbursement request submitted successfully for approver authorization.",
+      message:
+        "Disbursement request submitted successfully for approver authorization.",
     };
   }
 
@@ -790,6 +961,7 @@ export class FinanceService {
 
   /**
    * 7. Reverse Disbursement
+   * Posts a REVERSAL ledger journal after marking the disbursement reversed.
    */
   async reverseDisbursement(id: string, reason: string, userId: string) {
     const d = await Disbursement.findByPk(id);
@@ -801,6 +973,42 @@ export class FinanceService {
     d.reversedAt = new Date();
     d.reversalReason = reason;
     await d.save();
+
+    // ── Post reversal ledger journal (non-blocking) ────────────────────────
+    // Find the original disbursement journal for this loan and reverse it.
+    try {
+      const { FinancialLedgerEntry } = await import("../models");
+      const origEntry = await (FinancialLedgerEntry as any).findOne({
+        where: {
+          sourceType: "Disbursement",
+          sourceId: d.id,
+          entryType: "LOAN_DISBURSEMENT",
+          isReversed: false,
+        },
+        order: [["created_at", "ASC"]],
+      });
+
+      if (origEntry) {
+        await ledgerService.postReversal({
+          originalJournalId: origEntry.journalId,
+          loanApplicationId: d.loanApplicationId,
+          reason,
+          actorId: userId,
+          actorName: "Admin",
+        });
+        logger.info(
+          `[finance.service] Reversal ledger journal posted for disbursement=${d.id}`,
+        );
+      } else {
+        logger.warn(
+          `[finance.service] No ledger entry found for disbursement=${d.id} — reversal journal skipped`,
+        );
+      }
+    } catch (ledgerErr) {
+      logger.error(
+        `[finance.service] Ledger reversal failed for disbursement=${d.id} (non-fatal): ${ledgerErr}`,
+      );
+    }
 
     return {
       id: d.id,
@@ -823,16 +1031,25 @@ export class FinanceService {
     if (schools.length > 0) {
       return schools.map((s: any, idx: number) => {
         const bank = s.bankAccounts?.[0];
-        const status = bank?.isVerified ? "Verified" : idx === 1 ? "Re-verification due" : idx === 3 ? "Pending review" : "Unverified";
+        const status = bank?.isVerified
+          ? "Verified"
+          : idx === 1
+            ? "Re-verification due"
+            : idx === 3
+              ? "Pending review"
+              : "Unverified";
         return {
           id: s.id,
           schoolName: s.name,
           schoolCode: `SCH-0${(idx + 140).toString()}`,
-          bankAccount: bank ? `•••• ${bank.accountNumber.slice(-4)}` : "•••• 4821",
+          bankAccount: bank
+            ? `•••• ${bank.accountNumber.slice(-4)}`
+            : "•••• 4821",
           status,
           lastVerified: "12 Aug 2026",
           issuesCount: status === "Unverified" ? 1 : 0,
-          paymentsBlocked: status === "Unverified" || status === "Pending review",
+          paymentsBlocked:
+            status === "Unverified" || status === "Pending review",
           linkedLoansCount: (idx + 1) * 60,
         };
       });
@@ -914,12 +1131,12 @@ export class FinanceService {
   async updateSchoolVerificationStatus(
     schoolId: string,
     data: { status: string; reason?: string; notes?: string },
-    userId: string
+    userId: string,
   ) {
     const isVerified = data.status === "Verified";
     await SchoolBankAccount.update(
       { isVerified },
-      { where: { catalogSchoolId: schoolId } }
+      { where: { catalogSchoolId: schoolId } },
     );
 
     return {
@@ -1030,7 +1247,9 @@ export class FinanceService {
 
     let filtered = items;
     if (params.status && params.status !== "All") {
-      filtered = filtered.filter((i) => i.status.toLowerCase() === params.status!.toLowerCase());
+      filtered = filtered.filter(
+        (i) => i.status.toLowerCase() === params.status!.toLowerCase(),
+      );
     }
     if (params.search) {
       const q = params.search.toLowerCase();
@@ -1038,7 +1257,7 @@ export class FinanceService {
         (i) =>
           i.parentName.toLowerCase().includes(q) ||
           i.schoolName.toLowerCase().includes(q) ||
-          i.loanId.toLowerCase().includes(q)
+          i.loanId.toLowerCase().includes(q),
       );
     }
 
@@ -1082,28 +1301,60 @@ export class FinanceService {
       lateFees: 20000,
       nextDueDate: "28 Oct 2026",
       status: "Overdue",
-      instalments: schedules.length > 0
-        ? schedules.map((s) => ({
-            number: s.installmentNumber,
-            dueDate: s.dueDate,
-            amount: Number(s.totalAmount),
-            paidAmount: Number(s.amountPaid || 0),
-            status: s.status,
-            lateFee: Number(s.lateFeeApplied || 0),
-          }))
-        : [
-            { number: 1, dueDate: "28 Jul 2026", amount: 160000, paidAmount: 160000, status: "paid", lateFee: 0 },
-            { number: 2, dueDate: "28 Aug 2026", amount: 160000, paidAmount: 160000, status: "paid", lateFee: 0 },
-            { number: 3, dueDate: "28 Sep 2026", amount: 160000, paidAmount: 0, status: "overdue", lateFee: 20000 },
-            { number: 4, dueDate: "28 Oct 2026", amount: 160000, paidAmount: 0, status: "due", lateFee: 0 },
-          ],
+      instalments:
+        schedules.length > 0
+          ? schedules.map((s) => ({
+              number: s.installmentNumber,
+              dueDate: s.dueDate,
+              amount: Number(s.totalAmount),
+              paidAmount: Number(s.amountPaid || 0),
+              status: s.status,
+              lateFee: Number(s.lateFeeApplied || 0),
+            }))
+          : [
+              {
+                number: 1,
+                dueDate: "28 Jul 2026",
+                amount: 160000,
+                paidAmount: 160000,
+                status: "paid",
+                lateFee: 0,
+              },
+              {
+                number: 2,
+                dueDate: "28 Aug 2026",
+                amount: 160000,
+                paidAmount: 160000,
+                status: "paid",
+                lateFee: 0,
+              },
+              {
+                number: 3,
+                dueDate: "28 Sep 2026",
+                amount: 160000,
+                paidAmount: 0,
+                status: "overdue",
+                lateFee: 20000,
+              },
+              {
+                number: 4,
+                dueDate: "28 Oct 2026",
+                amount: 160000,
+                paidAmount: 0,
+                status: "due",
+                lateFee: 0,
+              },
+            ],
     };
   }
 
   /**
    * 12. Trigger Collection Follow-up / Reminder
    */
-  async triggerFollowUp(data: { loanId: string; actionType?: string; notes?: string }, userId: string) {
+  async triggerFollowUp(
+    data: { loanId: string; actionType?: string; notes?: string },
+    userId: string,
+  ) {
     return {
       loanId: data.loanId,
       dispatched: true,
@@ -1115,11 +1366,59 @@ export class FinanceService {
 
   /**
    * 13. Waive Late Fee
+   * Posts a WAIVER ledger journal and actually updates the repayment schedule.
    */
-  async waiveLateFee(data: { loanId: string; scheduleId?: string; amount?: number; reason: string }, userId: string) {
+  async waiveLateFee(
+    data: {
+      loanId: string;
+      scheduleId?: string;
+      amount?: number;
+      reason: string;
+    },
+    userId: string,
+  ) {
+    const loanId = data.loanId;
+    const waivedAmount = data.amount || 0;
+
+    // Update the repayment schedule row if a specific installment was provided
+    if (data.scheduleId && waivedAmount > 0) {
+      const schedule = await RepaymentSchedule.findByPk(data.scheduleId);
+      if (schedule) {
+        const currentFee = Number(schedule.lateFeeApplied) || 0;
+        const newFee = Math.max(0, currentFee - waivedAmount);
+        await schedule.update({
+          lateFeeApplied: newFee,
+          lateFeeAppliedAt: newFee === 0 ? null : schedule.lateFeeAppliedAt,
+        } as never);
+      }
+    }
+
+    // ── Post WAIVER ledger journal ─────────────────────────────────────────
+    if (waivedAmount > 0) {
+      try {
+        await ledgerService.postWaiver({
+          loanApplicationId: loanId,
+          scheduleId: data.scheduleId ?? loanId,
+          amount: waivedAmount,
+          waivingType: "LATE_FEE",
+          reason: data.reason,
+          actorId: userId,
+          actorName: "Admin",
+        });
+        logger.info(
+          `[finance.service] Waiver ledger journal posted — loan=${loanId} amount=${waivedAmount}`,
+        );
+      } catch (ledgerErr) {
+        logger.error(
+          `[finance.service] Ledger waiver failed for loan=${loanId} (non-fatal): ${ledgerErr}`,
+        );
+      }
+    }
+
     return {
-      loanId: data.loanId,
-      waivedAmount: data.amount || 20000,
+      loanId,
+      waivedAmount,
+      scheduleId: data.scheduleId ?? null,
       reason: data.reason,
       status: "Waived",
       message: "Late fee waived successfully.",
@@ -1131,19 +1430,79 @@ export class FinanceService {
    */
   async getOutstandingBalances() {
     const buckets = [
-      { bucket: "Current (within grace period)", amount: "₦351.4M", count: 1840, percentage: 85.2, color: "#10b981" },
-      { bucket: "1 - 30 days overdue", amount: "₦28.2M", count: 142, percentage: 6.8, color: "#f59e0b" },
-      { bucket: "31 - 60 days overdue", amount: "₦18.6M", count: 62, percentage: 4.5, color: "#f97316" },
-      { bucket: "61 - 90 days overdue", amount: "₦9.4M", count: 28, percentage: 2.3, color: "#ef4444" },
-      { bucket: "90+ days overdue", amount: "₦4.9M", count: 12, percentage: 1.2, color: "#700936" },
+      {
+        bucket: "Current (within grace period)",
+        amount: "₦351.4M",
+        count: 1840,
+        percentage: 85.2,
+        color: "#10b981",
+      },
+      {
+        bucket: "1 - 30 days overdue",
+        amount: "₦28.2M",
+        count: 142,
+        percentage: 6.8,
+        color: "#f59e0b",
+      },
+      {
+        bucket: "31 - 60 days overdue",
+        amount: "₦18.6M",
+        count: 62,
+        percentage: 4.5,
+        color: "#f97316",
+      },
+      {
+        bucket: "61 - 90 days overdue",
+        amount: "₦9.4M",
+        count: 28,
+        percentage: 2.3,
+        color: "#ef4444",
+      },
+      {
+        bucket: "90+ days overdue",
+        amount: "₦4.9M",
+        count: 12,
+        percentage: 1.2,
+        color: "#700936",
+      },
     ];
 
     const schoolBreakdown = [
-      { school: "Greenfield International", balance: "₦142.1M", loans: 680, percentage: 34.4, color: "#700936" },
-      { school: "Rosehill College", balance: "₦98.5M", loans: 490, percentage: 23.9, color: "#9f1239" },
-      { school: "Crestview Academy", balance: "₦82.4M", loans: 420, percentage: 20.0, color: "#be123c" },
-      { school: "Lakeside Preparatory", balance: "₦54.2M", loans: 340, percentage: 13.1, color: "#e11d48" },
-      { school: "Maple Ridge Academy", balance: "₦35.3M", loans: 254, percentage: 8.6, color: "#fb7185" },
+      {
+        school: "Greenfield International",
+        balance: "₦142.1M",
+        loans: 680,
+        percentage: 34.4,
+        color: "#700936",
+      },
+      {
+        school: "Rosehill College",
+        balance: "₦98.5M",
+        loans: 490,
+        percentage: 23.9,
+        color: "#9f1239",
+      },
+      {
+        school: "Crestview Academy",
+        balance: "₦82.4M",
+        loans: 420,
+        percentage: 20.0,
+        color: "#be123c",
+      },
+      {
+        school: "Lakeside Preparatory",
+        balance: "₦54.2M",
+        loans: 340,
+        percentage: 13.1,
+        color: "#e11d48",
+      },
+      {
+        school: "Maple Ridge Academy",
+        balance: "₦35.3M",
+        loans: 254,
+        percentage: 8.6,
+        color: "#fb7185",
+      },
     ];
 
     return {
@@ -1236,7 +1595,10 @@ export class FinanceService {
   /**
    * 16. Bulk Reminders Dispatch
    */
-  async sendBulkReminders(data: { loanIds: string[]; channel: string }, userId: string) {
+  async sendBulkReminders(
+    data: { loanIds: string[]; channel: string },
+    userId: string,
+  ) {
     return {
       dispatchedCount: data.loanIds.length,
       channel: data.channel,
@@ -1326,8 +1688,14 @@ export class FinanceService {
    * 18. Log Interaction & Assign Officer
    */
   async logInteraction(
-    data: { loanId: string; interactionType: string; notes: string; promiseDate?: string; promisedAmount?: number },
-    userId: string
+    data: {
+      loanId: string;
+      interactionType: string;
+      notes: string;
+      promiseDate?: string;
+      promisedAmount?: number;
+    },
+    userId: string,
   ) {
     return {
       loanId: data.loanId,
@@ -1338,7 +1706,10 @@ export class FinanceService {
     };
   }
 
-  async assignOfficer(data: { loanId: string; officerId: string; officerName?: string }, userId: string) {
+  async assignOfficer(
+    data: { loanId: string; officerId: string; officerName?: string },
+    userId: string,
+  ) {
     return {
       loanId: data.loanId,
       officerId: data.officerId,
@@ -1410,7 +1781,10 @@ export class FinanceService {
       reportId,
       format,
       filename,
-      contentType: format.toLowerCase() === "csv" ? "text/csv" : "application/octet-stream",
+      contentType:
+        format.toLowerCase() === "csv"
+          ? "text/csv"
+          : "application/octet-stream",
       content: csvContent,
     };
   }
@@ -1501,14 +1875,23 @@ export class FinanceService {
       amount: "₦4,250,000",
       schoolName: "Greenfield International School",
       bankAccount: "•••• 4821",
-      reason: "Internal Ledger references ₦4,150,000 (variance: ₦100,000). Possible fee deduction discrepancy.",
+      reason:
+        "Internal Ledger references ₦4,150,000 (variance: ₦100,000). Possible fee deduction discrepancy.",
       status: "Flagged for reconciliation",
     };
 
     return { directory, linkedLoans, sampleMismatch };
   }
 
-  async createInvestigation(data: { transactionReference: string; schoolId?: string; issueType: string; description: string }, userId: string) {
+  async createInvestigation(
+    data: {
+      transactionReference: string;
+      schoolId?: string;
+      issueType: string;
+      description: string;
+    },
+    userId: string,
+  ) {
     return {
       ticketNumber: `INV-${Date.now().toString().slice(-5)}`,
       transactionReference: data.transactionReference,
@@ -1538,8 +1921,18 @@ export class FinanceService {
       user: l.actor?.name || l.actorRole || "System",
       action: l.action || "Financial Transaction",
       reference: l.entityId || `TXN-${l.id.slice(0, 6).toUpperCase()}`,
-      outcome: l.eventStatus === "SUCCESS" ? "Success" : l.eventStatus === "PENDING" ? "Pending approval" : "Flagged",
-      outcomeVariant: l.eventStatus === "SUCCESS" ? "green" : l.eventStatus === "PENDING" ? "yellow" : "pink",
+      outcome:
+        l.eventStatus === "SUCCESS"
+          ? "Success"
+          : l.eventStatus === "PENDING"
+            ? "Pending approval"
+            : "Flagged",
+      outcomeVariant:
+        l.eventStatus === "SUCCESS"
+          ? "green"
+          : l.eventStatus === "PENDING"
+            ? "yellow"
+            : "pink",
       details: l.event?.message || "Processed successfully",
     }));
 
@@ -1598,14 +1991,19 @@ export class FinanceService {
       ];
     }
 
-    const settingRecord = await SystemSetting.findOne({ where: { section: "finance" } });
+    const settingRecord = await SystemSetting.findOne({
+      where: { section: "finance" },
+    });
     const settings = settingRecord?.settings || {
       autoDisbursementLimit: 5000000,
       requireTwoPersonApproval: true,
       gracePeriodDays: 7,
       defaultLateFeePercentage: 2.5,
       reconciliationThreshold: 1000,
-      notificationEmails: ["finance@skulcredit.com", "approvals@skulcredit.com"],
+      notificationEmails: [
+        "finance@skulcredit.com",
+        "approvals@skulcredit.com",
+      ],
     };
 
     return {
@@ -1620,8 +2018,13 @@ export class FinanceService {
     };
   }
 
-  async updateFinanceSettings(newSettings: Record<string, unknown>, userId: string) {
-    let settingRecord = await SystemSetting.findOne({ where: { section: "finance" } });
+  async updateFinanceSettings(
+    newSettings: Record<string, unknown>,
+    userId: string,
+  ) {
+    let settingRecord = await SystemSetting.findOne({
+      where: { section: "finance" },
+    });
     if (!settingRecord) {
       settingRecord = await SystemSetting.create({
         section: "finance",

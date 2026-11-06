@@ -16,17 +16,20 @@ import { seedAcademicSessions } from "./seeders/academicSessionSeeder";
 import { seedSchoolBankAccounts } from "./seeders/schoolBankAccountSeeder";
 import { seedAdmin } from "./seeders/adminSeeder";
 import { seedFundingPartners } from "./seeders/fundingPartnerSeeder";
+import { seedSchools } from "./seeders/schoolSeeder";
+import ledgerService from "./services/ledger.service";
 import "./models/index";
 
 const start = async (): Promise<void> => {
   try {
     await connectDB();
 
-    const { AuditLog: AuditLogModel, ...otherModels } = sequelize.models as Record<string, typeof sequelize.models[string]>;
-    void otherModels; 
+    const { AuditLog: AuditLogModel, ...otherModels } =
+      sequelize.models as Record<string, (typeof sequelize.models)[string]>;
+    void otherModels;
 
     const originalAuditSync = (AuditLogModel as any).sync.bind(AuditLogModel);
-    (AuditLogModel as any).sync = async () => { };
+    (AuditLogModel as any).sync = async () => {};
 
     await sequelize.sync({ alter: env.nodeEnv === "development" });
     logger.info("Database tables synced");
@@ -41,6 +44,10 @@ const start = async (): Promise<void> => {
     await seedSchoolBankAccounts();
     await seedAdmin();
     await seedFundingPartners();
+    await seedSchools();
+
+    // Seed the chart of accounts (idempotent upsert)
+    await ledgerService.seedAccounts();
 
     initFirebase();
 

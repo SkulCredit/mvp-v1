@@ -3,7 +3,7 @@ import env from "./env";
 const publicBaseUrl =
   env.appUrl !== `http://localhost:${env.port}`
     ? env.appUrl
-    : "http://localhost"; 
+    : "http://localhost";
 
 const swaggerSpec: Record<string, unknown> = {
   openapi: "3.0.0",
@@ -45,6 +45,118 @@ const swaggerSpec: Record<string, unknown> = {
           errors: { type: "array", items: { type: "object" } },
         },
       },
+
+      // ── Shared reusable schemas ────────────────────────────────────────────
+      Pagination: {
+        type: "object",
+        properties: {
+          page: { type: "integer", example: 1 },
+          limit: { type: "integer", example: 100 },
+          total: { type: "integer", example: 42 },
+          totalPages: { type: "integer", example: 1 },
+        },
+      },
+
+      LedgerEntry: {
+        type: "object",
+        description: "A single immutable double-entry journal line",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          journalId: {
+            type: "string",
+            format: "uuid",
+            description: "Groups all lines in the same balanced posting",
+          },
+          entrySequence: {
+            type: "integer",
+            description:
+              "Monotonically increasing per loan — gaps indicate missing postings",
+          },
+          accountCode: { type: "string", example: "LOANS_RECEIVABLE" },
+          side: { type: "string", enum: ["DEBIT", "CREDIT"] },
+          amount: { type: "number", example: 4250000 },
+          currency: { type: "string", example: "NGN" },
+          runningBalance: {
+            type: "number",
+            example: 4250000,
+            description: "Account balance after this entry",
+          },
+          entryType: {
+            type: "string",
+            enum: [
+              "LOAN_DISBURSEMENT",
+              "REPAYMENT_PRINCIPAL",
+              "REPAYMENT_INTEREST",
+              "REPAYMENT_FEE",
+              "INTEREST_ACCRUAL",
+              "LATE_FEE_CHARGE",
+              "LATE_FEE_COLLECTION",
+              "WAIVER",
+              "WRITE_OFF",
+              "REVERSAL",
+              "SUSPENSE_HOLD",
+              "SUSPENSE_RELEASE",
+              "ADJUSTMENT",
+            ],
+          },
+          principalComponent: { type: "number", nullable: true },
+          interestComponent: { type: "number", nullable: true },
+          feeComponent: { type: "number", nullable: true },
+          lateFeeComponent: { type: "number", nullable: true },
+          loanApplicationId: { type: "string", format: "uuid", nullable: true },
+          sourceType: {
+            type: "string",
+            enum: [
+              "LoanApplication",
+              "Disbursement",
+              "Repayment",
+              "RepaymentSchedule",
+              "LoanLedger",
+              "Manual",
+            ],
+          },
+          sourceId: { type: "string" },
+          externalReference: {
+            type: "string",
+            nullable: true,
+            description: "Paystack / Lendsqr transaction reference",
+          },
+          internalReference: {
+            type: "string",
+            nullable: true,
+            description: "Internal receipt or disbursement reference",
+          },
+          originalEntryId: {
+            type: "string",
+            format: "uuid",
+            nullable: true,
+            description:
+              "Set on REVERSAL entries — points to the original entry",
+          },
+          isReversed: {
+            type: "boolean",
+            description:
+              "True once a reversal has been posted against this entry",
+          },
+          actor: {
+            type: "string",
+            enum: ["SYSTEM", "ADMIN", "LENDSQR", "PARENT", "SCHEDULER"],
+          },
+          actorId: { type: "string", nullable: true },
+          actorName: { type: "string", nullable: true },
+          reconciliationStatus: {
+            type: "string",
+            enum: ["UNRECONCILED", "RECONCILED", "DISPUTED", "WRITTEN_OFF"],
+          },
+          reconciledAt: { type: "string", format: "date-time", nullable: true },
+          bankStatementRef: { type: "string", nullable: true },
+          description: { type: "string" },
+          notes: { type: "string", nullable: true },
+          effectiveDate: { type: "string", format: "date-time" },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+
       RegisterParent: {
         type: "object",
         required: ["firstName", "lastName", "email", "password", "phoneNumber"],
@@ -255,7 +367,11 @@ const swaggerSpec: Record<string, unknown> = {
         type: "object",
         required: ["email", "password", "role", "firstName", "lastName"],
         properties: {
-          email: { type: "string", format: "email", example: "staff@example.com" },
+          email: {
+            type: "string",
+            format: "email",
+            example: "staff@example.com",
+          },
           password: { type: "string", format: "password", minLength: 8 },
           role: {
             type: "string",
@@ -288,7 +404,10 @@ const swaggerSpec: Record<string, unknown> = {
         required: ["subject", "message"],
         properties: {
           subject: { type: "string", example: "Issue with loan disbursement" },
-          message: { type: "string", example: "My loan was approved but not disbursed." },
+          message: {
+            type: "string",
+            example: "My loan was approved but not disbursed.",
+          },
           category: { type: "string", example: "disbursement" },
         },
       },
@@ -297,7 +416,10 @@ const swaggerSpec: Record<string, unknown> = {
         required: ["title", "message"],
         properties: {
           title: { type: "string", example: "Platform Maintenance" },
-          message: { type: "string", example: "The platform will be down for maintenance." },
+          message: {
+            type: "string",
+            example: "The platform will be down for maintenance.",
+          },
           userIds: {
             type: "array",
             items: { type: "string", format: "uuid" },
@@ -315,7 +437,11 @@ const swaggerSpec: Record<string, unknown> = {
         required: ["name", "email"],
         properties: {
           name: { type: "string", example: "Lendsqr Capital" },
-          email: { type: "string", format: "email", example: "partner@lendsqr.com" },
+          email: {
+            type: "string",
+            format: "email",
+            example: "partner@lendsqr.com",
+          },
           phone: { type: "string", example: "08055555555" },
           website: { type: "string", example: "https://lendsqr.com" },
         },
@@ -370,7 +496,7 @@ const swaggerSpec: Record<string, unknown> = {
       name: "Payments",
       description: "Paystack payment initialization and verification",
     },
-    { name: "Upload", description: "Document upload to Cloudinary" },
+    { name: "Upload", description: "Document upload to local storage" },
     {
       name: "Notifications",
       description:
@@ -382,390 +508,1027 @@ const swaggerSpec: Record<string, unknown> = {
       description:
         "Customer service portal — ticket management, application review (role: customer_service)",
     },
-    { name: "Catalog", description: "Public catalog endpoints — no auth required" },
-    { name: "Webhooks", description: "Inbound webhooks from third-party payment / lending providers" },
+    {
+      name: "Catalog",
+      description: "Public catalog endpoints — no auth required",
+    },
+    {
+      name: "Webhooks",
+      description:
+        "Inbound webhooks from third-party payment / lending providers",
+    },
     {
       name: "Support",
       description: "Parent-facing support ticket system",
     },
+    {
+      name: "Ledger",
+      description:
+        "Corporate double-entry financial ledger — chart of accounts, journal entry history per loan, trial balance, reconciliation queue, manual adjustments and reversals (role: admin)",
+    },
   ],
   paths: {
-      "/finance/dashboard/stats": {
-        get: {
-          summary: "Get finance dashboard KPI stats, charts, portfolio status, pending actions, and recent transactions",
-          tags: ["Finance"],
-          parameters: [
-            { in: "query", name: "period", schema: { type: "string", enum: ["6M", "12M"], default: "12M" } }
-          ],
-          responses: { "200": { description: "Finance dashboard metrics and charts" } },
+    "/finance/dashboard/stats": {
+      get: {
+        summary:
+          "Get finance dashboard KPI stats, charts, portfolio status, pending actions, and recent transactions",
+        tags: ["Finance"],
+        parameters: [
+          {
+            in: "query",
+            name: "period",
+            schema: { type: "string", enum: ["6M", "12M"], default: "12M" },
+          },
+        ],
+        responses: {
+          "200": { description: "Finance dashboard metrics and charts" },
         },
       },
-      "/finance/disbursements": {
-        get: {
-          summary: "List disbursements with status counters and filters",
-          tags: ["Finance"],
-          parameters: [
-            { in: "query", name: "status", schema: { type: "string", enum: ["all", "completed", "processing", "failed", "reversed"] } },
-            { in: "query", name: "search", schema: { type: "string" } },
-            { in: "query", name: "date", schema: { type: "string" } },
-            { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-            { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
-          ],
-          responses: { "200": { description: "Disbursements history list" } },
+    },
+    "/finance/disbursements": {
+      get: {
+        summary: "List disbursements with status counters and filters",
+        tags: ["Finance"],
+        parameters: [
+          {
+            in: "query",
+            name: "status",
+            schema: {
+              type: "string",
+              enum: ["all", "completed", "processing", "failed", "reversed"],
+            },
+          },
+          { in: "query", name: "search", schema: { type: "string" } },
+          { in: "query", name: "date", schema: { type: "string" } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Disbursements history list" } },
+      },
+      post: {
+        summary: "Initiate new disbursement for approved loan",
+        tags: ["Finance"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["loanApplicationId"],
+                properties: {
+                  loanApplicationId: { type: "string", format: "uuid" },
+                  notes: { type: "string" },
+                },
+              },
+            },
+          },
         },
-        post: {
-          summary: "Initiate new disbursement for approved loan",
-          tags: ["Finance"],
-          requestBody: {
+        responses: { "201": { description: "Disbursement initiated" } },
+      },
+    },
+    "/finance/disbursements/eligible-loans": {
+      get: {
+        summary: "List eligible approved loans awaiting payout",
+        tags: ["Finance"],
+        parameters: [
+          { in: "query", name: "search", schema: { type: "string" } },
+        ],
+        responses: { "200": { description: "Eligible loan list" } },
+      },
+    },
+    "/finance/disbursements/{id}": {
+      get: {
+        summary: "Get disbursement details by ID",
+        tags: ["Finance"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
             required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["loanApplicationId"],
-                  properties: {
-                    loanApplicationId: { type: "string", format: "uuid" },
-                    notes: { type: "string" },
+            schema: { type: "string" },
+          },
+        ],
+        responses: { "200": { description: "Disbursement detail" } },
+      },
+    },
+    "/finance/disbursements/{id}/retry": {
+      post: {
+        summary: "Retry a failed disbursement",
+        tags: ["Finance"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: { "200": { description: "Disbursement retry queued" } },
+      },
+    },
+    "/finance/disbursements/{id}/reverse": {
+      post: {
+        summary: "Request disbursement reversal",
+        tags: ["Finance"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["reason"],
+                properties: {
+                  reason: { type: "string", minLength: 3 },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Disbursement reversed" } },
+      },
+    },
+    "/finance/schools/verification": {
+      get: {
+        summary: "List school bank account verification statuses",
+        tags: ["Finance"],
+        parameters: [
+          { in: "query", name: "search", schema: { type: "string" } },
+        ],
+        responses: { "200": { description: "School verification list" } },
+      },
+    },
+    "/finance/schools/verification/{schoolId}/status": {
+      patch: {
+        summary: "Update school bank verification status",
+        tags: ["Finance"],
+        parameters: [
+          {
+            in: "path",
+            name: "schoolId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["status"],
+                properties: {
+                  status: {
+                    type: "string",
+                    enum: [
+                      "Verified",
+                      "Re-verification due",
+                      "Pending review",
+                      "Unverified",
+                    ],
+                  },
+                  reason: { type: "string" },
+                  notes: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Verification status updated" } },
+      },
+    },
+    "/finance/repayments": {
+      get: {
+        summary: "List borrower repayments with status filters and counts",
+        tags: ["Finance"],
+        parameters: [
+          {
+            in: "query",
+            name: "status",
+            schema: {
+              type: "string",
+              enum: [
+                "All",
+                "On track",
+                "Due soon",
+                "Grace period",
+                "Overdue",
+                "Defaulted",
+              ],
+            },
+          },
+          { in: "query", name: "search", schema: { type: "string" } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
+        ],
+        responses: { "200": { description: "Repayments register" } },
+      },
+    },
+    "/finance/repayments/{loanId}": {
+      get: {
+        summary: "Get loan repayment details and schedule history",
+        tags: ["Finance"],
+        parameters: [
+          {
+            in: "path",
+            name: "loanId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: { "200": { description: "Loan repayment details" } },
+      },
+    },
+    "/finance/repayments/follow-up": {
+      post: {
+        summary: "Trigger collection reminder for a loan",
+        tags: ["Finance"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["loanId"],
+                properties: {
+                  loanId: { type: "string" },
+                  actionType: {
+                    type: "string",
+                    enum: ["call", "sms", "email", "reminder", "general"],
+                  },
+                  notes: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Follow-up triggered" } },
+      },
+    },
+    "/finance/repayments/waive-fee": {
+      post: {
+        summary: "Waive late fee on repayment schedule",
+        tags: ["Finance"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["loanId", "reason"],
+                properties: {
+                  loanId: { type: "string" },
+                  scheduleId: { type: "string" },
+                  amount: { type: "number" },
+                  reason: { type: "string", minLength: 3 },
+                },
+              },
+            },
+          },
+        },
+        responses: { "200": { description: "Late fee waived" } },
+      },
+    },
+    "/finance/outstanding-balances": {
+      get: {
+        summary: "Get portfolio outstanding aging analysis and breakdown",
+        tags: ["Finance"],
+        responses: { "200": { description: "Outstanding balances analytics" } },
+      },
+    },
+    "/finance/overdue-accounts": {
+      get: {
+        summary: "Get overdue accounts collection queue and metrics",
+        tags: ["Finance"],
+        responses: { "200": { description: "Overdue accounts queue" } },
+      },
+    },
+    "/finance/overdue-accounts/bulk-reminders": {
+      post: {
+        summary: "Dispatch bulk payment reminders",
+        tags: ["Finance"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["loanIds"],
+                properties: {
+                  loanIds: { type: "array", items: { type: "string" } },
+                  channel: {
+                    type: "string",
+                    enum: ["sms", "email", "both"],
+                    default: "both",
                   },
                 },
               },
             },
           },
-          responses: { "201": { description: "Disbursement initiated" } },
         },
+        responses: { "200": { description: "Bulk reminders queued" } },
       },
-      "/finance/disbursements/eligible-loans": {
-        get: {
-          summary: "List eligible approved loans awaiting payout",
-          tags: ["Finance"],
-          parameters: [
-            { in: "query", name: "search", schema: { type: "string" } },
-          ],
-          responses: { "200": { description: "Eligible loan list" } },
+    },
+    "/finance/collections/follow-up": {
+      get: {
+        summary: "Get collection follow-up queue and worklist",
+        tags: ["Finance"],
+        responses: { "200": { description: "Collection follow-up queue" } },
+      },
+    },
+    "/finance/collections/log-interaction": {
+      post: {
+        summary: "Log borrower contact interaction",
+        tags: ["Finance"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["loanId", "interactionType", "notes"],
+                properties: {
+                  loanId: { type: "string" },
+                  interactionType: {
+                    type: "string",
+                    enum: [
+                      "call",
+                      "sms",
+                      "email",
+                      "in_person",
+                      "promise_to_pay",
+                    ],
+                  },
+                  notes: { type: "string" },
+                  promiseDate: { type: "string" },
+                  promisedAmount: { type: "number" },
+                },
+              },
+            },
+          },
         },
+        responses: { "200": { description: "Interaction logged" } },
       },
-      "/finance/disbursements/{id}": {
-        get: {
-          summary: "Get disbursement details by ID",
-          tags: ["Finance"],
-          parameters: [
-            { in: "path", name: "id", required: true, schema: { type: "string" } },
-          ],
-          responses: { "200": { description: "Disbursement detail" } },
+    },
+    "/finance/collections/assign": {
+      post: {
+        summary: "Assign follow-up work item to officer",
+        tags: ["Finance"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["loanId", "officerId"],
+                properties: {
+                  loanId: { type: "string" },
+                  officerId: { type: "string" },
+                  officerName: { type: "string" },
+                },
+              },
+            },
+          },
         },
+        responses: { "200": { description: "Officer assigned" } },
       },
-      "/finance/disbursements/{id}/retry": {
-        post: {
-          summary: "Retry a failed disbursement",
-          tags: ["Finance"],
-          parameters: [
-            { in: "path", name: "id", required: true, schema: { type: "string" } },
-          ],
-          responses: { "200": { description: "Disbursement retry queued" } },
-        },
+    },
+    "/finance/reports": {
+      get: {
+        summary: "Get financial reports list and portfolio comparison bars",
+        tags: ["Finance"],
+        responses: { "200": { description: "Reports and analytics" } },
       },
-      "/finance/disbursements/{id}/reverse": {
-        post: {
-          summary: "Request disbursement reversal",
-          tags: ["Finance"],
-          parameters: [
-            { in: "path", name: "id", required: true, schema: { type: "string" } },
-          ],
-          requestBody: {
+    },
+    "/finance/reports/{id}/download": {
+      get: {
+        summary: "Download financial report file",
+        tags: ["Finance"],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
             required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["reason"],
-                  properties: {
-                    reason: { type: "string", minLength: 3 },
+            schema: { type: "string" },
+          },
+          {
+            in: "query",
+            name: "format",
+            schema: {
+              type: "string",
+              enum: ["CSV", "XLSX", "PDF"],
+              default: "CSV",
+            },
+          },
+        ],
+        responses: { "200": { description: "Report file stream" } },
+      },
+    },
+    "/finance/records/schools": {
+      get: {
+        summary: "Get schools & loan reconciliation records",
+        tags: ["Finance"],
+        responses: {
+          "200": { description: "School records and linked loans" },
+        },
+      },
+    },
+    "/finance/records/investigation": {
+      post: {
+        summary: "Create reconciliation investigation ticket",
+        tags: ["Finance"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["transactionReference", "issueType", "description"],
+                properties: {
+                  transactionReference: { type: "string" },
+                  schoolId: { type: "string" },
+                  issueType: { type: "string" },
+                  description: { type: "string", minLength: 3 },
+                },
+              },
+            },
+          },
+        },
+        responses: { "201": { description: "Investigation ticket created" } },
+      },
+    },
+    "/finance/audit-logs": {
+      get: {
+        summary: "Get finance audit logs and settings configuration",
+        tags: ["Finance"],
+        responses: { "200": { description: "Audit logs and settings" } },
+      },
+    },
+    "/finance/settings": {
+      patch: {
+        summary: "Update finance control settings",
+        tags: ["Finance"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  autoDisbursementLimit: { type: "number" },
+                  requireTwoPersonApproval: { type: "boolean" },
+                  gracePeriodDays: { type: "number" },
+                  defaultLateFeePercentage: { type: "number" },
+                  reconciliationThreshold: { type: "number" },
+                  notificationEmails: {
+                    type: "array",
+                    items: { type: "string" },
                   },
                 },
               },
             },
           },
-          responses: { "200": { description: "Disbursement reversed" } },
         },
+        responses: { "200": { description: "Settings updated" } },
       },
-      "/finance/schools/verification": {
-        get: {
-          summary: "List school bank account verification statuses",
-          tags: ["Finance"],
-          parameters: [
-            { in: "query", name: "search", schema: { type: "string" } },
-          ],
-          responses: { "200": { description: "School verification list" } },
-        },
-      },
-      "/finance/schools/verification/{schoolId}/status": {
-        patch: {
-          summary: "Update school bank verification status",
-          tags: ["Finance"],
-          parameters: [
-            { in: "path", name: "schoolId", required: true, schema: { type: "string" } },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["status"],
-                  properties: {
-                    status: { type: "string", enum: ["Verified", "Re-verification due", "Pending review", "Unverified"] },
-                    reason: { type: "string" },
-                    notes: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-          responses: { "200": { description: "Verification status updated" } },
-        },
-      },
-      "/finance/repayments": {
-        get: {
-          summary: "List borrower repayments with status filters and counts",
-          tags: ["Finance"],
-          parameters: [
-            { in: "query", name: "status", schema: { type: "string", enum: ["All", "On track", "Due soon", "Grace period", "Overdue", "Defaulted"] } },
-            { in: "query", name: "search", schema: { type: "string" } },
-            { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-            { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
-          ],
-          responses: { "200": { description: "Repayments register" } },
-        },
-      },
-      "/finance/repayments/{loanId}": {
-        get: {
-          summary: "Get loan repayment details and schedule history",
-          tags: ["Finance"],
-          parameters: [
-            { in: "path", name: "loanId", required: true, schema: { type: "string" } },
-          ],
-          responses: { "200": { description: "Loan repayment details" } },
-        },
-      },
-      "/finance/repayments/follow-up": {
-        post: {
-          summary: "Trigger collection reminder for a loan",
-          tags: ["Finance"],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["loanId"],
-                  properties: {
-                    loanId: { type: "string" },
-                    actionType: { type: "string", enum: ["call", "sms", "email", "reminder", "general"] },
-                    notes: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-          responses: { "200": { description: "Follow-up triggered" } },
-        },
-      },
-      "/finance/repayments/waive-fee": {
-        post: {
-          summary: "Waive late fee on repayment schedule",
-          tags: ["Finance"],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["loanId", "reason"],
-                  properties: {
-                    loanId: { type: "string" },
-                    scheduleId: { type: "string" },
-                    amount: { type: "number" },
-                    reason: { type: "string", minLength: 3 },
-                  },
-                },
-              },
-            },
-          },
-          responses: { "200": { description: "Late fee waived" } },
-        },
-      },
-      "/finance/outstanding-balances": {
-        get: {
-          summary: "Get portfolio outstanding aging analysis and breakdown",
-          tags: ["Finance"],
-          responses: { "200": { description: "Outstanding balances analytics" } },
-        },
-      },
-      "/finance/overdue-accounts": {
-        get: {
-          summary: "Get overdue accounts collection queue and metrics",
-          tags: ["Finance"],
-          responses: { "200": { description: "Overdue accounts queue" } },
-        },
-      },
-      "/finance/overdue-accounts/bulk-reminders": {
-        post: {
-          summary: "Dispatch bulk payment reminders",
-          tags: ["Finance"],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["loanIds"],
-                  properties: {
-                    loanIds: { type: "array", items: { type: "string" } },
-                    channel: { type: "string", enum: ["sms", "email", "both"], default: "both" },
-                  },
-                },
-              },
-            },
-          },
-          responses: { "200": { description: "Bulk reminders queued" } },
-        },
-      },
-      "/finance/collections/follow-up": {
-        get: {
-          summary: "Get collection follow-up queue and worklist",
-          tags: ["Finance"],
-          responses: { "200": { description: "Collection follow-up queue" } },
-        },
-      },
-      "/finance/collections/log-interaction": {
-        post: {
-          summary: "Log borrower contact interaction",
-          tags: ["Finance"],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["loanId", "interactionType", "notes"],
-                  properties: {
-                    loanId: { type: "string" },
-                    interactionType: { type: "string", enum: ["call", "sms", "email", "in_person", "promise_to_pay"] },
-                    notes: { type: "string" },
-                    promiseDate: { type: "string" },
-                    promisedAmount: { type: "number" },
-                  },
-                },
-              },
-            },
-          },
-          responses: { "200": { description: "Interaction logged" } },
-        },
-      },
-      "/finance/collections/assign": {
-        post: {
-          summary: "Assign follow-up work item to officer",
-          tags: ["Finance"],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["loanId", "officerId"],
-                  properties: {
-                    loanId: { type: "string" },
-                    officerId: { type: "string" },
-                    officerName: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-          responses: { "200": { description: "Officer assigned" } },
-        },
-      },
-      "/finance/reports": {
-        get: {
-          summary: "Get financial reports list and portfolio comparison bars",
-          tags: ["Finance"],
-          responses: { "200": { description: "Reports and analytics" } },
-        },
-      },
-      "/finance/reports/{id}/download": {
-        get: {
-          summary: "Download financial report file",
-          tags: ["Finance"],
-          parameters: [
-            { in: "path", name: "id", required: true, schema: { type: "string" } },
-            { in: "query", name: "format", schema: { type: "string", enum: ["CSV", "XLSX", "PDF"], default: "CSV" } },
-          ],
-          responses: { "200": { description: "Report file stream" } },
-        },
-      },
-      "/finance/records/schools": {
-        get: {
-          summary: "Get schools & loan reconciliation records",
-          tags: ["Finance"],
-          responses: { "200": { description: "School records and linked loans" } },
-        },
-      },
-      "/finance/records/investigation": {
-        post: {
-          summary: "Create reconciliation investigation ticket",
-          tags: ["Finance"],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["transactionReference", "issueType", "description"],
-                  properties: {
-                    transactionReference: { type: "string" },
-                    schoolId: { type: "string" },
-                    issueType: { type: "string" },
-                    description: { type: "string", minLength: 3 },
-                  },
-                },
-              },
-            },
-          },
-          responses: { "201": { description: "Investigation ticket created" } },
-        },
-      },
-      "/finance/audit-logs": {
-        get: {
-          summary: "Get finance audit logs and settings configuration",
-          tags: ["Finance"],
-          responses: { "200": { description: "Audit logs and settings" } },
-        },
-      },
-      "/finance/settings": {
-        patch: {
-          summary: "Update finance control settings",
-          tags: ["Finance"],
-          requestBody: {
-            required: true,
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Financial Ledger  (role: admin)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    "/finance/ledger/trial-balance": {
+      get: {
+        summary: "Trial balance — all accounts with debit/credit totals",
+        description:
+          "Returns every account in the chart of accounts with its current balance. The `isBalanced` flag confirms ∑DR = ∑CR across the full book.",
+        tags: ["Ledger"],
+        security: [{ BearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Trial balance",
             content: {
               "application/json": {
                 schema: {
                   type: "object",
                   properties: {
-                    autoDisbursementLimit: { type: "number" },
-                    requireTwoPersonApproval: { type: "boolean" },
-                    gracePeriodDays: { type: "number" },
-                    defaultLateFeePercentage: { type: "number" },
-                    reconciliationThreshold: { type: "number" },
-                    notificationEmails: { type: "array", items: { type: "string" } },
+                    success: { type: "boolean" },
+                    data: {
+                      type: "object",
+                      properties: {
+                        accounts: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              code: {
+                                type: "string",
+                                example: "LOANS_RECEIVABLE",
+                              },
+                              accountNumber: {
+                                type: "string",
+                                example: "1100",
+                              },
+                              name: {
+                                type: "string",
+                                example: "Loans Receivable — Principal",
+                              },
+                              type: {
+                                type: "string",
+                                enum: [
+                                  "ASSET",
+                                  "LIABILITY",
+                                  "INCOME",
+                                  "EXPENSE",
+                                  "EQUITY",
+                                ],
+                              },
+                              normalBalance: {
+                                type: "string",
+                                enum: ["DEBIT", "CREDIT"],
+                              },
+                              balance: { type: "number", example: 4250000 },
+                              debitBalance: {
+                                type: "number",
+                                example: 4250000,
+                              },
+                              creditBalance: { type: "number", example: 0 },
+                            },
+                          },
+                        },
+                        totalDebits: { type: "number" },
+                        totalCredits: { type: "number" },
+                        isBalanced: { type: "boolean" },
+                      },
+                    },
                   },
                 },
               },
             },
           },
-          responses: { "200": { description: "Settings updated" } },
         },
       },
+    },
+
+    "/finance/ledger/accounts": {
+      get: {
+        summary: "List chart of accounts with current balances",
+        description:
+          "Returns the same data as the trial balance, structured as an account registry. Useful for building account-picker dropdowns in the adjustment form.",
+        tags: ["Ledger"],
+        security: [{ BearerAuth: [] }],
+        responses: { "200": { description: "Ledger accounts list" } },
+      },
+    },
+
+    "/finance/ledger/accounts/{code}/statement": {
+      get: {
+        summary: "Statement for one ledger account",
+        description:
+          "Chronological list of every journal entry that posted to the specified account (e.g. `LOANS_RECEIVABLE`). Supports date range and pagination.",
+        tags: ["Ledger"],
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "code",
+            required: true,
+            schema: {
+              type: "string",
+              enum: [
+                "CASH_AND_EQUIVALENTS",
+                "LOANS_RECEIVABLE",
+                "INTEREST_RECEIVABLE",
+                "FEE_RECEIVABLE",
+                "LATE_FEE_RECEIVABLE",
+                "SUSPENSE_CLEARING",
+                "SCHOOL_PAYABLE",
+                "UNEARNED_INTEREST",
+                "REFUND_PAYABLE",
+                "THIRD_PARTY_PAYABLE",
+                "INTEREST_INCOME",
+                "SERVICE_CHARGE_INCOME",
+                "LATE_FEE_INCOME",
+                "REVERSAL_INCOME",
+                "FUNDING_COST",
+                "BAD_DEBT_EXPENSE",
+                "PROCESSING_EXPENSE",
+                "WAIVER_EXPENSE",
+              ],
+            },
+            description: "Ledger account code",
+          },
+          {
+            in: "query",
+            name: "fromDate",
+            schema: { type: "string", format: "date-time" },
+          },
+          {
+            in: "query",
+            name: "toDate",
+            schema: { type: "string", format: "date-time" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 100 },
+          },
+        ],
+        responses: {
+          "200": { description: "Account statement with pagination" },
+          "404": { description: "Account code not found" },
+        },
+      },
+    },
+
+    "/finance/ledger/unreconciled": {
+      get: {
+        summary:
+          "Reconciliation queue — entries not yet matched to a bank statement",
+        description:
+          "Returns all disbursement and repayment journal entries with `reconciliationStatus = UNRECONCILED`. Optionally filter by account code and date range.",
+        tags: ["Ledger"],
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "accountCode",
+            schema: { type: "string" },
+            description: "Filter by ledger account code",
+          },
+          {
+            in: "query",
+            name: "fromDate",
+            schema: { type: "string", format: "date-time" },
+          },
+          {
+            in: "query",
+            name: "toDate",
+            schema: { type: "string", format: "date-time" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 50 },
+          },
+        ],
+        responses: {
+          "200": { description: "Unreconciled entries with pagination" },
+        },
+      },
+    },
+
+    "/finance/ledger/loan/{loanId}/statement": {
+      get: {
+        summary: "Full journal entry history for one loan",
+        description:
+          "Every ledger line ever posted against this `loanApplicationId`, in entry-sequence order. Supports filtering by account code, entry type, date range, and pagination.",
+        tags: ["Ledger"],
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "loanId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Loan application UUID",
+          },
+          {
+            in: "query",
+            name: "accountCode",
+            schema: { type: "string" },
+            description: "Filter to a specific account (e.g. LOANS_RECEIVABLE)",
+          },
+          {
+            in: "query",
+            name: "entryType",
+            schema: {
+              type: "string",
+              enum: [
+                "LOAN_DISBURSEMENT",
+                "REPAYMENT_PRINCIPAL",
+                "REPAYMENT_INTEREST",
+                "REPAYMENT_FEE",
+                "INTEREST_ACCRUAL",
+                "LATE_FEE_CHARGE",
+                "LATE_FEE_COLLECTION",
+                "WAIVER",
+                "WRITE_OFF",
+                "REVERSAL",
+                "SUSPENSE_HOLD",
+                "SUSPENSE_RELEASE",
+                "ADJUSTMENT",
+              ],
+            },
+          },
+          {
+            in: "query",
+            name: "fromDate",
+            schema: { type: "string", format: "date-time" },
+          },
+          {
+            in: "query",
+            name: "toDate",
+            schema: { type: "string", format: "date-time" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 100 },
+          },
+        ],
+        responses: {
+          "200": { description: "Loan ledger statement with pagination" },
+        },
+      },
+    },
+
+    "/finance/ledger/loan/{loanId}/summary": {
+      get: {
+        summary:
+          "Outstanding balances for a loan — computed from ledger (authoritative)",
+        description:
+          "Computes outstanding principal, interest, fees, and late fees directly from journal entries — not from the repayment schedules table. This is the authoritative financial position for the loan.",
+        tags: ["Ledger"],
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "loanId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Loan financial summary",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    data: {
+                      type: "object",
+                      properties: {
+                        outstandingPrincipal: {
+                          type: "number",
+                          example: 3800000,
+                        },
+                        outstandingInterest: {
+                          type: "number",
+                          example: 190000,
+                        },
+                        outstandingFees: { type: "number", example: 57000 },
+                        outstandingLateFees: { type: "number", example: 0 },
+                        totalDisbursed: { type: "number", example: 4250000 },
+                        totalRepaid: { type: "number", example: 450000 },
+                        totalInterestCollected: {
+                          type: "number",
+                          example: 47500,
+                        },
+                        isFullyRepaid: { type: "boolean", example: false },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+
+    "/finance/ledger/entries/{id}/reconcile": {
+      patch: {
+        summary: "Reconcile a ledger entry against a bank statement",
+        description:
+          "Marks one journal entry as matched to an external bank statement reference. Sets `reconciliationStatus` to `RECONCILED` (or `DISPUTED`) and stamps who reconciled it and when.",
+        tags: ["Ledger"],
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Ledger entry UUID",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["bankStatementRef"],
+                properties: {
+                  bankStatementRef: {
+                    type: "string",
+                    example: "NIBSS-2026-11-06-00482",
+                    description: "Bank statement reference to match against",
+                  },
+                  status: {
+                    type: "string",
+                    enum: ["RECONCILED", "DISPUTED"],
+                    default: "RECONCILED",
+                    description:
+                      "Use DISPUTED if amounts differ and need investigation",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Entry reconciled" },
+          "404": { description: "Ledger entry not found" },
+        },
+      },
+    },
+
+    "/finance/ledger/entries/adjustment": {
+      post: {
+        summary: "Post a manual adjustment journal entry",
+        description:
+          "Creates a balanced DR/CR manual adjustment. The `note` field is mandatory and stored immutably on both journal lines. Also written to the audit log with action `LEDGER_ADJUSTMENT_POSTED`.",
+        tags: ["Ledger"],
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: [
+                  "debitAccount",
+                  "creditAccount",
+                  "amount",
+                  "description",
+                  "note",
+                ],
+                properties: {
+                  loanApplicationId: {
+                    type: "string",
+                    format: "uuid",
+                    description:
+                      "Optional — links this adjustment to a specific loan",
+                  },
+                  debitAccount: {
+                    type: "string",
+                    example: "LOANS_RECEIVABLE",
+                    description: "Ledger account code to debit",
+                  },
+                  creditAccount: {
+                    type: "string",
+                    example: "SUSPENSE_CLEARING",
+                    description: "Ledger account code to credit",
+                  },
+                  amount: {
+                    type: "number",
+                    example: 5000,
+                    description:
+                      "Positive adjustment amount in NGN (kobo precision to 4dp)",
+                  },
+                  description: {
+                    type: "string",
+                    example: "Correct misposted repayment — ticket #SC-4821",
+                  },
+                  note: {
+                    type: "string",
+                    example:
+                      "Parent overpaid ₦5,000 on 6 Nov 2026. Moved to suspense pending refund decision.",
+                    description: "Mandatory audit note — must be non-empty",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Adjustment journal posted",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    data: {
+                      type: "object",
+                      properties: {
+                        journalId: { type: "string", format: "uuid" },
+                        entries: { type: "array", items: { type: "object" } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Journal does not balance or note is missing" },
+        },
+      },
+    },
+
+    "/finance/ledger/entries/{id}/reverse-journal": {
+      post: {
+        summary: "Reverse an entire journal batch",
+        description:
+          "Posts a mirror-image journal that exactly undoes every entry in the same `journalId` as the referenced entry (DR↔CR swapped, same amounts). Marks all original entries `isReversed = true`. Use this to undo a mis-posted disbursement or repayment.",
+        tags: ["Ledger"],
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Any entry UUID from the journal batch to reverse",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["reason"],
+                properties: {
+                  reason: {
+                    type: "string",
+                    example:
+                      "Disbursement sent to wrong school account — reversing for re-issue",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Reversal journal posted",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    data: {
+                      type: "object",
+                      properties: {
+                        reversalJournalId: { type: "string", format: "uuid" },
+                        entries: { type: "array", items: { type: "object" } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "404": { description: "Ledger entry not found" },
+        },
+      },
+    },
+
     "/health": {
       get: {
         summary: "Server health check",
@@ -774,7 +1537,7 @@ const swaggerSpec: Record<string, unknown> = {
         responses: { "200": { description: "Server is running" } },
       },
     },
-    
+
     "/auth/register/parent": {
       post: {
         summary: "Register a new parent account",
@@ -1403,7 +2166,12 @@ const swaggerSpec: Record<string, unknown> = {
               schema: {
                 type: "object",
                 required: ["photoUrl"],
-                properties: { photoUrl: { type: "string", example: "https://cdn.example.com/photo.jpg" } },
+                properties: {
+                  photoUrl: {
+                    type: "string",
+                    example: "https://cdn.example.com/photo.jpg",
+                  },
+                },
               },
             },
           },
@@ -1646,7 +2414,9 @@ const swaggerSpec: Record<string, unknown> = {
             },
           },
         },
-        responses: { "200": { description: "Schedule created, funder notified" } },
+        responses: {
+          "200": { description: "Schedule created, funder notified" },
+        },
       },
     },
     "/parents/applications/{id}/mandate-preview": {
@@ -1681,7 +2451,9 @@ const swaggerSpec: Record<string, unknown> = {
             schema: { type: "string", format: "uuid" },
           },
         ],
-        responses: { "200": { description: "Repayment schedule installments" } },
+        responses: {
+          "200": { description: "Repayment schedule installments" },
+        },
       },
     },
     "/parents/applications/{id}/pay-installment": {
@@ -4439,10 +5211,20 @@ const swaggerSpec: Record<string, unknown> = {
         tags: ["Admin"],
         parameters: [
           { in: "query", name: "status", schema: { type: "string" } },
-          { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-          { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
         ],
-        responses: { "200": { description: "Paginated disbursement request list" } },
+        responses: {
+          "200": { description: "Paginated disbursement request list" },
+        },
       },
     },
 
@@ -4591,9 +5373,21 @@ const swaggerSpec: Record<string, unknown> = {
         tags: ["Admin"],
         parameters: [
           { in: "query", name: "status", schema: { type: "string" } },
-          { in: "query", name: "assignedTo", schema: { type: "string", format: "uuid" } },
-          { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-          { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          {
+            in: "query",
+            name: "assignedTo",
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
         ],
         responses: { "200": { description: "Paginated ticket list" } },
       },
@@ -4667,12 +5461,32 @@ const swaggerSpec: Record<string, unknown> = {
         summary: "List audit log entries with filters",
         tags: ["Admin"],
         parameters: [
-          { in: "query", name: "userId", schema: { type: "string", format: "uuid" } },
+          {
+            in: "query",
+            name: "userId",
+            schema: { type: "string", format: "uuid" },
+          },
           { in: "query", name: "action", schema: { type: "string" } },
-          { in: "query", name: "fromDate", schema: { type: "string", format: "date" } },
-          { in: "query", name: "toDate", schema: { type: "string", format: "date" } },
-          { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-          { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          {
+            in: "query",
+            name: "fromDate",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            in: "query",
+            name: "toDate",
+            schema: { type: "string", format: "date" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
         ],
         responses: { "200": { description: "Paginated audit log list" } },
       },
@@ -4899,8 +5713,16 @@ const swaggerSpec: Record<string, unknown> = {
         tags: ["School"],
         parameters: [
           { in: "query", name: "search", schema: { type: "string" } },
-          { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-          { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
         ],
         responses: { "200": { description: "Paginated student list" } },
       },
@@ -4987,8 +5809,16 @@ const swaggerSpec: Record<string, unknown> = {
         tags: ["CustomerService"],
         parameters: [
           { in: "query", name: "status", schema: { type: "string" } },
-          { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-          { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
         ],
         responses: { "200": { description: "Paginated ticket list" } },
       },
@@ -5024,7 +5854,10 @@ const swaggerSpec: Record<string, unknown> = {
             "application/json": {
               schema: {
                 type: "object",
-                properties: { status: { type: "string" }, note: { type: "string" } },
+                properties: {
+                  status: { type: "string" },
+                  note: { type: "string" },
+                },
               },
             },
           },
@@ -5105,8 +5938,16 @@ const swaggerSpec: Record<string, unknown> = {
         tags: ["CustomerService"],
         parameters: [
           { in: "query", name: "status", schema: { type: "string" } },
-          { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-          { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
         ],
         responses: { "200": { description: "Application list" } },
       },
@@ -5117,8 +5958,16 @@ const swaggerSpec: Record<string, unknown> = {
         tags: ["CustomerService"],
         parameters: [
           { in: "query", name: "search", schema: { type: "string" } },
-          { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-          { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
         ],
         responses: { "200": { description: "Parent list" } },
       },
@@ -5129,8 +5978,16 @@ const swaggerSpec: Record<string, unknown> = {
         tags: ["CustomerService"],
         parameters: [
           { in: "query", name: "search", schema: { type: "string" } },
-          { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-          { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
         ],
         responses: { "200": { description: "School list" } },
       },
@@ -5216,8 +6073,16 @@ const swaggerSpec: Record<string, unknown> = {
         summary: "List the authenticated parent's support tickets",
         tags: ["Support"],
         parameters: [
-          { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-          { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
         ],
         responses: { "200": { description: "Ticket list" } },
       },
@@ -5299,8 +6164,16 @@ const swaggerSpec: Record<string, unknown> = {
         parameters: [
           { in: "query", name: "search", schema: { type: "string" } },
           { in: "query", name: "state", schema: { type: "string" } },
-          { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-          { in: "query", name: "limit", schema: { type: "integer", default: 20 } },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", default: 20 },
+          },
         ],
         responses: { "200": { description: "Catalog school list" } },
       },

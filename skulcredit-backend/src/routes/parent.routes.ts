@@ -101,21 +101,23 @@ router.post(
 );
 router.post(
   "/verify-nin",
+  // Active identity method — NIN verification (replaces BVN consent flow)
   validate(verifyNinSchema),
   parentController.verifyNin.bind(parentController),
 );
 
-// BVN two-stage consent flow (Lendsqr adjutor API)
-router.post(
-  "/bvn-consent/init",
-  validate(initBvnConsentSchema),
-  parentController.initBvnConsent.bind(parentController),
-);
-router.put(
-  "/bvn-consent/complete",
-  validate(completeBvnConsentSchema),
-  parentController.completeBvnConsent.bind(parentController),
-);
+// BVN two-stage consent flow — commented out, replaced by NIN verification above.
+// To re-enable: uncomment the two routes below and update the frontend wizard.
+// router.post(
+//   "/bvn-consent/init",
+//   validate(initBvnConsentSchema),
+//   parentController.initBvnConsent.bind(parentController),
+// );
+// router.put(
+//   "/bvn-consent/complete",
+//   validate(completeBvnConsentSchema),
+//   parentController.completeBvnConsent.bind(parentController),
+// );
 
 router.get("/students", parentController.getStudents.bind(parentController));
 router.post(

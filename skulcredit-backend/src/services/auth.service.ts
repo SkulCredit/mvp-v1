@@ -11,7 +11,7 @@ import { sequelize } from "../config/db";
 import env from "../config/env";
 import ApiError from "../utils/apiError";
 import redis from "../config/redis";
-import { RefreshToken } from "../models/index";
+import { RefreshToken, AdminProfile } from "../models/index";
 import { AuthEventPublisher } from "../notifications/auth.event.publisher";
 import emailService from "../emails/email.service";
 import logger from "../config/logger";
@@ -106,7 +106,11 @@ class AuthService {
 
       await t.commit();
 
-      this._sendVerificationOtp(user.id, user.email).catch((err: Error) => logger.error(`[auth.service] _sendVerificationOtp failed: ${err.message}`));
+      this._sendVerificationOtp(user.id, user.email).catch((err: Error) =>
+        logger.error(
+          `[auth.service] _sendVerificationOtp failed: ${err.message}`,
+        ),
+      );
 
       const userJson = user.toJSON() as unknown as Record<string, unknown>;
       delete userJson.password;
@@ -148,7 +152,11 @@ class AuthService {
 
       await t.commit();
 
-      this._sendVerificationOtp(user.id, user.email).catch((err: Error) => logger.error(`[auth.service] _sendVerificationOtp failed: ${err.message}`));
+      this._sendVerificationOtp(user.id, user.email).catch((err: Error) =>
+        logger.error(
+          `[auth.service] _sendVerificationOtp failed: ${err.message}`,
+        ),
+      );
 
       const userJson = user.toJSON() as unknown as Record<string, unknown>;
       delete userJson.password;
@@ -167,7 +175,10 @@ class AuthService {
     const existing = await UserRepository.findOne({ email: data.email });
     if (existing) throw new ApiError(400, "Email already in use");
 
-    const assignedRole: "admin" | "customer_service" | "customer_service_manager" = data.role ?? "admin";
+    const assignedRole:
+      | "admin"
+      | "customer_service"
+      | "customer_service_manager" = data.role ?? "admin";
 
     const user = await UserRepository.create({
       email: data.email,
@@ -178,9 +189,18 @@ class AuthService {
       isActive: true,
     });
 
+    // Persist first + last name in AdminProfile so the admin UI shows the real name
+    const fullName =
+      [data.firstName, data.lastName].filter(Boolean).join(" ") || null;
+    await AdminProfile.create({
+      userId: user.id,
+      fullName,
+      phone: data.phoneNumber ?? null,
+    } as never);
+
     const userJson = user.toJSON() as unknown as Record<string, unknown>;
     delete userJson.password;
-    return userJson;
+    return { ...userJson, fullName };
   }
 
   async login(
@@ -234,11 +254,17 @@ class AuthService {
       try {
         const { SystemSetting } = await import("../models/index");
         const DEFAULT_TWO_FA = true;
-        const row = await SystemSetting.findOne({ where: { section: "security" } });
-        const securitySettings = row?.settings as Record<string, unknown> | null;
-        const twoFaEnabled = securitySettings !== null
-          ? securitySettings?.twoFa === true
-          : DEFAULT_TWO_FA;
+        const row = await SystemSetting.findOne({
+          where: { section: "security" },
+        });
+        const securitySettings = row?.settings as Record<
+          string,
+          unknown
+        > | null;
+        const twoFaEnabled =
+          securitySettings !== null
+            ? securitySettings?.twoFa === true
+            : DEFAULT_TWO_FA;
 
         if (twoFaEnabled) {
           // Send MFA OTP and return a partial response — NO JWT issued yet
@@ -300,7 +326,9 @@ class AuthService {
     const otp = crypto.randomInt(100_000, 1_000_000).toString();
     await redis.set(otpKey(email), `${userId}:${otp}`, "EX", OTP_TTL_SEC);
 
-    logger.info(`[auth.service] Email verification OTP generated → ${email} otp=${otp} ttl=${OTP_TTL_SEC}s`);
+    logger.info(
+      `[auth.service] Email verification OTP generated → ${email} otp=${otp} ttl=${OTP_TTL_SEC}s`,
+    );
     AuthEventPublisher.otpSend({ userId, email, otp });
   }
 
@@ -376,7 +404,9 @@ class AuthService {
     const otp = crypto.randomInt(100_000, 1_000_000).toString();
     await redis.set(pwResetKey(email), otp, "EX", PW_RESET_TTL_SEC);
 
-    logger.info(`[auth.service] Password reset OTP generated → ${email} otp=${otp} ttl=${PW_RESET_TTL_SEC}s`);
+    logger.info(
+      `[auth.service] Password reset OTP generated → ${email} otp=${otp} ttl=${PW_RESET_TTL_SEC}s`,
+    );
     AuthEventPublisher.otpSend({ userId: user.id, email: user.email, otp });
   }
 
@@ -420,7 +450,9 @@ class AuthService {
     const otp = crypto.randomInt(100_000, 1_000_000).toString();
     await redis.set(this.mfaKey(email), `${user.id}:${otp}`, "EX", OTP_TTL_SEC);
 
-    logger.info(`[auth.service] MFA OTP generated → ${email} otp=${otp} ttl=${OTP_TTL_SEC}s`);
+    logger.info(
+      `[auth.service] MFA OTP generated → ${email} otp=${otp} ttl=${OTP_TTL_SEC}s`,
+    );
     // Send directly via SMTP — bypasses RabbitMQ so it works even if the
     // message queue is down. MFA OTPs are time-critical and must be delivered.
     await emailService.sendOtp({ email: user.email, otp });
@@ -441,10 +473,7 @@ class AuthService {
   }
 
   // ── Login with MFA — issues JWT only after OTP verified ─────────────────────
-  async loginMfa(
-    email: string,
-    meta?: { ip?: string; device?: string },
-  ) {
+  async loginMfa(email: string, meta?: { ip?: string; device?: string }) {
     const user = await UserRepository.findOne({ email });
     if (!user || !user.isActive)
       throw new ApiError(401, "User not found or deactivated");
@@ -467,7 +496,11 @@ class AuthService {
     const userJson = user.toJSON() as unknown as Record<string, unknown>;
     delete userJson.password;
 
-    return { user: { ...userJson, profile: null }, accessToken, refreshToken: refreshToken.token };
+    return {
+      user: { ...userJson, profile: null },
+      accessToken,
+      refreshToken: refreshToken.token,
+    };
   }
 
   generateAccessToken(input: GenerateAccessTokenInput): string {

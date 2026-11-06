@@ -81,8 +81,7 @@ app.get("/api/v1/docs.json", (req, res) => {
 
 app.use("/api/v1", routes);
 
-// Kept for backward compatibility with pre-Cloudinary records that store local paths.
-// New uploads go directly to Cloudinary; this route serves no new files post-migration.
+// Serve uploaded files from the local uploads directory
 app.use(
   "/uploads",
   express.static(path.resolve(process.cwd(), env.uploads.dir), {
