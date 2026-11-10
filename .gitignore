@@ -1,3 +1,4 @@
+# Environment files
 .env
 .env.*
 .env.example
@@ -5,12 +6,14 @@
 .env.development
 .env.production
 
+# Agent configuration
 .agents/
-ngnix/
 
+# Nginx configuration
+nginx/
+# Documentation and internal files
 SQLDOCUMENTATION.md
 TODO.md
 LendsqrAdminRecoveryCodes.txt
-
 Adjustor-customers-api.md
 ALETPAY-API.md
