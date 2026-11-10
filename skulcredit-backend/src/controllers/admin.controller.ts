@@ -187,6 +187,26 @@ class AdminController {
     }
   }
 
+  async generateSchoolVerificationLink(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const loanApplicationId = String(req.params.applicationId);
+      const adminId = req.user?.userId ?? "system";
+      const expiryHours = Number(req.body.expiryHours ?? 72);
+      const data = await adminService.generateSchoolVerificationLink(
+        loanApplicationId,
+        adminId,
+        expiryHours,
+      );
+      successResponse(res, 201, "Verification link generated", data);
+    } catch (e) {
+      next(e);
+    }
+  }
+
   async createStaffUser(
     req: Request,
     res: Response,
@@ -200,7 +220,12 @@ class AdminController {
           phoneNumber?: string;
           firstName?: string;
           lastName?: string;
-          role?: "admin" | "customer_service" | "customer_service_manager";
+          role?:
+            | "admin"
+            | "customer_service"
+            | "customer_service_manager"
+            | "risk_management"
+            | "accountant";
         };
 
       if (!email || !password)
@@ -210,9 +235,16 @@ class AdminController {
         "admin",
         "customer_service",
         "customer_service_manager",
+        "risk_management",
+        "accountant",
       ];
       const assignedRole = allowedRoles.includes(role ?? "")
-        ? (role as "admin" | "customer_service" | "customer_service_manager")
+        ? (role as
+            | "admin"
+            | "customer_service"
+            | "customer_service_manager"
+            | "risk_management"
+            | "accountant")
         : "admin";
 
       const user = await authService.createAdmin({
@@ -801,8 +833,15 @@ class AdminController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const { status, parentId, studentId, catalogSchoolId, fromDate, toDate } =
-        req.query as Record<string, string>;
+      const {
+        status,
+        parentId,
+        studentId,
+        catalogSchoolId,
+        fromDate,
+        toDate,
+        isUnknownSchool,
+      } = req.query as Record<string, string>;
       const page = qInt(req.query.page, 1);
       const limit = qInt(req.query.limit, 20);
 
@@ -815,6 +854,7 @@ class AdminController {
           parentId,
           studentId,
           catalogSchoolId,
+          isUnknownSchool: isUnknownSchool === "true" ? true : undefined,
           fromDate,
           toDate,
           page,
@@ -1724,6 +1764,7 @@ class AdminController {
       };
       if (!fundingPartnerId)
         throw new ApiError(400, "fundingPartnerId is required");
+      const cleanContactId = contactId?.trim() || undefined;
       successResponse(
         res,
         200,
@@ -1731,7 +1772,7 @@ class AdminController {
         await adminService.assignDisbursementPartner(
           String(req.params.id),
           fundingPartnerId,
-          contactId,
+          cleanContactId,
           note,
         ),
       );

@@ -1281,10 +1281,14 @@ class ParentService {
       status: partnerSchool ? "school_verification" : "pending",
       termsAccepted: true,
       termsAcceptedAt: new Date(),
-      serviceChargeRate: Number(catalogSchool!.serviceChargeRate ?? 0.235),
+      serviceChargeRate: isManualSchool
+        ? 0.235
+        : Number(catalogSchool!.serviceChargeRate ?? 0.235),
       serviceChargeAmount: Math.round(
         payload.tuitionAmount *
-          Number(catalogSchool!.serviceChargeRate ?? 0.235),
+          (isManualSchool
+            ? 0.235
+            : Number(catalogSchool!.serviceChargeRate ?? 0.235)),
       ),
       adminNote: isManualSchool ? `Manual school: ${manualSchoolName}` : null,
     });
@@ -1303,21 +1307,23 @@ class ParentService {
         const planLabel = formatTenorLabel(payload.tenor);
         const amountFormatted = formatNaira(payload.tuitionAmount);
 
-        emailService
-          .sendApplicationReceived({
-            email: user.email,
-            parentName: parent.firstName,
-            referenceNumber: application.referenceNumber ?? "",
-            studentName: `${student.firstName} ${student.lastName}`,
-            schoolName: catalogSchool?.name ?? manualSchoolName ?? "—",
-            repaymentPlan: planLabel,
-            totalAmount: amountFormatted,
-          })
-          .catch((err) =>
-            logger.warn(
-              `[parent.service] Parent confirmation email failed: ${(err as Error).message}`,
-            ),
-          );
+        if (!isManualSchool) {
+          emailService
+            .sendApplicationReceived({
+              email: user.email,
+              parentName: parent.firstName,
+              referenceNumber: application.referenceNumber ?? "",
+              studentName: `${student.firstName} ${student.lastName}`,
+              schoolName: catalogSchool?.name ?? manualSchoolName ?? "—",
+              repaymentPlan: planLabel,
+              totalAmount: amountFormatted,
+            })
+            .catch((err) =>
+              logger.warn(
+                `[parent.service] Parent confirmation email failed: ${(err as Error).message}`,
+              ),
+            );
+        }
 
         if (!isManualSchool && catalogSchool) {
           this._sendSchoolVerificationEmail({
@@ -1926,7 +1932,6 @@ class ParentService {
       repayment = record;
     } catch (err) {
       if (err instanceof UniqueConstraintError) {
-     
         const existing = await Repayment.findOne({
           where: { paystackReference: ref },
         });

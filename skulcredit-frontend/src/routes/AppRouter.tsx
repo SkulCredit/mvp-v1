@@ -22,6 +22,9 @@ const SchoolOnboardingPage = React.lazy(
   () => import("../pages/SchoolFlow/SchoolOnboardingPage"),
 );
 
+const SchoolVerificationPage = React.lazy(
+  () => import("../pages/Public/SchoolVerificationPage"),
+);
 const AdminLoginPage = React.lazy(
   () => import("../pages/AdminFlow/AdminLoginPage"),
 );
@@ -148,19 +151,41 @@ const AdminSupportPage = React.lazy(
 const AdminAuditLogPage = React.lazy(
   () => import("../pages/AdminFlow/AdminAuditLogPage"),
 );
-const AdminAnalyticsPage = React.lazy(() => import("../pages/AdminFlow/AdminAnalyticsPage"));
-const AdminDisbursementRequestsPage = React.lazy(() => import("../pages/AdminFlow/AdminDisbursementRequestsPage"));
-const AdminProfilePage = React.lazy(() => import("../pages/AdminFlow/AdminProfilePage"));
+const AdminAnalyticsPage = React.lazy(
+  () => import("../pages/AdminFlow/AdminAnalyticsPage"),
+);
+const AdminDisbursementRequestsPage = React.lazy(
+  () => import("../pages/AdminFlow/AdminDisbursementRequestsPage"),
+);
+const AdminProfilePage = React.lazy(
+  () => import("../pages/AdminFlow/AdminProfilePage"),
+);
 
 const CSLayout = React.lazy(() => import("../components/layout/CSLayout"));
-const CSDashboardPage = React.lazy(() => import("../pages/CustomerServiceFlow/CSDashboardPage"));
-const CSIssuesPage = React.lazy(() => import("../pages/CustomerServiceFlow/CSIssuesPage"));
-const CSTicketDetailPage = React.lazy(() => import("../pages/CustomerServiceFlow/CSTicketDetailPage"));
-const CSApplicationsPage = React.lazy(() => import("../pages/CustomerServiceFlow/CSApplicationsPage"));
-const CSSchoolsPage = React.lazy(() => import("../pages/CustomerServiceFlow/CSSchoolsPage"));
-const CSParentsPage = React.lazy(() => import("../pages/CustomerServiceFlow/CSParentsPage"));
-const CSProfilePage = React.lazy(() => import("../pages/CustomerServiceFlow/CSProfilePage"));
-const CSPlaceholderPage = React.lazy(() => import("../pages/CustomerServiceFlow/CSPlaceholderPage"));
+const CSDashboardPage = React.lazy(
+  () => import("../pages/CustomerServiceFlow/CSDashboardPage"),
+);
+const CSIssuesPage = React.lazy(
+  () => import("../pages/CustomerServiceFlow/CSIssuesPage"),
+);
+const CSTicketDetailPage = React.lazy(
+  () => import("../pages/CustomerServiceFlow/CSTicketDetailPage"),
+);
+const CSApplicationsPage = React.lazy(
+  () => import("../pages/CustomerServiceFlow/CSApplicationsPage"),
+);
+const CSSchoolsPage = React.lazy(
+  () => import("../pages/CustomerServiceFlow/CSSchoolsPage"),
+);
+const CSParentsPage = React.lazy(
+  () => import("../pages/CustomerServiceFlow/CSParentsPage"),
+);
+const CSProfilePage = React.lazy(
+  () => import("../pages/CustomerServiceFlow/CSProfilePage"),
+);
+const CSPlaceholderPage = React.lazy(
+  () => import("../pages/CustomerServiceFlow/CSPlaceholderPage"),
+);
 
 const FinanceDashboardPage = React.lazy(
   () => import("../pages/FinanceFlow/FinanceDashboardPage"),
@@ -241,10 +266,7 @@ const AppRouter: React.FC = () => (
             </PublicRoute>
           }
         />
-        <Route
-          path="/admin/auth/verify-otp"
-          element={<AdminOtpPage />}
-        />
+        <Route path="/admin/auth/verify-otp" element={<AdminOtpPage />} />
         <Route
           path="/auth/staff"
           element={
@@ -367,78 +389,179 @@ const AppRouter: React.FC = () => (
           path="/admin"
           element={<Navigate to="/admin/dashboard" replace />}
         />
-
         <Route
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
               <AdminLayout />
             </ProtectedRoute>
           }
         >
-          <Route path="/admin/dashboard"        element={<AdminDashboardPage />} />
-          <Route path="/admin/applications"     element={<AdminApplicationsPage />} />
-          <Route path="/admin/applications/:id" element={<AdminApplicationDetailPage />} />
-          <Route path="/admin/parents"          element={<AdminParentsPage />} />
-          <Route path="/admin/parents/:id"      element={<AdminParentProfilePage />} />
-          <Route path="/admin/disbursements"    element={<AdminDisbursementsPage />} />
-          <Route path="/admin/schools"          element={<AdminSchoolsPage />} />
-          <Route path="/admin/schools/:id"       element={<AdminSchoolProfilePage />} />
-          <Route path="/admin/funding-partners" element={<AdminFundingPartnersPage />} />
-          <Route path="/admin/funding-partners/requests" element={<AdminDisbursementRequestsPage />} />
-          <Route path="/admin/settings"         element={<AdminSettingsPage />} />
-          <Route path="/admin/profile"          element={<AdminProfilePage />} />
-          <Route path="/admin/users"            element={<AdminUsersPage />} />
-          <Route path="/admin/users/roles"      element={<AdminRolesPage />} />
-          <Route path="/admin/compliance"       element={<AdminCompliancePage />} />
-          <Route path="/admin/support"          element={<AdminSupportPage />} />
-          <Route path="/admin/audit"            element={<AdminAuditLogPage />} />
+          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+          <Route
+            path="/admin/applications"
+            element={<AdminApplicationsPage />}
+          />
+          <Route
+            path="/admin/applications/:id"
+            element={<AdminApplicationDetailPage />}
+          />
+          <Route path="/admin/parents" element={<AdminParentsPage />} />
+          <Route
+            path="/admin/parents/:id"
+            element={<AdminParentProfilePage />}
+          />
+          <Route
+            path="/admin/disbursements"
+            element={<AdminDisbursementsPage />}
+          />
+          <Route path="/admin/schools" element={<AdminSchoolsPage />} />
+          <Route
+            path="/admin/schools/:id"
+            element={<AdminSchoolProfilePage />}
+          />
+          <Route
+            path="/admin/funding-partners"
+            element={<AdminFundingPartnersPage />}
+          />
+          <Route
+            path="/admin/funding-partners/requests"
+            element={<AdminDisbursementRequestsPage />}
+          />
+          <Route path="/admin/settings" element={<AdminSettingsPage />} />
+          <Route path="/admin/profile" element={<AdminProfilePage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/users/roles" element={<AdminRolesPage />} />
+          <Route path="/admin/compliance" element={<AdminCompliancePage />} />
+          <Route path="/admin/support" element={<AdminSupportPage />} />
+          <Route path="/admin/audit" element={<AdminAuditLogPage />} />
           <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
         </Route>
-
         <Route path="/cs" element={<Navigate to="/cs/dashboard" replace />} />
-
         <Route
           element={
-            <ProtectedRoute allowedRoles={["customer_service", "customer_service_manager"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                "customer_service",
+                "customer_service_manager",
+                "risk_management",
+              ]}
+            >
               <CSLayout />
             </ProtectedRoute>
           }
         >
-          <Route path="/cs/dashboard"    element={<CSDashboardPage />} />
-          <Route path="/cs/issues"       element={<CSIssuesPage />} />
-          <Route path="/cs/issues/:id"   element={<CSTicketDetailPage />} />
+          <Route path="/cs/dashboard" element={<CSDashboardPage />} />
+          <Route path="/cs/issues" element={<CSIssuesPage />} />
+          <Route path="/cs/issues/:id" element={<CSTicketDetailPage />} />
           <Route path="/cs/applications" element={<CSApplicationsPage />} />
-          <Route path="/cs/schools"      element={<CSSchoolsPage />} />
-          <Route path="/cs/parents"      element={<CSParentsPage />} />
-          <Route path="/cs/profile"      element={<CSProfilePage />} />
-          <Route path="/cs/escalations"  element={<CSPlaceholderPage title="Escalations" description="View and manage escalated issues that require higher-level support." icon="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />} />
-          <Route path="/cs/knowledge"    element={<CSPlaceholderPage title="Knowledge Base" description="Browse articles, FAQs and guides to help resolve customer issues faster." icon="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" />} />
-          <Route path="/cs/reports"      element={<CSPlaceholderPage title="Reports" description="View support metrics, ticket resolution rates, and performance reports." icon="M18 20V10M12 20V4M6 20v-6" />} />
+          <Route path="/cs/schools" element={<CSSchoolsPage />} />
+          <Route path="/cs/parents" element={<CSParentsPage />} />
+          <Route path="/cs/profile" element={<CSProfilePage />} />
+          <Route
+            path="/cs/escalations"
+            element={
+              <CSPlaceholderPage
+                title="Escalations"
+                description="View and manage escalated issues that require higher-level support."
+                icon="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+              />
+            }
+          />
+          <Route
+            path="/cs/knowledge"
+            element={
+              <CSPlaceholderPage
+                title="Knowledge Base"
+                description="Browse articles, FAQs and guides to help resolve customer issues faster."
+                icon="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"
+              />
+            }
+          />
+          <Route
+            path="/cs/reports"
+            element={
+              <CSPlaceholderPage
+                title="Reports"
+                description="View support metrics, ticket resolution rates, and performance reports."
+                icon="M18 20V10M12 20V4M6 20v-6"
+              />
+            }
+          />
         </Route>
-
         <Route
           path="/funding-partner/disbursement/:id"
           element={<FundingPartnerDisbursementPage />}
         />
-
-        {/* Finance Flow Routes */}
-        <Route path="/finance" element={<Navigate to="/finance/dashboard" replace />} />
-        <Route path="/finance/dashboard" element={<FinanceDashboardPage />} />
-        <Route path="/finance/disbursements" element={<FinanceDisbursementsPage />} />
-        <Route path="/finance/disbursements/history" element={<FinanceDisbursementsPage />} />
-        <Route path="/finance/disbursements/new" element={<FinanceNewDisbursementPage />} />
-        <Route path="/finance/disbursements/verification" element={<FinanceSchoolVerificationPage />} />
-        <Route path="/finance/repayments" element={<FinanceRepaymentsPage />} />
-        <Route path="/finance/repayments/history" element={<FinanceRepaymentsPage />} />
-        <Route path="/finance/repayments/outstanding" element={<FinanceOutstandingBalancesPage />} />
-        <Route path="/finance/repayments/overdue" element={<FinanceOverdueAccountsPage />} />
-        <Route path="/finance/repayments/follow-up" element={<FinanceCollectionFollowUpPage />} />
-        <Route path="/finance/records/schools" element={<FinanceSchoolRecordsPage />} />
-        <Route path="/finance/records" element={<FinanceSchoolRecordsPage />} />
-        <Route path="/finance/reconciliation" element={<FinanceSchoolRecordsPage />} />
-        <Route path="/finance/reports" element={<FinanceFinancialReportsPage />} />
-        <Route path="/finance/settings" element={<FinanceAuditLogsPage />} />
-
+        <Route
+          path="/finance"
+          element={<Navigate to="/finance/dashboard" replace />}
+        />
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={["accountant"]}>
+              <React.Fragment />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/finance/dashboard" element={<FinanceDashboardPage />} />
+          <Route
+            path="/finance/disbursements"
+            element={<FinanceDisbursementsPage />}
+          />
+          <Route
+            path="/finance/disbursements/history"
+            element={<FinanceDisbursementsPage />}
+          />
+          <Route
+            path="/finance/disbursements/new"
+            element={<FinanceNewDisbursementPage />}
+          />
+          <Route
+            path="/finance/disbursements/verification"
+            element={<FinanceSchoolVerificationPage />}
+          />
+          <Route
+            path="/finance/repayments"
+            element={<FinanceRepaymentsPage />}
+          />
+          <Route
+            path="/finance/repayments/history"
+            element={<FinanceRepaymentsPage />}
+          />
+          <Route
+            path="/finance/repayments/outstanding"
+            element={<FinanceOutstandingBalancesPage />}
+          />
+          <Route
+            path="/finance/repayments/overdue"
+            element={<FinanceOverdueAccountsPage />}
+          />
+          <Route
+            path="/finance/repayments/follow-up"
+            element={<FinanceCollectionFollowUpPage />}
+          />
+          <Route
+            path="/finance/records/schools"
+            element={<FinanceSchoolRecordsPage />}
+          />
+          <Route
+            path="/finance/records"
+            element={<FinanceSchoolRecordsPage />}
+          />
+          <Route
+            path="/finance/reconciliation"
+            element={<FinanceSchoolRecordsPage />}
+          />
+          <Route
+            path="/finance/reports"
+            element={<FinanceFinancialReportsPage />}
+          />
+          <Route path="/finance/settings" element={<FinanceAuditLogsPage />} />
+        </Route>
+        <Route
+          path="/verify-school/:token"
+          element={<SchoolVerificationPage />}
+        />
         <Route path="*" element={<Navigate to="/" replace />} />{" "}
       </Routes>
     </Suspense>

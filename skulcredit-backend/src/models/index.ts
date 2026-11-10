@@ -32,6 +32,7 @@ import AuditLog from "./AuditLog";
 import SystemSetting from "./SystemSetting";
 import LedgerAccount from "./LedgerAccount";
 import FinancialLedgerEntry from "./FinancialLedgerEntry";
+import SchoolVerificationLink from "./SchoolVerificationLink";
 
 User.hasOne(Parent, { foreignKey: "userId", as: "parentProfile" });
 User.hasOne(School, { foreignKey: "userId", as: "schoolProfile" });
@@ -247,6 +248,15 @@ FinancialLedgerEntry.belongsTo(LoanApplication, {
   as: "loanApplication",
 });
 
+LoanApplication.hasMany(SchoolVerificationLink, {
+  foreignKey: "loanApplicationId",
+  as: "verificationLinks",
+});
+SchoolVerificationLink.belongsTo(LoanApplication, {
+  foreignKey: "loanApplicationId",
+  as: "loanApplication",
+});
+
 export {
   User,
   Parent,
@@ -282,4 +292,5 @@ export {
   SystemSetting,
   LedgerAccount,
   FinancialLedgerEntry,
+  SchoolVerificationLink,
 };

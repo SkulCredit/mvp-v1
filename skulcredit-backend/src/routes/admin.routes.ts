@@ -81,6 +81,10 @@ router.patch("/loans/:id/note", ctrl.updateApplicationNote.bind(ctrl));
 router.get("/loans/:id/events", ctrl.listApplicationEvents.bind(ctrl));
 router.post("/loans/:id/events", ctrl.createApplicationEvent.bind(ctrl));
 router.get("/loans/:id/schedule", ctrl.getRepaymentSchedule.bind(ctrl));
+router.post(
+  "/loans/:applicationId/school-verification-link",
+  ctrl.generateSchoolVerificationLink.bind(ctrl),
+);
 
 router.get("/ledgers", ctrl.listLoanLedgers.bind(ctrl));
 router.get("/ledgers/loan/:loanApplicationId", ctrl.getLoanLedger.bind(ctrl));

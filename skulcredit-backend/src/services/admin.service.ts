@@ -1,5 +1,6 @@
 ﻿import { Op, fn, col, literal, QueryTypes } from "sequelize";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { sequelize } from "../config/db";
 import { spawn } from "child_process";
 import * as fs from "fs";
@@ -37,6 +38,7 @@ import {
   FundingPartnerContact,
   AdminProfile,
   SystemSetting,
+  SchoolVerificationLink,
 } from "../models/index";
 import ApiError from "../utils/apiError";
 import emailService from "../emails/email.service";
@@ -44,6 +46,7 @@ import { formatNaira, formatTenorLabel } from "../utils/format";
 import env from "../config/env";
 import ledgerService from "./ledger.service";
 import logger from "../config/logger";
+import eventNotifier from "../notifications/event.notifier";
 
 const DEFAULT_SETTINGS: Record<string, unknown> = {
   security: {
@@ -309,6 +312,8 @@ class AdminService {
       "admin",
       "customer_service",
       "customer_service_manager",
+      "risk_management",
+      "accountant",
     ];
     const where: Record<string, unknown> = {
       role: role ? role : { [Op.in]: STAFF_ROLES },
@@ -377,6 +382,8 @@ class AdminService {
       "admin",
       "customer_service",
       "customer_service_manager",
+      "risk_management",
+      "accountant",
     ];
 
     if (data.email && data.email !== user.email) {
@@ -394,7 +401,9 @@ class AdminService {
         role: data.role as
           | "admin"
           | "customer_service"
-          | "customer_service_manager",
+          | "customer_service_manager"
+          | "risk_management"
+          | "accountant",
       });
     }
 
@@ -915,14 +924,22 @@ class AdminService {
     parentId?: string;
     studentId?: string;
     catalogSchoolId?: string;
+    isUnknownSchool?: boolean;
     fromDate?: string;
     toDate?: string;
     page?: number;
     limit?: number;
   }) {
     const where: Record<string, unknown> = {};
-    const { status, parentId, studentId, catalogSchoolId, fromDate, toDate } =
-      filters ?? {};
+    const {
+      status,
+      parentId,
+      studentId,
+      catalogSchoolId,
+      isUnknownSchool,
+      fromDate,
+      toDate,
+    } = filters ?? {};
 
     if (status) where.status = status;
     if (parentId) where.parentId = parentId;
@@ -939,6 +956,9 @@ class AdminService {
     const page = filters?.page ?? 1;
     const limit = filters?.limit ?? 20;
 
+    const catalogSchoolWhere: Record<string, unknown> = {};
+    if (isUnknownSchool === true) catalogSchoolWhere.isRegistered = false;
+
     const { count, rows } = await LoanApplication.findAndCountAll({
       where,
       include: [
@@ -951,6 +971,10 @@ class AdminService {
           model: CatalogSchool,
           as: "catalogSchool",
           attributes: ["id", "name", "tier", "isRegistered"],
+          where: Object.keys(catalogSchoolWhere).length
+            ? catalogSchoolWhere
+            : undefined,
+          required: isUnknownSchool === true,
         },
         {
           model: Parent,
@@ -995,7 +1019,33 @@ class AdminService {
       ],
     } as never);
     if (!app) throw new ApiError(404, "Loan application not found");
-    return app;
+
+    const appAny = app as any;
+    const isUnknownSchool =
+      appAny.catalogSchool && !appAny.catalogSchool.isRegistered;
+    let schoolRequest = null;
+    if (isUnknownSchool) {
+      schoolRequest = await SchoolRequest.findOne({
+        where: {
+          parentId: app.parentId,
+          schoolName: appAny.catalogSchool.name,
+        },
+        order: [["createdAt", "DESC"]],
+        attributes: [
+          "id",
+          "schoolName",
+          "schoolAddress",
+          "schoolCity",
+          "schoolState",
+          "contactPerson",
+          "contactPhone",
+          "contactEmail",
+          "additionalNotes",
+        ],
+      } as never);
+    }
+
+    return { ...appAny.toJSON(), schoolRequest, isUnknownSchool };
   }
 
   async updateApplicationStatus(
@@ -2235,6 +2285,226 @@ class AdminService {
     const valid = await bcrypt.compare(currentPassword, user.password);
     if (!valid) throw new ApiError(400, "Current password is incorrect");
     await user.update({ password: await bcrypt.hash(newPassword, 10) });
+  }
+
+  async generateSchoolVerificationLink(
+    loanApplicationId: string,
+    generatedBy: string,
+    expiryHours = 72,
+  ) {
+    const app = (await LoanApplication.findByPk(loanApplicationId, {
+      include: [
+        {
+          model: CatalogSchool,
+          as: "catalogSchool",
+          attributes: ["id", "name", "isRegistered"],
+        },
+        { model: Parent, as: "parent", attributes: ["id"] },
+      ],
+    } as never)) as any;
+    if (!app) throw new ApiError(404, "Loan application not found");
+
+    const catalogSchool = app.catalogSchool;
+    const isManualSchool = catalogSchool && !catalogSchool.isRegistered;
+    if (!isManualSchool) {
+      throw new ApiError(
+        400,
+        "Verification links can only be generated for unknown/unregistered school applications",
+      );
+    }
+
+    const schoolRequest = (await SchoolRequest.findOne({
+      where: { parentId: app.parentId, schoolName: catalogSchool.name },
+      order: [["createdAt", "DESC"]],
+    } as never)) as any;
+    const contactEmail = schoolRequest?.contactEmail ?? null;
+
+    const token = randomBytes(48).toString("hex");
+    const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000);
+
+    const link = (await SchoolVerificationLink.create({
+      token,
+      loanApplicationId,
+      schoolName: catalogSchool.name,
+      contactEmail,
+      generatedBy,
+      expiresAt,
+      usedAt: null,
+      action: null,
+      rejectionNote: null,
+    } as never)) as any;
+
+    const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:3000";
+    return {
+      id: link.id,
+      token,
+      url: `${frontendUrl}/verify-school/${token}`,
+      schoolName: catalogSchool.name,
+      contactEmail,
+      expiresAt,
+    };
+  }
+
+  async getSchoolVerificationLinkByToken(token: string) {
+    const link = await SchoolVerificationLink.findOne({
+      where: { token },
+      include: [
+        {
+          model: LoanApplication,
+          as: "loanApplication",
+          include: [
+            {
+              model: CatalogSchool,
+              as: "catalogSchool",
+              attributes: ["id", "name"],
+            },
+            {
+              model: Student,
+              as: "student",
+              attributes: [
+                "id",
+                "firstName",
+                "lastName",
+                "gradeLevel",
+                "studentId",
+              ],
+            },
+            {
+              model: Parent,
+              as: "parent",
+              attributes: [
+                "id",
+                "firstName",
+                "lastName",
+                "addressCity",
+                "addressState",
+              ],
+            },
+            {
+              model: ApplicationEvent,
+              as: "events",
+              order: [["createdAt", "ASC"]],
+              separate: true,
+            },
+          ],
+        },
+      ],
+    } as never);
+
+    if (!link)
+      throw new ApiError(404, "Verification link not found or invalid");
+    if (new Date() > new Date((link as any).expiresAt))
+      throw new ApiError(410, "This verification link has expired");
+
+    return link;
+  }
+
+  async useSchoolVerificationLink(
+    token: string,
+    action: "confirmed" | "rejected",
+    rejectionNote?: string,
+  ) {
+    const link = (await SchoolVerificationLink.findOne({
+      where: { token },
+    })) as any;
+    if (!link)
+      throw new ApiError(404, "Verification link not found or invalid");
+    if (new Date() > new Date(link.expiresAt))
+      throw new ApiError(410, "This verification link has expired");
+    if (link.usedAt)
+      throw new ApiError(409, "This verification link has already been used");
+
+    const app = (await LoanApplication.findByPk(link.loanApplicationId, {
+      include: [{ model: Parent, as: "parent", attributes: ["id", "userId"] }],
+    } as never)) as any;
+    if (!app) throw new ApiError(404, "Application not found");
+
+    if (action === "confirmed") {
+      await app.update({
+        schoolVerificationStatus: "confirmed",
+        schoolVerifiedAt: new Date(),
+        status: "under_review",
+      });
+      await ApplicationEvent.create({
+        loanApplicationId: app.id,
+        actor: "school",
+        actorId: null,
+        status: "under_review",
+        note: "Enrollment confirmed by unknown school via verification link",
+      } as never);
+
+      eventNotifier.notifyApplicationApproved(app.parentId, app.id);
+
+      this._sendParentServiceChargeEmailForManual(app.id).catch((err: Error) =>
+        logger.error(
+          `[admin.service] Manual school parent email failed: ${err.message}`,
+        ),
+      );
+    } else {
+      const reason =
+        rejectionNote ?? "Application could not be confirmed by the school";
+      await app.update({
+        schoolVerificationStatus: "rejected",
+        schoolVerifiedAt: new Date(),
+        status: "rejected",
+        rejectionReason: reason,
+      });
+      await ApplicationEvent.create({
+        loanApplicationId: app.id,
+        actor: "school",
+        actorId: null,
+        status: "rejected",
+        note: reason,
+      } as never);
+
+      eventNotifier.notifyApplicationRejected(app.parentId, app.id, reason);
+    }
+
+    await link.update({
+      usedAt: new Date(),
+      action,
+      rejectionNote: rejectionNote ?? null,
+    });
+
+    return { success: true, action };
+  }
+
+  private async _sendParentServiceChargeEmailForManual(
+    loanApplicationId: string,
+  ) {
+    const app = (await LoanApplication.findByPk(loanApplicationId, {
+      include: [
+        { model: CatalogSchool, as: "catalogSchool", attributes: ["name"] },
+        {
+          model: Student,
+          as: "student",
+          attributes: ["firstName", "lastName"],
+        },
+        {
+          model: Parent,
+          as: "parent",
+          include: [{ model: User, as: "user", attributes: ["email"] }],
+        },
+      ],
+    } as never)) as any;
+    if (!app) return;
+
+    const parentEmail = app.parent?.user?.email;
+    if (!parentEmail) return;
+
+    const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:3000";
+
+    await emailService.sendServiceCharge({
+      email: parentEmail,
+      parentName: app.parent?.firstName ?? "Parent",
+      studentName:
+        `${app.student?.firstName ?? ""} ${app.student?.lastName ?? ""}`.trim(),
+      schoolName: app.catalogSchool?.name ?? "—",
+      referenceNumber: app.referenceNumber ?? "",
+      tuitionAmount: formatNaira(Number(app.amountRequested)),
+      serviceCharge: formatNaira(Number(app.serviceChargeAmount ?? 0)),
+      serviceChargeLink: `${frontendUrl}/parent/service-charge?ref=${app.referenceNumber ?? app.id}`,
+    });
   }
 }
 

@@ -8,10 +8,12 @@ npm-debug.log*
 .DS_Store
 logs
 *.log
+log/
+scripts/
 coverage
 .nyc_output
 dist
 README.md
 Overview.md
-docs
-uploads
+docs/
+uploads/

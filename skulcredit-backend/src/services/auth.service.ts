@@ -55,7 +55,12 @@ interface CreateAdminData {
   phoneNumber?: string;
   firstName?: string;
   lastName?: string;
-  role?: "admin" | "customer_service" | "customer_service_manager";
+  role?:
+    | "admin"
+    | "customer_service"
+    | "customer_service_manager"
+    | "risk_management"
+    | "accountant";
 }
 
 class AuthService {
@@ -178,7 +183,9 @@ class AuthService {
     const assignedRole:
       | "admin"
       | "customer_service"
-      | "customer_service_manager" = data.role ?? "admin";
+      | "customer_service_manager"
+      | "risk_management"
+      | "accountant" = data.role ?? "admin";
 
     const user = await UserRepository.create({
       email: data.email,

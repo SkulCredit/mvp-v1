@@ -24,7 +24,7 @@ const FinanceDashboardPage: React.FC = () => {
     } catch {
       // Handled via fallback in service
     }
-  };
+  };  
 
   useEffect(() => {
     fetchStats("12M");

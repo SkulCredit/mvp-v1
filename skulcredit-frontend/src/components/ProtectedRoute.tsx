@@ -21,14 +21,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (sessionState === "unauthenticated") {
     const isAdminRoute = location.pathname.startsWith("/admin");
-    const isCsRoute    = location.pathname.startsWith("/cs");
+    const isCsRoute = location.pathname.startsWith("/cs");
+    const isFinanceRoute = location.pathname.startsWith("/finance");
     const isSchoolRoute =
       location.pathname.startsWith("/school") ||
       location.pathname.startsWith("/funding-partner");
     const nextParam = `?next=${encodeURIComponent(location.pathname + location.search)}`;
     const loginPath = isAdminRoute
       ? `/admin/auth/login${nextParam}`
-      : isCsRoute
+      : isCsRoute || isFinanceRoute
         ? `/auth/staff${nextParam}`
         : isSchoolRoute
           ? `/auth/school${nextParam}`

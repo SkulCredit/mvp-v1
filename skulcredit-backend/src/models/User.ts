@@ -1,6 +1,6 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '../config/db';
-import type { UserRole } from '../types';
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../config/db";
+import type { UserRole } from "../types";
 
 export interface UserAttributes {
   id: string;
@@ -16,9 +16,20 @@ export interface UserAttributes {
   updatedAt?: Date;
 }
 
-type UserCreationAttributes = Optional<UserAttributes, 'id' | 'phoneNumber' | 'isActive' | 'isEmailVerified' | 'isPhoneVerified' | 'lastLogin'>;
+type UserCreationAttributes = Optional<
+  UserAttributes,
+  | "id"
+  | "phoneNumber"
+  | "isActive"
+  | "isEmailVerified"
+  | "isPhoneVerified"
+  | "lastLogin"
+>;
 
-export class UserInstance extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
+export class UserInstance
+  extends Model<UserAttributes, UserCreationAttributes>
+  implements UserAttributes
+{
   declare id: string;
   declare email: string;
   declare password: string;
@@ -50,7 +61,15 @@ UserInstance.init(
       allowNull: false,
     },
     role: {
-      type: DataTypes.ENUM('parent', 'school', 'admin', 'customer_service', 'customer_service_manager'),
+      type: DataTypes.ENUM(
+        "parent",
+        "school",
+        "admin",
+        "customer_service",
+        "customer_service_manager",
+        "risk_management",
+        "accountant",
+      ),
       allowNull: false,
     },
     phoneNumber: {
@@ -76,11 +95,11 @@ UserInstance.init(
   },
   {
     sequelize,
-    modelName: 'User',
-    tableName: 'users',
+    modelName: "User",
+    tableName: "users",
     timestamps: true,
     underscored: true,
-  }
+  },
 );
 
 export default UserInstance;

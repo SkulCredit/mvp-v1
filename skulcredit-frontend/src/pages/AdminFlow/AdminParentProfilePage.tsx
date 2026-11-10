@@ -250,7 +250,7 @@ const LoanApplicationDrawer: React.FC<{
               <span
                 className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${loanStatusCls(app.status)}`}
               >
-                {app.status
+                {(app.status ?? "")
                   .replace(/_/g, " ")
                   .replace(/\b\w/g, (c) => c.toUpperCase())}
               </span>
@@ -407,7 +407,7 @@ const LoanApplicationDrawer: React.FC<{
                             <span
                               className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${loanStatusCls(evt.status)}`}
                             >
-                              {evt.status
+                              {(evt.status ?? "")
                                 .replace(/_/g, " ")
                                 .replace(/\b\w/g, (c) => c.toUpperCase())}
                             </span>
@@ -469,7 +469,7 @@ const LoanApplicationDrawer: React.FC<{
                       <span
                         className={`mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${loanStatusCls(app.offer.status)}`}
                       >
-                        {app.offer.status
+                        {(app.offer.status ?? "")
                           .replace(/_/g, " ")
                           .replace(/\b\w/g, (c) => c.toUpperCase())}
                       </span>
@@ -508,7 +508,7 @@ const LoanApplicationDrawer: React.FC<{
                       <span
                         className={`mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${loanStatusCls(app.disbursement.status)}`}
                       >
-                        {app.disbursement.status
+                        {(app.disbursement.status ?? "")
                           .replace(/_/g, " ")
                           .replace(/\b\w/g, (c) => c.toUpperCase())}
                       </span>
@@ -565,7 +565,7 @@ const LoanApplicationDrawer: React.FC<{
                       <span
                         className={`mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${loanStatusCls(app.ledger.status)}`}
                       >
-                        {app.ledger.status
+                        {(app.ledger.status ?? "")
                           .replace(/_/g, " ")
                           .replace(/\b\w/g, (c) => c.toUpperCase())}
                       </span>
@@ -1187,7 +1187,7 @@ const AdminParentProfilePage: React.FC = () => {
                 parent.documents.map((doc) => (
                   <InfoRow
                     key={doc.id}
-                    label={doc.type
+                    label={(doc.type ?? "")
                       .replace(/_/g, " ")
                       .replace(/\b\w/g, (c) => c.toUpperCase())}
                     value={

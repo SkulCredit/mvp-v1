@@ -12,6 +12,7 @@ import webhookRoutes from "./webhook.routes";
 import supportRoutes from "./support.routes";
 import csRoutes from "./cs.routes";
 import financeRoutes from "./finance.routes";
+import schoolVerificationRoutes from "./schoolVerification.routes";
 
 const router = Router();
 
@@ -28,6 +29,7 @@ router.use("/webhooks", webhookRoutes);
 router.use("/support", supportRoutes);
 router.use("/cs", csRoutes);
 router.use("/finance", financeRoutes);
+router.use("/school-verification", schoolVerificationRoutes);
 
 /**
  * @swagger

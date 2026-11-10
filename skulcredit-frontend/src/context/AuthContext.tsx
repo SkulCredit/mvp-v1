@@ -19,7 +19,15 @@ import { ROLE_DASHBOARD } from "../config/routes";
 export interface AuthUser {
   id: string;
   email: string;
-  role: "parent" | "school" | "admin" | "super_admin" | "customer_service" | "customer_service_manager" | "accountant" | "risk_management";
+  role:
+    | "parent"
+    | "school"
+    | "admin"
+    | "super_admin"
+    | "customer_service"
+    | "customer_service_manager"
+    | "accountant"
+    | "risk_management";
   name?: string;
   firstName?: string;
   lastName?: string;
@@ -68,7 +76,7 @@ function enrichUser(raw: ServiceAuthUser): AuthUser {
   return {
     id: raw.id,
     email: raw.email,
-    role: raw.role,
+    role: (raw.role as string).toLowerCase() as AuthUser["role"],
     firstName,
     lastName,
     schoolName: (raw as { schoolName?: string }).schoolName,
@@ -167,8 +175,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           setUser(null);
           setSessionState("unauthenticated");
         } else {
-          const isAdminPath = window.location.pathname.startsWith("/admin");
-          if (cachedUser && isAdminPath && cachedUser.role !== "admin") {
+          const path = window.location.pathname;
+          const isAdminPath = path.startsWith("/admin");
+          const isCsPath = path.startsWith("/cs");
+          const isFinancePath = path.startsWith("/finance");
+          const isParentPath = path.startsWith("/parent");
+          const isSchoolPath = path.startsWith("/school");
+          const ADMIN_ROLES = ["admin", "super_admin"];
+          const CS_ROLES = [
+            "customer_service",
+            "customer_service_manager",
+            "risk_management",
+          ];
+          const FINANCE_ROLES = ["accountant"];
+          const wrongPath =
+            (isAdminPath &&
+              cachedUser &&
+              !ADMIN_ROLES.includes(cachedUser.role)) ||
+            (isCsPath && cachedUser && !CS_ROLES.includes(cachedUser.role)) ||
+            (isFinancePath &&
+              cachedUser &&
+              !FINANCE_ROLES.includes(cachedUser.role)) ||
+            (isParentPath && cachedUser && cachedUser.role !== "parent") ||
+            (isSchoolPath && cachedUser && cachedUser.role !== "school");
+          if (wrongPath && cachedUser) {
             wipeSession(cachedUser.id);
             setUser(null);
             setSessionState("unauthenticated");
@@ -226,16 +256,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       return;
     apiClient
       .get<{ data: { avatarUrl?: string | null; fullName?: string | null } }>(
-        "/admin/profile",
+        user.role === "admin" || user.role === "super_admin"
+          ? "/admin/profile"
+          : "/cs/profile",
       )
       .then(({ data }) => {
         const d = data.data;
         const photo = d.avatarUrl ?? null;
         const name = d.fullName ?? null;
-        if (
-          photo === user.profilePhotoUrl &&
-          (!name || name === user.name)
-        )
+        if (photo === user.profilePhotoUrl && (!name || name === user.name))
           return;
         setUser((prev) => {
           if (!prev) return prev;

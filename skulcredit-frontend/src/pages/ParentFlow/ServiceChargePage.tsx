@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Icon from "../../components/Icon";
 import { AppFlowHeader } from "../../components/layout";
-import { paymentService, AletpayInitResult } from "../../services/paymentService";
 import { parentService } from "../../services/parentService";
 import { AxiosError } from "axios";
 
@@ -15,6 +14,12 @@ interface StudentDetails {
 }
 
 type PaymentMethod = "card" | "transfer";
+
+const SERVICE_CHARGE_ACCOUNT = {
+  bankName: "Wema Bank",
+  accountNumber: "0128265488",
+  accountName: "Eureka Fortunato Technologies",
+};
 
 const ServiceChargePage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,16 +35,9 @@ const ServiceChargePage: React.FC = () => {
   const [isProcessingCard, setIsProcessingCard] = useState(false);
   const [cardError, setCardError] = useState("");
 
-  // Virtual account (transfer tab)
-  const [virtualAccountDetails, setVirtualAccountDetails] =
-    useState<AletpayInitResult | null>(null);
-  const [isLoadingVA, setIsLoadingVA] = useState(false);
-  const [vaError, setVaError] = useState("");
   const [isProcessingTransfer, setIsProcessingTransfer] = useState(false);
-  const [transferMsg, setTransferMsg] = useState("");
+  const [transferError, setTransferError] = useState("");
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState(0);
-  const [isPolling, setIsPolling] = useState(false);
 
   const urlApplicationId = searchParams.get("applicationId");
   const storedDetails: StudentDetails = JSON.parse(
@@ -83,7 +81,9 @@ const ServiceChargePage: React.FC = () => {
           referenceNumber: d.referenceNumber,
           amountRequested: Number(d.amountRequested ?? 0),
           serviceChargeAmount:
-            d.serviceChargeAmount != null ? Number(d.serviceChargeAmount) : null,
+            d.serviceChargeAmount != null
+              ? Number(d.serviceChargeAmount)
+              : null,
           serviceChargeRate:
             d.serviceChargeRate != null ? Number(d.serviceChargeRate) : null,
           student: d.student,
@@ -119,66 +119,6 @@ const ServiceChargePage: React.FC = () => {
     : "N/A";
   const applicationId = applicationData?.id ?? effectiveApplicationId;
 
-  // ── Virtual account generation (transfer tab) ──────────────────────────────
-  const hasGeneratedRef = useRef(false);
-
-  // Auto-generate when user switches to transfer tab for the first time
-  useEffect(() => {
-    if (
-      paymentMethod !== "transfer" ||
-      hasGeneratedRef.current ||
-      !applicationId ||
-      serviceCharge <= 0
-    )
-      return;
-    hasGeneratedRef.current = true;
-    void generateVirtualAccount();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paymentMethod, applicationId, serviceCharge]);
-
-  async function generateVirtualAccount() {
-    setIsLoadingVA(true);
-    setVaError("");
-    setTransferMsg("");
-    try {
-      const orderId = `SC-${String(applicationId ?? "").slice(0, 8)}-${Date.now()}`;
-      const result = await paymentService.initiatePayment({
-        amount: serviceCharge,
-        orderId,
-        description: "Service charge payment",
-      });
-      setVirtualAccountDetails(result);
-      const secs = Math.max(
-        0,
-        Math.floor((new Date(result.expiredAt).getTime() - Date.now()) / 1000),
-      );
-      setSecondsLeft(secs);
-    } catch (err) {
-      setVaError(
-        (err as AxiosError<{ message?: string }>).response?.data?.message ??
-          "Could not generate payment account. Please try again.",
-      );
-    } finally {
-      setIsLoadingVA(false);
-    }
-  }
-
-  // Countdown tick
-  useEffect(() => {
-    if (!virtualAccountDetails || secondsLeft <= 0) return;
-    const id = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(id);
-  }, [virtualAccountDetails, secondsLeft]);
-
-  const isExpired = !!virtualAccountDetails && secondsLeft <= 0;
-
-  const formatCountdown = (total: number) => {
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
-    return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
-  };
-
   const handleCopy = async (field: string, value: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -189,63 +129,26 @@ const ServiceChargePage: React.FC = () => {
     }
   };
 
-  async function verifyAndConfirm(): Promise<boolean> {
-    if (!virtualAccountDetails) return false;
-    try {
-      const data = await paymentService.verifyPayment(
-        virtualAccountDetails.transactionId,
-      );
-      const status = String(data.status ?? "").toLowerCase();
-      if (status === "successful") {
-        if (applicationId) {
-          await parentService.confirmServiceCharge(
-            applicationId,
-            virtualAccountDetails.transactionId,
-          );
-        }
-        navigate(
-          applicationId
-            ? `/parent/repayment?applicationId=${applicationId}`
-            : "/parent/repayment",
-        );
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  }
-
-  const handleCheckTransfer = async () => {
+  const handleTransferConfirm = async () => {
+    setTransferError("");
     setIsProcessingTransfer(true);
-    setTransferMsg("");
-    const confirmed = await verifyAndConfirm();
-    if (!confirmed) {
-      setTransferMsg(
-        "Transfer not yet received. Please wait a few minutes and try again.",
+    try {
+      if (applicationId) {
+        await parentService.confirmServiceCharge(applicationId);
+      }
+      navigate(
+        applicationId
+          ? `/parent/repayment?applicationId=${applicationId}`
+          : "/parent/repayment",
       );
+    } catch (err) {
+      setTransferError(
+        (err as AxiosError<{ message?: string }>).response?.data?.message ??
+          "Could not confirm payment. Please try again.",
+      );
+    } finally {
+      setIsProcessingTransfer(false);
     }
-    setIsProcessingTransfer(false);
-  };
-
-  // Auto-poll every 30s while transfer tab is active
-  useEffect(() => {
-    if (paymentMethod !== "transfer" || !virtualAccountDetails || isExpired)
-      return;
-    const interval = setInterval(async () => {
-      setIsPolling(true);
-      await verifyAndConfirm();
-      setIsPolling(false);
-    }, 30000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paymentMethod, virtualAccountDetails, isExpired]);
-
-  const handleRegenerateAccount = () => {
-    hasGeneratedRef.current = false;
-    setVirtualAccountDetails(null);
-    setSecondsLeft(0);
-    void generateVirtualAccount();
   };
 
   // ── Card "payment" ──────────────────────────────────────────────────────────
@@ -375,7 +278,10 @@ const ServiceChargePage: React.FC = () => {
                         </p>
                       </div>
                       <p className="text-center text-xs text-slate-400 font-medium flex items-center justify-center gap-1.5">
-                        <Icon name="shield-check" className="w-4 h-4 text-emerald-500" />
+                        <Icon
+                          name="shield-check"
+                          className="w-4 h-4 text-emerald-500"
+                        />
                         PCI-DSS Compliant &amp; Secured
                       </p>
                     </div>
@@ -393,9 +299,21 @@ const ServiceChargePage: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4 mb-8">
                       {(
                         [
-                          { value: "card" as PaymentMethod, label: "Debit Card", icon: "credit-card" },
-                          { value: "transfer" as PaymentMethod, label: "Bank Transfer", icon: "building-2" },
-                        ] as { value: PaymentMethod; label: string; icon: string }[]
+                          {
+                            value: "card" as PaymentMethod,
+                            label: "Debit Card",
+                            icon: "credit-card",
+                          },
+                          {
+                            value: "transfer" as PaymentMethod,
+                            label: "Bank Transfer",
+                            icon: "building-2",
+                          },
+                        ] as {
+                          value: PaymentMethod;
+                          label: string;
+                          icon: string;
+                        }[]
                       ).map((m) => (
                         <label key={m.value} className="cursor-pointer">
                           <input
@@ -405,7 +323,7 @@ const ServiceChargePage: React.FC = () => {
                             checked={paymentMethod === m.value}
                             onChange={() => {
                               setCardError("");
-                              setTransferMsg("");
+                              setTransferError("");
                               setPaymentMethod(m.value);
                             }}
                             className="sr-only"
@@ -503,160 +421,84 @@ const ServiceChargePage: React.FC = () => {
                     {/* ── BANK TRANSFER ── */}
                     {paymentMethod === "transfer" && (
                       <div className="space-y-5">
-                        {/* Loading VA */}
-                        {isLoadingVA && (
-                          <div className="flex flex-col items-center justify-center py-14 gap-4">
-                            <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin" />
-                            <p className="text-sm text-slate-500 font-medium">
-                              Generating your payment account…
-                            </p>
-                          </div>
-                        )}
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                            Transfer exactly ₦{serviceCharge.toLocaleString()}{" "}
+                            to the account below
+                          </p>
 
-                        {/* VA error */}
-                        {!isLoadingVA && vaError && !virtualAccountDetails && (
-                          <div className="space-y-4">
-                            <div className="p-4 bg-red-50 text-red-600 text-sm rounded-xl font-medium">
-                              {vaError}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                hasGeneratedRef.current = false;
-                                void generateVirtualAccount();
-                              }}
-                              className="w-full bg-brand hover:bg-brand-hover text-white font-bold py-4 rounded-2xl transition-all shadow-lg"
+                          {[
+                            {
+                              field: "bankName",
+                              label: "Bank Name",
+                              value: SERVICE_CHARGE_ACCOUNT.bankName,
+                            },
+                            {
+                              field: "accountNumber",
+                              label: "Account Number",
+                              value: SERVICE_CHARGE_ACCOUNT.accountNumber,
+                            },
+                            {
+                              field: "accountName",
+                              label: "Account Name",
+                              value: SERVICE_CHARGE_ACCOUNT.accountName,
+                            },
+                            {
+                              field: "amount",
+                              label: "Amount",
+                              value: `₦${serviceCharge.toLocaleString()}`,
+                            },
+                          ].map((row) => (
+                            <div
+                              key={row.field}
+                              className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-slate-100"
                             >
-                              Try Again
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Virtual account details */}
-                        {!isLoadingVA && virtualAccountDetails && (
-                          <>
-                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
-                              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                                Transfer exactly ₦{serviceCharge.toLocaleString()} to the account below
-                              </p>
-
-                              {/* Countdown */}
-                              <div className="flex flex-col items-center gap-1 py-2">
-                                <span className="text-xs font-semibold text-slate-400">
-                                  {isExpired ? "Account expired" : "Account valid for:"}
-                                </span>
-                                <span
-                                  className={`text-2xl font-black tabular-nums tracking-wider ${
-                                    isExpired
-                                      ? "text-red-500"
-                                      : secondsLeft <= 300
-                                        ? "text-red-500"
-                                        : "text-emerald-500"
-                                  }`}
-                                >
-                                  {formatCountdown(secondsLeft)}
-                                </span>
+                              <div>
+                                <p className="text-[11px] text-slate-400 font-semibold uppercase">
+                                  {row.label}
+                                </p>
+                                <p className="text-sm font-bold text-slate-900">
+                                  {row.value}
+                                </p>
                               </div>
-
-                              {/* Account rows */}
-                              {[
-                                { field: "bankName", label: "Bank Name", value: virtualAccountDetails.bankName },
-                                { field: "accountNumber", label: "Account Number", value: virtualAccountDetails.virtualBankAccountNumber },
-                                { field: "accountName", label: "Account Name", value: "SkulCredit Technologies Ltd" },
-                                { field: "amount", label: "Amount", value: `₦${serviceCharge.toLocaleString()}` },
-                              ].map((row) => (
-                                <div
-                                  key={row.field}
-                                  className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-slate-100"
-                                >
-                                  <div>
-                                    <p className="text-[11px] text-slate-400 font-semibold uppercase">
-                                      {row.label}
-                                    </p>
-                                    <p className="text-sm font-bold text-slate-900">
-                                      {row.value}
-                                    </p>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopy(row.field, row.value)}
-                                    disabled={isExpired}
-                                    className="text-xs font-bold text-brand hover:text-brand-hover px-3 py-1.5 rounded-lg bg-brand-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                                  >
-                                    {copiedField === row.field ? "Copied ✓" : "Copy"}
-                                  </button>
-                                </div>
-                              ))}
-
-                              <p className="text-xs text-slate-400 font-medium">
-                                This account is unique to this transaction and valid for 24 hours.
-                                Do not reuse it for other payments.
-                              </p>
-                            </div>
-
-                            {isPolling && (
-                              <p className="text-xs text-center text-slate-400 animate-pulse">
-                                Checking payment status…
-                              </p>
-                            )}
-
-                            {transferMsg && (
-                              <div className="p-3 bg-amber-50 text-amber-700 text-sm rounded-xl font-medium">
-                                {transferMsg}
-                              </div>
-                            )}
-
-                            {vaError && (
-                              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl font-medium">
-                                {vaError}
-                              </div>
-                            )}
-
-                            {isExpired ? (
                               <button
                                 type="button"
-                                onClick={handleRegenerateAccount}
-                                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2"
+                                onClick={() => handleCopy(row.field, row.value)}
+                                className="text-xs font-bold text-brand hover:text-brand-hover px-3 py-1.5 rounded-lg bg-brand-50"
                               >
-                                <Icon name="refresh-cw" className="w-4 h-4" />
-                                Generate New Account
+                                {copiedField === row.field
+                                  ? "Copied ✓"
+                                  : "Copy"}
                               </button>
-                            ) : (
-                              <div className="space-y-3">
-                                <button
-                                  type="button"
-                                  onClick={handleCheckTransfer}
-                                  disabled={isProcessingTransfer}
-                                  className="w-full bg-brand hover:bg-brand-hover text-white font-bold py-4 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-70"
-                                >
-                                  <span>
-                                    {isProcessingTransfer
-                                      ? "Checking payment…"
-                                      : "I've Made This Transfer"}
-                                  </span>
-                                  <Icon name="lock" className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleCheckTransfer}
-                                  disabled={isProcessingTransfer}
-                                  className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold py-3 rounded-2xl transition-all border border-slate-200 text-sm disabled:opacity-70 flex items-center justify-center gap-2"
-                                >
-                                  <Icon name="refresh-cw" className="w-3.5 h-3.5" />
-                                  Refresh Payment Status
-                                </button>
-                              </div>
-                            )}
+                            </div>
+                          ))}
 
-                            <button
-                              type="button"
-                              onClick={handleRegenerateAccount}
-                              className="w-full text-xs text-slate-400 hover:text-slate-600 font-medium py-1 transition-colors"
-                            >
-                              Generate a new account number
-                            </button>
-                          </>
+                          <p className="text-xs text-slate-400 font-medium">
+                            Use this account only for your service charge
+                            payment. Please use your application reference as
+                            the transfer narration.
+                          </p>
+                        </div>
+
+                        {transferError && (
+                          <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl font-medium">
+                            {transferError}
+                          </div>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={handleTransferConfirm}
+                          disabled={isProcessingTransfer}
+                          className="w-full bg-brand hover:bg-brand-hover text-white font-bold py-4 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-70"
+                        >
+                          <span>
+                            {isProcessingTransfer
+                              ? "Confirming…"
+                              : "I've Made This Transfer"}
+                          </span>
+                          <Icon name="lock" className="w-4 h-4" />
+                        </button>
                       </div>
                     )}
                   </div>

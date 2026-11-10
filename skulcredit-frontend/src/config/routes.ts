@@ -85,15 +85,21 @@ export const ROLE_ROUTE_PREFIX: Record<string, string> = {
   parent: "/parent",
   school: "/school",
   admin: "/admin",
+  super_admin: "/admin",
+  customer_service: "/cs",
+  customer_service_manager: "/cs",
+  accountant: "/finance",
+  risk_management: "/cs",
 };
 
 export const ROLE_DASHBOARD: Record<string, string> = {
   parent: "/parent/dashboard",
   school: "/school/dashboard",
   admin: "/admin/dashboard",
+  super_admin: "/admin/dashboard",
   customer_service: "/cs/dashboard",
   customer_service_manager: "/cs/dashboard",
-  accountant: "/cs/dashboard",
+  accountant: "/finance/dashboard",
   risk_management: "/cs/dashboard",
 };
 

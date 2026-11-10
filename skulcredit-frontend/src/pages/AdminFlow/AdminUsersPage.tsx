@@ -801,12 +801,7 @@ const AdminUsersPage: React.FC = () => {
           lastName: form.lastName,
           email: form.email,
           phoneNumber: form.phone,
-          role:
-            form.role === "customer_service"
-              ? "customer_service"
-              : form.role === "customer_service_manager"
-                ? "customer_service_manager"
-                : "admin",
+          role: form.role,
         });
         toastSuccess("User updated successfully.");
         await fetchUsers();
@@ -817,12 +812,7 @@ const AdminUsersPage: React.FC = () => {
           phoneNumber: form.phone,
           firstName: form.firstName,
           lastName: form.lastName,
-          role:
-            form.role === "customer_service"
-              ? "customer_service"
-              : form.role === "customer_service_manager"
-                ? "customer_service_manager"
-                : "admin",
+          role: form.role,
         });
         toastSuccess("User created successfully.");
         await fetchUsers();
