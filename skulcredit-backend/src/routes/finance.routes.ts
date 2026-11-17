@@ -25,7 +25,7 @@ const router = Router();
 const ctrl = financeController;
 
 // All finance routes are restricted to authenticated admin staff
-router.use(protect, authorize("admin"));
+router.use(protect, authorize("admin", "accountant"));
 
 // 1. Dashboard
 router.get(

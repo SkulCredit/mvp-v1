@@ -203,7 +203,7 @@ const FinanceNewDisbursementPage: React.FC = () => {
               {/* Eligible loan cards */}
               <div className="space-y-2.5">
                 {filteredLoans.map((loan) => {
-                  const isSelected = selectedLoan.id === loan.id;
+                  const isSelected = selectedLoan?.id === loan.id;
                   return (
                     <div
                       key={loan.id}
@@ -265,19 +265,19 @@ const FinanceNewDisbursementPage: React.FC = () => {
               <div className="space-y-2.5 text-xs text-gray-700 pt-1">
                 <div className="flex justify-between py-1 border-b border-gray-50">
                   <span className="text-gray-400">Application</span>
-                  <span className="font-semibold text-gray-900">{selectedLoan.applicationId}</span>
+                  <span className="font-semibold text-gray-900">{selectedLoan?.applicationId ?? "—"}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-gray-50">
                   <span className="text-gray-400">Parent</span>
-                  <span className="font-semibold text-gray-900">{selectedLoan.parentName}</span>
+                  <span className="font-semibold text-gray-900">{selectedLoan?.parentName ?? "—"}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-gray-50">
                   <span className="text-gray-400">School</span>
-                  <span className="font-semibold text-gray-900">{selectedLoan.schoolName}</span>
+                  <span className="font-semibold text-gray-900">{selectedLoan?.schoolName ?? "—"}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-gray-50">
                   <span className="text-gray-400">Verified account</span>
-                  <span className="font-mono text-gray-800">{selectedLoan.bankAccount}</span>
+                  <span className="font-mono text-gray-800">{selectedLoan?.bankAccount ?? "—"}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-gray-50">
                   <span className="text-gray-400">Transaction ref</span>
@@ -286,7 +286,7 @@ const FinanceNewDisbursementPage: React.FC = () => {
                 <div className="flex justify-between py-2 items-center">
                   <span className="text-gray-900 font-bold">Amount</span>
                   <span className="text-base sm:text-lg font-extrabold text-gray-900">
-                    {selectedLoan.formattedAmount}
+                    {selectedLoan?.formattedAmount ?? "—"}
                   </span>
                 </div>
               </div>

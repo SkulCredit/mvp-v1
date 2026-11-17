@@ -1,4 +1,4 @@
-﻿import { Op, fn, col, literal, QueryTypes } from "sequelize";
+import { Op, fn, col, literal, QueryTypes } from "sequelize";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { sequelize } from "../config/db";
@@ -516,6 +516,31 @@ class AdminService {
     return parent.update({ kycStatus: kycStatus as never });
   }
 
+  async deleteParent(id: string) {
+    const parent = await Parent.findByPk(id);
+    if (!parent) throw new ApiError(404, "Parent not found");
+
+    const [hasLoanApp, hasDisbursement, hasRepayment] = await Promise.all([
+      LoanApplication.findOne({ where: { parentId: id } }),
+      Disbursement.findOne({ where: { parentId: id } }),
+      Repayment.findOne({ where: { parentId: id } }),
+    ]);
+
+    if (hasLoanApp || hasDisbursement || hasRepayment) {
+      throw new ApiError(
+        400,
+        "Cannot delete parent with existing loan applications or financial records",
+      );
+    }
+
+    const userId = parent.userId;
+    await parent.destroy();
+    if (userId) {
+      await User.destroy({ where: { id: userId } });
+    }
+    return { id };
+  }
+
   async getParents() {
     return ParentRepository.find(
       {},
@@ -721,6 +746,30 @@ class AdminService {
     const school = await SchoolRepository.findById(id);
     if (!school) throw new ApiError(404, "School not found");
     return school.update({ status: status as never });
+  }
+
+  async deleteSchool(id: string) {
+    const school = await SchoolRepository.findById(id);
+    if (!school) throw new ApiError(404, "School not found");
+
+    const [hasLoanApp, hasDisbursement] = await Promise.all([
+      LoanApplication.findOne({ where: { schoolId: id } }),
+      Disbursement.findOne({ where: { schoolId: id } }),
+    ]);
+
+    if (hasLoanApp || hasDisbursement) {
+      throw new ApiError(
+        400,
+        "Cannot delete school with existing loan applications or financial records",
+      );
+    }
+
+    const userId = school.userId;
+    await school.destroy();
+    if (userId) {
+      await User.destroy({ where: { id: userId } });
+    }
+    return { id };
   }
 
   async listCatalogSchools(search?: string, isRegistered?: boolean) {

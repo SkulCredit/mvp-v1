@@ -256,13 +256,11 @@ export class FinanceService {
           as: "loanApplication",
           attributes: ["id", "referenceNumber"],
         },
-        { model: School, as: "school", attributes: ["id", "name"] },
+        { model: School, as: "school", attributes: ["id", "schoolName"] },
         {
           model: Parent,
           as: "parent",
-          include: [
-            { model: User, as: "user", attributes: ["firstName", "lastName"] },
-          ],
+          attributes: ["id", "firstName", "lastName"],
         },
       ],
     });
@@ -279,9 +277,7 @@ export class FinanceService {
         {
           model: Parent,
           as: "parent",
-          include: [
-            { model: User, as: "user", attributes: ["firstName", "lastName"] },
-          ],
+          attributes: ["id", "firstName", "lastName"],
         },
       ],
     });
@@ -290,11 +286,11 @@ export class FinanceService {
     if (recentDisbursements.length > 0 || recentRepayments.length > 0) {
       for (const d of recentDisbursements) {
         const dAny = d as any;
-        const parentUser = dAny.parent?.user;
-        const parentName = parentUser
-          ? `${parentUser.firstName} ${parentUser.lastName}`
+        const parent = dAny.parent;
+        const parentName = parent
+          ? `${parent.firstName} ${parent.lastName}`
           : "Parent";
-        const schoolName = dAny.school?.name || "Partner School";
+        const schoolName = dAny.school?.schoolName || dAny.school?.name || "Partner School";
         recentTransactions.push({
           id:
             dAny.disbursementReference ||
@@ -327,9 +323,9 @@ export class FinanceService {
 
       for (const r of recentRepayments) {
         const rAny = r as any;
-        const parentUser = rAny.parent?.user;
-        const parentName = parentUser
-          ? `Parent · ${parentUser.firstName} ${parentUser.lastName}`
+        const parent = rAny.parent;
+        const parentName = parent
+          ? `Parent · ${parent.firstName} ${parent.lastName}`
           : "Parent";
         recentTransactions.push({
           id: rAny.receiptNumber || `RPM-${r.id.slice(0, 6).toUpperCase()}`,
@@ -498,13 +494,11 @@ export class FinanceService {
           as: "loanApplication",
           attributes: ["id", "referenceNumber"],
         },
-        { model: School, as: "school", attributes: ["id", "name"] },
+        { model: School, as: "school", attributes: ["id", "schoolName"] },
         {
           model: Parent,
           as: "parent",
-          include: [
-            { model: User, as: "user", attributes: ["firstName", "lastName"] },
-          ],
+          attributes: ["id", "firstName", "lastName"],
         },
       ],
     });
@@ -518,7 +512,7 @@ export class FinanceService {
     };
 
     let items = rows.map((r: any) => {
-      const parentUser = r.parent?.user;
+      const parent = r.parent;
       const statusLabel =
         r.status === "successful"
           ? "Completed"
@@ -538,12 +532,12 @@ export class FinanceService {
           month: "short",
           year: "numeric",
         }),
-        schoolName: r.school?.name || "Greenfield International School",
+        schoolName: (r.school as any)?.schoolName || (r.school as any)?.name || "Greenfield International School",
         bankAccount: r.recipientAccountNumber
           ? `•••• ${r.recipientAccountNumber.slice(-4)}`
           : "•••• 4821",
-        parentName: parentUser
-          ? `${parentUser.firstName[0]}. ${parentUser.lastName}`
+        parentName: parent
+          ? `${parent.firstName?.[0] ?? ""}. ${parent.lastName ?? ""}`
           : "A. Okoro",
         amount: Number(r.amount),
         transactionRef:
@@ -661,9 +655,7 @@ export class FinanceService {
         {
           model: Parent,
           as: "parent",
-          include: [
-            { model: User, as: "user", attributes: ["firstName", "lastName"] },
-          ],
+          attributes: ["id", "firstName", "lastName"],
         },
         {
           model: CatalogSchool,
@@ -675,9 +667,9 @@ export class FinanceService {
 
     if (loans.length > 0) {
       return loans.map((l: any) => {
-        const pUser = l.parent?.user;
-        const parentName = pUser
-          ? `${pUser.firstName[0]}. ${pUser.lastName}`
+        const parent = l.parent;
+        const parentName = parent
+          ? `${parent.firstName?.[0] ?? ""}. ${parent.lastName ?? ""}`
           : "Parent";
         const schoolName = l.catalogSchool?.name || "Partner School";
         const primaryAccount =
@@ -758,11 +750,12 @@ export class FinanceService {
         {
           model: Parent,
           as: "parent",
+          attributes: ["id", "firstName", "lastName"],
           include: [
             {
               model: User,
               as: "user",
-              attributes: ["firstName", "lastName", "email"],
+              attributes: ["email"],
             },
           ],
         },
@@ -833,15 +826,15 @@ export class FinanceService {
             : d.status,
       amount: Number(d.amount),
       formattedAmount: this.formatNGN(Number(d.amount)),
-      schoolName: dAny.school?.name || "Greenfield International School",
+      schoolName: dAny.school?.schoolName || dAny.school?.name || "Greenfield International School",
       bankAccount: d.recipientAccountNumber
         ? `•••• ${d.recipientAccountNumber.slice(-4)}`
         : "•••• 4821",
       recipientBank: d.recipientBankName || "Access Bank Plc",
       recipientAccountName: d.recipientAccountName || "School Account",
       recipientAccountNumber: d.recipientAccountNumber || "0049281721",
-      parentName: parentUser
-        ? `${parentUser.firstName} ${parentUser.lastName}`
+      parentName: dAny.parent
+        ? `${dAny.parent.firstName} ${dAny.parent.lastName}`
         : "Parent",
       date: new Date(d.createdAt).toLocaleString("en-GB"),
       transactionRef:

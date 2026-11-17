@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   Navigate,
+  Outlet,
 } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
 import PublicRoute from "../components/PublicRoute";
@@ -498,8 +499,8 @@ const AppRouter: React.FC = () => (
         />
         <Route
           element={
-            <ProtectedRoute allowedRoles={["accountant"]}>
-              <React.Fragment />
+            <ProtectedRoute allowedRoles={["accountant", "admin", "super_admin"]}>
+              <Outlet />
             </ProtectedRoute>
           }
         >

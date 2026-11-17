@@ -424,22 +424,37 @@ const AdminApplicationDetailPage: React.FC = () => {
                 <div className="px-5 py-4">
                   <InfoRow
                     label="Parent"
-                    value={`${app.parent.firstName} ${app.parent.lastName}`}
+                    value={
+                      app.parent
+                        ? `${app.parent.firstName} ${app.parent.lastName}`
+                        : "—"
+                    }
                   />
-                  <InfoRow label="Email" value={app.parent.user.email} />
+                  <InfoRow label="Email" value={app.parent?.user?.email ?? "—"} />
                   <InfoRow
                     label="Phone"
-                    value={app.parent.user.phoneNumber ?? "—"}
+                    value={app.parent?.user?.phoneNumber ?? "—"}
                   />
                   <InfoRow
                     label="Student"
-                    value={`${app.student.firstName} ${app.student.lastName}`}
+                    value={
+                      app.student
+                        ? `${app.student.firstName} ${app.student.lastName}`
+                        : "—"
+                    }
                   />
                   <InfoRow
                     label="Grade"
-                    value={app.student.gradeLevel ?? "—"}
+                    value={app.student?.gradeLevel ?? "—"}
                   />
-                  <InfoRow label="School" value={app.catalogSchool.name} />
+                  <InfoRow
+                    label="School"
+                    value={
+                      app.catalogSchool?.name ??
+                      app.schoolRequest?.schoolName ??
+                      "—"
+                    }
+                  />
                   {app.isUnknownSchool && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 mt-1">
                       Unknown / Unregistered School

@@ -9,8 +9,10 @@ const AdminLoginPage: React.FC = () => {
   const [password, setPassword]   = useState("");
   const [remember, setRemember]   = useState(false);
   const [showPw, setShowPw]       = useState(false);
-  const [error, setError]         = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [error,            setError]            = useState("");
+  const [isLoading,        setIsLoading]        = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showForgotModal,  setShowForgotModal]  = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -237,7 +239,8 @@ const AdminLoginPage: React.FC = () => {
                 </label>
                 <button
                   type="button"
-                  className="text-sm font-semibold text-[#881337] hover:underline"
+                  onClick={() => setShowForgotModal(true)}
+                  className="text-sm font-semibold text-[#881337] hover:underline cursor-pointer"
                 >
                   Forgot Password?
                 </button>
@@ -274,13 +277,169 @@ const AdminLoginPage: React.FC = () => {
             <p className="mt-8 flex items-center gap-1.5 text-sm text-slate-500">
               <Icon name="help-circle" className="w-4 h-4 text-slate-400" />
               Need help?{" "}
-              <button className="font-semibold text-[#881337] hover:underline">
+              <button
+                type="button"
+                onClick={() => setShowSupportModal(true)}
+                className="font-semibold text-[#881337] hover:underline cursor-pointer"
+              >
                 Contact support
               </button>
             </p>
           </div>
         </div>
       </div>
+
+      {/* ── Support Modal ── */}
+      {showSupportModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowSupportModal(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 sm:p-7 relative overflow-hidden animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowSupportModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+              aria-label="Close"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-[#fce4ef] text-[#881337] flex items-center justify-center mb-4">
+              <Icon name="help-circle" className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-lg font-bold text-gray-900">SkulCredit Support Desk</h3>
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+              Need assistance with your admin account, password reset, or platform operations?
+            </p>
+
+            <div className="mt-5 space-y-3">
+              <a
+                href="mailto:support@skulcredit.com?subject=SkulCredit%20Admin%20Support%20Request"
+                className="flex items-center gap-3.5 p-3 rounded-xl border border-rose-100 bg-rose-50/40 hover:bg-rose-50 transition-colors group"
+              >
+                <div className="w-9 h-9 rounded-lg bg-white border border-rose-100 text-[#881337] flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-900">Email Support</p>
+                  <p className="text-[11px] text-[#881337] font-medium truncate">support@skulcredit.com</p>
+                </div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-gray-400 group-hover:text-[#881337] transition-colors">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </a>
+
+              <a
+                href="tel:+2348007585273"
+                className="flex items-center gap-3.5 p-3 rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-gray-100/60 transition-colors group"
+              >
+                <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 text-gray-700 flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-900">Telephone Hotline</p>
+                  <p className="text-[11px] text-gray-500 font-medium">+234 1 800 SKULCREDIT</p>
+                </div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-gray-400 group-hover:text-gray-700 transition-colors">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </a>
+
+              <div className="p-3 rounded-xl bg-gray-50 text-[11px] text-gray-500 flex items-center justify-between">
+                <span>Working Hours:</span>
+                <span className="font-semibold text-gray-700">Mon – Fri · 8:00 AM – 6:00 PM WAT</span>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center gap-3">
+              <a
+                href="mailto:support@skulcredit.com?subject=SkulCredit%20Admin%20Support%20Request"
+                className="flex-1 flex items-center justify-center py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-[#881337] hover:bg-[#6f0e2c] transition-colors shadow-xs"
+              >
+                Send Email
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowSupportModal(false)}
+                className="py-2.5 px-4 rounded-xl text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Forgot Password Modal ── */}
+      {showForgotModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowForgotModal(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 sm:p-7 relative overflow-hidden animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowForgotModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+              aria-label="Close"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center mb-4">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
+
+            <h3 className="text-lg font-bold text-gray-900">Administrator Password Reset</h3>
+            <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+              For security compliance, administrator credentials must be verified through the organization Super Admin or the technical operations team.
+            </p>
+            <div className="mt-4 p-3 rounded-xl bg-amber-50/70 border border-amber-100 text-[11px] text-amber-900">
+              Please email <strong>support@skulcredit.com</strong> from your verified official staff email address with your staff ID to initiate an expedited password reset.
+            </div>
+
+            <div className="mt-6 flex items-center gap-3">
+              <a
+                href="mailto:support@skulcredit.com?subject=Admin%20Password%20Reset%20Request"
+                className="flex-1 flex items-center justify-center py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-[#881337] hover:bg-[#6f0e2c] transition-colors shadow-xs"
+              >
+                Request Reset via Email
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                className="py-2.5 px-4 rounded-xl text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
