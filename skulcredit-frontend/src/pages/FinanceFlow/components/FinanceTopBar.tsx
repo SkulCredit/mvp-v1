@@ -8,7 +8,8 @@ import {
   Settings,
   Search,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../../context/AuthContext";
 
 interface FinanceTopBarProps {
   onOpenMobileMenu?: () => void;
@@ -21,8 +22,27 @@ const FinanceTopBar: React.FC<FinanceTopBarProps> = ({
   breadcrumb,
   showSearch = true,
 }) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  const displayName =
+    user?.name ||
+    (user?.firstName ? `${user.firstName} ${user.lastName ?? ""}`.trim() : "") ||
+    (user?.email ? user.email.split("@")[0] : "Finance User");
+
+  const initials = displayName
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "FU";
+
+  const roleLabel =
+    user?.role === "admin" || user?.role === "super_admin"
+      ? "Administrator"
+      : "Finance Officer";
 
   return (
     <header className="h-16 px-4 sm:px-6 md:px-8 bg-white border-b border-gray-100 flex items-center justify-between shrink-0 sticky top-0 z-20">
@@ -117,10 +137,10 @@ const FinanceTopBar: React.FC<FinanceTopBarProps> = ({
             className="flex items-center gap-2 p-1 pl-1.5 rounded-full hover:bg-gray-50 transition-colors"
           >
             <div className="w-7 h-7 rounded-full bg-[#fce7ef] text-[#700936] font-bold text-xs flex items-center justify-center border border-[#fad2e1]">
-              AB
+              {initials}
             </div>
             <span className="text-xs font-semibold text-gray-700 hidden sm:inline-block">
-              Finance Officer
+              {roleLabel}
             </span>
             <ChevronDown className="w-3 h-3 text-gray-400 hidden sm:block" />
           </button>
@@ -128,8 +148,8 @@ const FinanceTopBar: React.FC<FinanceTopBarProps> = ({
           {profileOpen && (
             <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in-up">
               <div className="px-4 py-2 border-b border-gray-100">
-                <p className="text-xs font-bold text-gray-900">Adewale Bello</p>
-                <p className="text-[11px] text-gray-500">Finance Officer</p>
+                <p className="text-xs font-bold text-gray-900">{displayName}</p>
+                <p className="text-[11px] text-gray-500">{roleLabel}</p>
               </div>
               <Link
                 to="/finance/dashboard"
@@ -142,9 +162,10 @@ const FinanceTopBar: React.FC<FinanceTopBarProps> = ({
               <div className="border-t border-gray-100 my-1" />
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setProfileOpen(false);
-                  window.location.href = "/auth";
+                  await logout();
+                  navigate("/auth/staff", { replace: true });
                 }}
                 className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-red-600 hover:bg-red-50 text-left"
               >

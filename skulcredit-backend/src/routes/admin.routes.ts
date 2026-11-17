@@ -27,11 +27,13 @@ router.post("/users", ctrl.createStaffUser.bind(ctrl));
 router.get("/parents", ctrl.listParents.bind(ctrl));
 router.get("/parents/:id", ctrl.getParent.bind(ctrl));
 router.patch("/parents/:id/kyc", ctrl.updateParentKyc.bind(ctrl));
+router.delete("/parents/:id", ctrl.deleteParent.bind(ctrl));
 
 router.get("/schools", ctrl.getSchools.bind(ctrl));
 router.post("/schools", ctrl.createSchool.bind(ctrl));
 router.get("/schools/:id", ctrl.getSchool.bind(ctrl));
 router.patch("/schools/:id", ctrl.updateSchool.bind(ctrl));
+router.delete("/schools/:id", ctrl.deleteSchool.bind(ctrl));
 router.post(
   "/schools/:id/create-access",
   ctrl.createSchoolLoginAccess.bind(ctrl),

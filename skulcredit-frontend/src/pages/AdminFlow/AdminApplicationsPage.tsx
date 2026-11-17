@@ -177,11 +177,11 @@ const AdminApplicationsPage: React.FC = () => {
         const q = debouncedSearch.toLowerCase();
         data = data.filter(
           (r) =>
-            r.referenceNumber.toLowerCase().includes(q) ||
-            `${r.parent.firstName} ${r.parent.lastName}`
+            r.referenceNumber?.toLowerCase().includes(q) ||
+            `${r.parent?.firstName ?? ""} ${r.parent?.lastName ?? ""}`
               .toLowerCase()
               .includes(q) ||
-            r.catalogSchool.name.toLowerCase().includes(q),
+            r.catalogSchool?.name?.toLowerCase().includes(q),
         );
       }
 
@@ -506,13 +506,13 @@ const AdminApplicationsPage: React.FC = () => {
 
                       {/* Applicant (parent) */}
                       <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {row.parent.firstName} {row.parent.lastName}
+                        {row.parent ? `${row.parent.firstName} ${row.parent.lastName}` : "—"}
                       </td>
 
                       {/* School */}
                       <td className="px-5 py-4 text-sm text-gray-600 max-w-[200px] truncate">
-                        {row.catalogSchool.name}
-                        {row.catalogSchool.isRegistered === false && (
+                        {row.catalogSchool?.name ?? "—"}
+                        {row.catalogSchool?.isRegistered === false && (
                           <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 whitespace-nowrap">
                             Unknown
                           </span>

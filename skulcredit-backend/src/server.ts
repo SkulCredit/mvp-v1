@@ -31,7 +31,7 @@ const start = async (): Promise<void> => {
     const originalAuditSync = (AuditLogModel as any).sync.bind(AuditLogModel);
     (AuditLogModel as any).sync = async () => {};
 
-    await sequelize.sync({ alter: env.nodeEnv === "development" });
+    await sequelize.sync();
     logger.info("Database tables synced");
 
     (AuditLogModel as any).sync = originalAuditSync;

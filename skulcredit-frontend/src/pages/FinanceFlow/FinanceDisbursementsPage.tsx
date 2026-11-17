@@ -144,7 +144,7 @@ const FinanceDisbursementsPage: React.FC = () => {
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#700936] hover:underline mb-2"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                Back to disbursements
+                Back to dashboard
               </Link>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -177,7 +177,7 @@ const FinanceDisbursementsPage: React.FC = () => {
                         : "bg-white border border-gray-200 text-gray-700"
                     }`}
                   >
-                    Finance Officer
+                    Audit Viewer
                   </button>
                   <button
                     type="button"

@@ -328,6 +328,19 @@ class AdminController {
     }
   }
 
+  async deleteParent(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      await adminService.deleteParent(String(req.params.id));
+      successResponse(res, 200, "Parent deleted");
+    } catch (e) {
+      next(e);
+    }
+  }
+
   async getSchools(
     req: Request,
     res: Response,
@@ -471,6 +484,19 @@ class AdminController {
           adminNote,
         ),
       );
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async deleteSchool(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      await adminService.deleteSchool(String(req.params.id));
+      successResponse(res, 200, "School deleted");
     } catch (e) {
       next(e);
     }

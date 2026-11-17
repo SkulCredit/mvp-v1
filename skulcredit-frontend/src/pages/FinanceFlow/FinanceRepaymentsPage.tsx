@@ -148,7 +148,7 @@ const FinanceRepaymentsPage: React.FC = () => {
                         : "bg-white border border-gray-200 text-gray-700"
                     }`}
                   >
-                    Finance Officer
+                    Finance Lead
                   </button>
                 </div>
               </div>

@@ -63,14 +63,17 @@ const AdminTopBar: React.FC<AdminTopBarProps> = ({ onOpenMobileMenu }) => {
   const settings: DashboardSettings = ctx?.settings ?? loadSettings();
   const handleSettingsChange = (s: DashboardSettings) => ctx?.setSettings(s);
 
+  const [createOpen,      setCreateOpen]      = useState(false);
   const [notifOpen,       setNotifOpen]       = useState(false);
   const [notifDrawerOpen, setNotifDrawerOpen] = useState(false);
   const [activeNotif,     setActiveNotif]     = useState<AppNotification | null>(null);
   const [settingsOpen,    setSettingsOpen]    = useState(false);
   const [userOpen,        setUserOpen]        = useState(false);
 
+  const createRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef  = useRef<HTMLDivElement>(null);
+  useClickOutside(createRef, () => setCreateOpen(false));
   useClickOutside(notifRef, () => setNotifOpen(false));
   useClickOutside(userRef,  () => setUserOpen(false));
 
@@ -126,24 +129,131 @@ const AdminTopBar: React.FC<AdminTopBarProps> = ({ onOpenMobileMenu }) => {
         <div className="ml-auto flex items-center gap-1 sm:gap-1.5 shrink-0">
 
           {/* Create */}
-          <button
-            className="flex items-center gap-1.5 text-sm font-semibold text-white px-3 sm:px-4 py-2 rounded-lg transition-colors shrink-0"
-            style={{ backgroundColor: "#7A0E42" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#5e0a31")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#7A0E42")}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                 strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5" aria-hidden="true">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            <span className="hidden sm:inline">Create</span>
-          </button>
+          <div ref={createRef} className="relative">
+            <button
+              onClick={() => setCreateOpen((v) => !v)}
+              aria-label="Create new item"
+              aria-expanded={createOpen}
+              className="flex items-center gap-1.5 text-sm font-semibold text-white px-3 sm:px-4 py-2 rounded-lg transition-colors shrink-0 cursor-pointer"
+              style={{ backgroundColor: "#7A0E42" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#5e0a31")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#7A0E42")}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                   strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span className="hidden sm:inline">Create</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                   strokeLinecap="round" strokeLinejoin="round"
+                   className={`w-3 h-3 text-white/80 transition-transform ${createOpen ? "rotate-180" : ""}`}
+                   aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {createOpen && (
+              <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden py-1 animate-fade-in-up">
+                <div className="px-4 py-2 border-b border-gray-100">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Quick Actions</p>
+                </div>
+                <div className="py-1">
+                  <button
+                    onClick={() => { setCreateOpen(false); navigate("/admin/schools"); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-rose-50/60 hover:text-[#7A0E42] transition-colors text-left"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-rose-50 text-[#7A0E42] flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                        <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Add School</p>
+                      <p className="text-[10px] text-gray-500">Register partner institution</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setCreateOpen(false); navigate("/admin/parents"); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-rose-50/60 hover:text-[#7A0E42] transition-colors text-left"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-rose-50 text-[#7A0E42] flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <line x1="19" y1="8" x2="19" y2="14" />
+                        <line x1="22" y1="11" x2="16" y2="11" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Add Parent</p>
+                      <p className="text-[10px] text-gray-500">Onboard parent account</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setCreateOpen(false); navigate("/admin/users"); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-rose-50/60 hover:text-[#7A0E42] transition-colors text-left"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-rose-50 text-[#7A0E42] flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="8.5" cy="7" r="4" />
+                        <path d="M20 8v6M23 11h-6" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Add Admin / Staff User</p>
+                      <p className="text-[10px] text-gray-500">Create staff or admin role</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setCreateOpen(false); navigate("/admin/applications"); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-rose-50/60 hover:text-[#7A0E42] transition-colors text-left"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-rose-50 text-[#7A0E42] flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="12" y1="18" x2="12" y2="12" />
+                        <line x1="9" y1="15" x2="15" y2="15" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Loan Applications</p>
+                      <p className="text-[10px] text-gray-500">Review & process loans</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setCreateOpen(false); navigate("/finance/disbursements/new"); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-rose-50/60 hover:text-[#7A0E42] transition-colors text-left"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-rose-50 text-[#7A0E42] flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <line x1="6" y1="12" x2="18" y2="12" />
+                        <line x1="12" y1="6" x2="12" y2="18" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">New Disbursement</p>
+                      <p className="text-[10px] text-gray-500">Initiate school payout</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Help */}
           <button
-            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
-            aria-label="Help"
+            onClick={() => navigate("/admin/support")}
+            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 transition-colors cursor-pointer"
+            aria-label="Help & Support"
+            title="Help & Support"
           >
             <Ic d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" />
           </button>

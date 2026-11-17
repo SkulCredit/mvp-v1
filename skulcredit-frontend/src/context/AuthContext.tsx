@@ -187,7 +187,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
             "customer_service_manager",
             "risk_management",
           ];
-          const FINANCE_ROLES = ["accountant"];
+          const FINANCE_ROLES = ["accountant", "admin", "super_admin"];
           const wrongPath =
             (isAdminPath &&
               cachedUser &&

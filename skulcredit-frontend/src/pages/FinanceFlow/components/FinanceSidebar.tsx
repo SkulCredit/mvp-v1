@@ -30,6 +30,7 @@ const NEW_FINANCE_SECTIONS: NavSection[] = [
     items: [
       { id: "disbursements", label: "Disbursements", path: "/finance/disbursements" },
       { id: "repayments-collections", label: "Repayments & collections", path: "/finance/repayments" },
+      { id: "outstanding-balances", label: "Outstanding balances", path: "/finance/repayments/outstanding" },
       { id: "overdue-accounts", label: "Overdue accounts", path: "/finance/repayments/overdue" },
       { id: "collection-follow-up", label: "Collection follow-up", path: "/finance/repayments/follow-up" },
     ],
