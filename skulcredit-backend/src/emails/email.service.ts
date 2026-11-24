@@ -48,7 +48,7 @@ class EmailService {
       this.transporter = nodemailer.createTransport({
         host:   env.smtp.host,
         port:   env.smtp.port,
-        secure: env.smtp.port === 465,
+        secure: env.smtp.secure ?? (env.smtp.port === 465),
         auth:   { user: env.smtp.user, pass: env.smtp.pass },
         tls:    { rejectUnauthorized: false },
       });
@@ -71,8 +71,9 @@ class EmailService {
     html: string;
   }): Promise<void> {
     logger.info(`[EmailService] Sending "${opts.subject}" → ${opts.to}`);
+    const fromAddress = env.smtp.from || `"SkulCredit Team" <${env.smtp.user ?? 'noreply@skulcredit.com'}>`;
     const info = await this.transporter.sendMail({
-      from:    `"SkulCredit Team" <${env.smtp.user ?? 'noreply@skulcredit.com'}>`,
+      from:    fromAddress,
       to:      opts.to,
       subject: opts.subject,
       text:    opts.text,

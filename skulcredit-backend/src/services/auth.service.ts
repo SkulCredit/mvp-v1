@@ -32,6 +32,49 @@ const OTP_TTL_SEC = 30 * 60;
 
 const isRedisReady = (): boolean => redis.status === "ready";
 
+const memStore = new Map<string, { value: string; expiresAt: number }>();
+
+const setCache = async (key: string, value: string, ttlSec: number): Promise<void> => {
+  if (isRedisReady()) {
+    try {
+      await redis.set(key, value, "EX", ttlSec);
+      return;
+    } catch {
+      //
+    }
+  }
+  memStore.set(key, { value, expiresAt: Date.now() + ttlSec * 1000 });
+};
+
+const getCache = async (key: string): Promise<string | null> => {
+  if (isRedisReady()) {
+    try {
+      const val = await redis.get(key);
+      if (val !== null) return val;
+    } catch {
+      //
+    }
+  }
+  const item = memStore.get(key);
+  if (!item) return null;
+  if (Date.now() > item.expiresAt) {
+    memStore.delete(key);
+    return null;
+  }
+  return item.value;
+};
+
+const delCache = async (key: string): Promise<void> => {
+  if (isRedisReady()) {
+    try {
+      await redis.del(key);
+    } catch {
+      //
+    }
+  }
+  memStore.delete(key);
+};
+
 interface RegisterParentData {
   email: string;
   password: string;
@@ -328,15 +371,18 @@ class AuthService {
     userId: string,
     email: string,
   ): Promise<void> {
-    if (!isRedisReady()) return;
-
     const otp = crypto.randomInt(100_000, 1_000_000).toString();
-    await redis.set(otpKey(email), `${userId}:${otp}`, "EX", OTP_TTL_SEC);
+    await setCache(otpKey(email), `${userId}:${otp}`, OTP_TTL_SEC);
 
     logger.info(
       `[auth.service] Email verification OTP generated → ${email} otp=${otp} ttl=${OTP_TTL_SEC}s`,
     );
     AuthEventPublisher.otpSend({ userId, email, otp });
+    try {
+      await emailService.sendOtp({ email, otp });
+    } catch (err) {
+      logger.error(`[auth.service] Failed to send email verification OTP:`, err);
+    }
   }
 
   async resendVerificationEmail(email: string) {
@@ -349,10 +395,7 @@ class AuthService {
   }
 
   async verifyEmailOtp(email: string, otp: string) {
-    if (!isRedisReady())
-      throw new ApiError(503, "Verification service temporarily unavailable");
-
-    const stored = await redis.get(otpKey(email));
+    const stored = await getCache(otpKey(email));
     if (!stored)
       throw new ApiError(400, "OTP has expired or was never requested");
 
@@ -362,12 +405,12 @@ class AuthService {
     const user = await UserRepository.findById(userId);
     if (!user) throw new ApiError(404, "User not found");
     if (user.isEmailVerified) {
-      await redis.del(otpKey(email));
+      await delCache(otpKey(email));
       throw new ApiError(400, "Email is already verified");
     }
 
     await user.update({ isEmailVerified: true });
-    await redis.del(otpKey(email));
+    await delCache(otpKey(email));
   }
 
   /** @deprecated */
@@ -407,21 +450,23 @@ class AuthService {
 
   async forgotPassword(email: string) {
     const user = await UserRepository.findOne({ email });
-    if (!user || !isRedisReady()) return;
+    if (!user) return;
     const otp = crypto.randomInt(100_000, 1_000_000).toString();
-    await redis.set(pwResetKey(email), otp, "EX", PW_RESET_TTL_SEC);
+    await setCache(pwResetKey(email), otp, PW_RESET_TTL_SEC);
 
     logger.info(
       `[auth.service] Password reset OTP generated → ${email} otp=${otp} ttl=${PW_RESET_TTL_SEC}s`,
     );
     AuthEventPublisher.otpSend({ userId: user.id, email: user.email, otp });
+    try {
+      await emailService.sendOtp({ email: user.email, otp });
+    } catch (err) {
+      logger.error(`[auth.service] Failed to send password reset email to ${email}:`, err);
+    }
   }
 
   async resetPassword(email: string, otp: string, newPassword: string) {
-    if (!isRedisReady())
-      throw new ApiError(503, "Password reset service temporarily unavailable");
-
-    const storedOtp = await redis.get(pwResetKey(email));
+    const storedOtp = await getCache(pwResetKey(email));
     if (!storedOtp)
       throw new ApiError(400, "Reset code is invalid or has expired");
     if (storedOtp !== otp) throw new ApiError(400, "Invalid reset code");
@@ -430,7 +475,7 @@ class AuthService {
     if (!user) throw new ApiError(404, "User not found");
 
     await user.update({ password: await bcrypt.hash(newPassword, 10) });
-    await redis.del(pwResetKey(email));
+    await delCache(pwResetKey(email));
 
     await RefreshToken.update(
       { revokedAt: new Date() },
@@ -438,6 +483,11 @@ class AuthService {
     );
 
     AuthEventPublisher.passwordChanged({ userId: user.id, email: user.email });
+    try {
+      await emailService.sendPasswordChanged({ email: user.email });
+    } catch (err) {
+      logger.warn(`[auth.service] Failed to send password changed notification: ${err}`);
+    }
   }
 
   // ── MFA (2FA login OTP) ─────────────────────────────────────────────────────
@@ -447,36 +497,28 @@ class AuthService {
   private mfaKey = (email: string) => `mfa:${email}`;
 
   async sendMfaOtp(email: string): Promise<void> {
-    if (!isRedisReady())
-      throw new ApiError(503, "OTP service is temporarily unavailable");
-
     const user = await UserRepository.findOne({ email });
     if (!user) throw new ApiError(404, "No account found with that email");
     if (!user.isActive) throw new ApiError(401, "Account is deactivated");
 
     const otp = crypto.randomInt(100_000, 1_000_000).toString();
-    await redis.set(this.mfaKey(email), `${user.id}:${otp}`, "EX", OTP_TTL_SEC);
+    await setCache(this.mfaKey(email), `${user.id}:${otp}`, OTP_TTL_SEC);
 
     logger.info(
       `[auth.service] MFA OTP generated → ${email} otp=${otp} ttl=${OTP_TTL_SEC}s`,
     );
-    // Send directly via SMTP — bypasses RabbitMQ so it works even if the
-    // message queue is down. MFA OTPs are time-critical and must be delivered.
     await emailService.sendOtp({ email: user.email, otp });
   }
 
   async verifyMfaOtp(email: string, otp: string): Promise<void> {
-    if (!isRedisReady())
-      throw new ApiError(503, "OTP service is temporarily unavailable");
-
-    const stored = await redis.get(this.mfaKey(email));
+    const stored = await getCache(this.mfaKey(email));
     if (!stored)
       throw new ApiError(400, "OTP has expired or was never requested");
 
     const [, storedOtp] = stored.split(":");
     if (storedOtp !== otp) throw new ApiError(400, "Invalid OTP code");
 
-    await redis.del(this.mfaKey(email));
+    await delCache(this.mfaKey(email));
   }
 
   // ── Login with MFA — issues JWT only after OTP verified ─────────────────────

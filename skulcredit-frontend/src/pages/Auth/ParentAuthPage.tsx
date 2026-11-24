@@ -195,6 +195,19 @@ const ParentAuthPage: React.FC = () => {
   const [otpError, setOtpError] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
 
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotStep, setForgotStep] = useState<"email" | "reset">("email");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [showForgotPw, setShowForgotPw] = useState(false);
+  const [showForgotConf, setShowForgotConf] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+  const [forgotSuccess, setForgotSuccess] = useState("");
+  const [forgotCooldown, setForgotCooldown] = useState(0);
+  const forgotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -209,8 +222,77 @@ const ParentAuthPage: React.FC = () => {
       if (emailTimer.current) clearTimeout(emailTimer.current);
       if (phoneTimer.current) clearTimeout(phoneTimer.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
+      if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
     };
   }, []);
+
+  const startForgotCooldown = () => {
+    setForgotCooldown(60);
+    if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
+    forgotTimerRef.current = setInterval(() => {
+      setForgotCooldown((s) => {
+        if (s <= 1) {
+          if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  };
+
+  const handleForgotRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError("");
+    setForgotSuccess("");
+    setForgotLoading(true);
+    try {
+      await authService.forgotPassword(forgotEmail.trim().toLowerCase());
+      setForgotStep("reset");
+      setForgotSuccess("A 6-digit verification code has been sent to your email.");
+      startForgotCooldown();
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      setForgotError(axErr.response?.data?.message || "Failed to send reset code. Please try again.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError("");
+    setForgotSuccess("");
+    if (forgotOtp.length !== 6) {
+      setForgotError("Please enter the complete 6-digit code.");
+      return;
+    }
+    if (forgotNewPassword.length < 8) {
+      setForgotError("Password must be at least 8 characters long.");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError("Passwords do not match.");
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      await authService.resetPassword(forgotEmail.trim().toLowerCase(), forgotOtp, forgotNewPassword);
+      setForgotSuccess("Password reset successfully! Please sign in with your new password.");
+      setTimeout(() => {
+        setView("login");
+        setForgotStep("email");
+        setForgotOtp("");
+        setForgotNewPassword("");
+        setForgotConfirmPassword("");
+        setForgotError("");
+      }, 1500);
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      setForgotError(axErr.response?.data?.message || "Failed to reset password. Please check your code and try again.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const startResendCooldown = () => {
     setResendCooldown(60);
@@ -888,49 +970,173 @@ const ParentAuthPage: React.FC = () => {
                   <Icon name="key-round" className="w-8 h-8" />
                 </div>
                 <h1 className="text-2xl font-extrabold text-slate-900 mb-3">
-                  Forgot Password?
+                  {forgotStep === "email" ? "Forgot Password?" : "Reset Your Password"}
                 </h1>
                 <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-[90%] mx-auto">
-                  Enter your registered email. We'll send a verification code to
-                  reset your password.
+                  {forgotStep === "email"
+                    ? "Enter your registered email. We'll send a 6-digit verification code to reset your password."
+                    : `Enter the 6-digit code sent to ${forgotEmail} along with your new password.`}
                 </p>
               </div>
-              <form
-                className="space-y-6"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  setView("login");
-                }}
-              >
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                    Email Address*
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="you@example.com"
-                    required
-                    className="w-full px-4 py-3.5 rounded-2xl bg-slate-50/50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all text-sm text-slate-800 placeholder-slate-400"
-                  />
+
+              {forgotError && (
+                <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
+                  <ErrorIcon />
+                  <span>{forgotError}</span>
                 </div>
-                <button
-                  type="submit"
-                  className="w-full bg-brand text-white font-bold py-4 rounded-2xl hover:bg-brand-hover hover:-translate-y-0.5 transition-all shadow-[0_10px_20px_-10px_rgba(136,19,55,0.5)] flex items-center justify-center gap-2"
-                >
-                  Send Reset Code
-                  <Icon name="send" className="w-4 h-4" />
-                </button>
-                <p className="text-center text-sm text-slate-500 font-medium">
-                  Remembered your password?{" "}
+              )}
+
+              {forgotSuccess && (
+                <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm flex items-center gap-2">
+                  <Icon name="check" className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span>{forgotSuccess}</span>
+                </div>
+              )}
+
+              {forgotStep === "email" ? (
+                <form className="space-y-6" onSubmit={handleForgotRequest}>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                      Email Address*
+                    </label>
+                    <input
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                      className="w-full px-4 py-3.5 rounded-2xl bg-slate-50/50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all text-sm text-slate-800 placeholder-slate-400"
+                    />
+                  </div>
                   <button
-                    type="button"
-                    onClick={() => setView("login")}
-                    className="font-bold text-brand hover:text-brand-light transition-colors"
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="w-full bg-brand text-white font-bold py-4 rounded-2xl hover:bg-brand-hover hover:-translate-y-0.5 transition-all shadow-[0_10px_20px_-10px_rgba(136,19,55,0.5)] flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    Sign in
+                    {forgotLoading ? (
+                      <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        Send Reset Code
+                        <Icon name="send" className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
-                </p>
-              </form>
+                  <p className="text-center text-sm text-slate-500 font-medium">
+                    Remembered your password?{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView("login");
+                        setForgotError("");
+                        setForgotSuccess("");
+                      }}
+                      className="font-bold text-brand hover:text-brand-light transition-colors"
+                    >
+                      Sign in
+                    </button>
+                  </p>
+                </form>
+              ) : (
+                <form className="space-y-5" onSubmit={handleResetSubmit}>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                      6-Digit Code*
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={forgotOtp}
+                      onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ""))}
+                      placeholder="123456"
+                      required
+                      className="w-full px-4 py-3.5 tracking-widest text-center text-lg font-bold rounded-2xl bg-slate-50/50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                      New Password*
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showForgotPw ? "text" : "password"}
+                        value={forgotNewPassword}
+                        onChange={(e) => setForgotNewPassword(e.target.value)}
+                        placeholder="At least 8 characters"
+                        required
+                        className="w-full px-4 py-3.5 rounded-2xl bg-slate-50/50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all text-sm text-slate-800 placeholder-slate-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotPw(!showForgotPw)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <Icon name={showForgotPw ? "eye" : "eye-off"} className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                      Confirm New Password*
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showForgotConf ? "text" : "password"}
+                        value={forgotConfirmPassword}
+                        onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                        placeholder="Re-enter new password"
+                        required
+                        className="w-full px-4 py-3.5 rounded-2xl bg-slate-50/50 border border-slate-200 focus:bg-white focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all text-sm text-slate-800 placeholder-slate-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotConf(!showForgotConf)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <Icon name={showForgotConf ? "eye" : "eye-off"} className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="w-full bg-brand text-white font-bold py-4 rounded-2xl hover:bg-brand-hover hover:-translate-y-0.5 transition-all shadow-[0_10px_20px_-10px_rgba(136,19,55,0.5)] flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {forgotLoading ? (
+                      <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        Set New Password
+                        <Icon name="check" className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setForgotStep("email")}
+                      className="text-slate-500 hover:text-slate-700 font-medium flex items-center gap-1"
+                    >
+                      <Icon name="arrow-left" className="w-3.5 h-3.5" /> Back
+                    </button>
+                    {forgotCooldown > 0 ? (
+                      <span className="text-slate-400">Resend in {forgotCooldown}s</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleForgotRequest}
+                        className="font-bold text-brand hover:underline"
+                      >
+                        Resend code
+                      </button>
+                    )}
+                  </div>
+                </form>
+              )}
             </div>
           )}
         </div>

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Icon from "../../components/Icon";
 import apiClient from "../../services/apiClient";
+import authService from "../../services/authService";
 import { AxiosError } from "axios";
 
 type SchoolView = "login" | "signup" | "otp" | "forgot";
@@ -163,7 +164,88 @@ const SchoolAuthPage: React.FC = () => {
   const [resendCooldown, setResendCooldown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotStep, setForgotStep] = useState<"email" | "reset">("email");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [showForgotPw, setShowForgotPw] = useState(false);
+  const [showForgotConf, setShowForgotConf] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+  const [forgotSuccess, setForgotSuccess] = useState("");
+  const [forgotCooldown, setForgotCooldown] = useState(0);
+  const forgotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [isLoading, setIsLoading] = useState(false);
+
+  const startForgotCooldown = () => {
+    setForgotCooldown(60);
+    if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
+    forgotTimerRef.current = setInterval(() => {
+      setForgotCooldown((s) => {
+        if (s <= 1) {
+          if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  };
+
+  const handleForgotRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError("");
+    setForgotSuccess("");
+    setForgotLoading(true);
+    try {
+      await authService.forgotPassword(forgotEmail.trim().toLowerCase());
+      setForgotStep("reset");
+      setForgotSuccess("A 6-digit verification code has been sent to your official email.");
+      startForgotCooldown();
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      setForgotError(axErr.response?.data?.message || "Failed to send reset code. Please try again.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError("");
+    setForgotSuccess("");
+    if (forgotOtp.length !== 6) {
+      setForgotError("Please enter the complete 6-digit code.");
+      return;
+    }
+    if (forgotNewPassword.length < 8) {
+      setForgotError("Password must be at least 8 characters long.");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError("Passwords do not match.");
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      await authService.resetPassword(forgotEmail.trim().toLowerCase(), forgotOtp, forgotNewPassword);
+      setForgotSuccess("Password reset successfully! Please sign in with your new password.");
+      setTimeout(() => {
+        setView("login");
+        setForgotStep("email");
+        setForgotOtp("");
+        setForgotNewPassword("");
+        setForgotConfirmPassword("");
+        setForgotError("");
+      }, 1500);
+    } catch (err) {
+      const axErr = err as AxiosError<{ message?: string }>;
+      setForgotError(axErr.response?.data?.message || "Failed to reset password. Please check your code and try again.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const startCooldown = () => {
     setResendCooldown(60);
@@ -796,27 +878,38 @@ const SchoolAuthPage: React.FC = () => {
                 className="h-10 w-auto mx-auto mb-4"
               />
               <h1 className="text-2xl font-bold text-slate-900 mb-2">
-                Reset Your Password
+                {forgotStep === "email" ? "Reset Your Password" : "Enter Verification Code"}
               </h1>
               <p className="text-sm text-slate-500 max-w-xs mx-auto">
-                Enter your registered school email and we'll send a reset link.
+                {forgotStep === "email"
+                  ? "Enter your registered school email and we'll send a 6-digit verification code."
+                  : `Enter the 6-digit code sent to ${forgotEmail} and set your new password.`}
               </p>
             </div>
 
-            <div className="">
-              <form
-                className="space-y-5"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  setView("login");
-                }}
-              >
+            {forgotError && (
+              <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
+                {forgotError}
+              </div>
+            )}
+
+            {forgotSuccess && (
+              <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+                <Icon name="check" className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>{forgotSuccess}</span>
+              </div>
+            )}
+
+            {forgotStep === "email" ? (
+              <form className="space-y-5" onSubmit={handleForgotRequest}>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                     Official Email Address*
                   </label>
                   <input
                     type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
                     placeholder="admin@school.edu.ng"
                     required
                     className={inputCls()}
@@ -825,24 +918,122 @@ const SchoolAuthPage: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full bg-brand text-white font-bold py-3.5 rounded-full hover:bg-[#7a1848] transition-colors shadow-md shadow-brand/20 flex items-center justify-center gap-2"
+                  disabled={forgotLoading}
+                  className="w-full bg-brand text-white font-bold py-3.5 rounded-full hover:bg-[#7a1848] transition-colors shadow-md shadow-brand/20 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  Send Reset Link
-                  <Icon name="send" className="w-4 h-4" />
+                  {forgotLoading ? (
+                    <Spinner />
+                  ) : (
+                    <>
+                      Send Reset Code
+                      <Icon name="send" className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
 
                 <p className="text-center text-sm text-slate-500">
                   Remembered your password?{" "}
                   <button
                     type="button"
-                    onClick={() => setView("login")}
+                    onClick={() => {
+                      setView("login");
+                      setForgotError("");
+                      setForgotSuccess("");
+                    }}
                     className="font-bold text-brand hover:underline"
                   >
                     Back to Login
                   </button>
                 </p>
               </form>
-            </div>
+            ) : (
+              <form className="space-y-4" onSubmit={handleResetSubmit}>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    6-Digit Code*
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={forgotOtp}
+                    onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ""))}
+                    placeholder="123456"
+                    required
+                    className="w-full px-4 py-3 tracking-widest text-center text-lg font-bold rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    New Password*
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showForgotPw ? "text" : "password"}
+                      value={forgotNewPassword}
+                      onChange={(e) => setForgotNewPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      required
+                      className={inputCls()}
+                    />
+                    <EyeBtn show={showForgotPw} toggle={() => setShowForgotPw(!showForgotPw)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Confirm New Password*
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showForgotConf ? "text" : "password"}
+                      value={forgotConfirmPassword}
+                      onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                      placeholder="Re-enter new password"
+                      required
+                      className={inputCls()}
+                    />
+                    <EyeBtn show={showForgotConf} toggle={() => setShowForgotConf(!showForgotConf)} />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full bg-brand text-white font-bold py-3.5 rounded-full hover:bg-[#7a1848] transition-colors shadow-md shadow-brand/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {forgotLoading ? (
+                    <Spinner />
+                  ) : (
+                    <>
+                      Set New Password
+                      <Icon name="check" className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between text-xs text-slate-500 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setForgotStep("email")}
+                    className="text-slate-500 hover:text-slate-700 font-medium flex items-center gap-1"
+                  >
+                    <Icon name="arrow-left" className="w-3.5 h-3.5" /> Back
+                  </button>
+                  {forgotCooldown > 0 ? (
+                    <span className="text-slate-400">Resend in {forgotCooldown}s</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleForgotRequest}
+                      className="font-bold text-brand hover:underline"
+                    >
+                      Resend code
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
           </div>
         )}
       </div>
