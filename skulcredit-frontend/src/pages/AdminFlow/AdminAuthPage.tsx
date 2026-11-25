@@ -4,8 +4,8 @@ import { useAuth } from "../../context/AuthContext";
 import Icon from "../../components/Icon";
 
 const AdminAuthPage: React.FC = () => {
-  const [email, setEmail] = useState("akpeledavid@hotmail.com");
-  const [password, setPassword] = useState("SkulCreditAdmin@123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();

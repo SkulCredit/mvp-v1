@@ -47,7 +47,10 @@ export const refreshTokenSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  body: z.object({ email: z.string().email("Invalid email address") }),
+  body: z.object({
+    email: z.string().email("Invalid email address"),
+    role: z.string().optional(),
+  }),
 });
 
 export const resetPasswordSchema = z.object({

@@ -199,7 +199,7 @@ const SchoolAuthPage: React.FC = () => {
     setForgotSuccess("");
     setForgotLoading(true);
     try {
-      await authService.forgotPassword(forgotEmail.trim().toLowerCase());
+      await authService.forgotPassword(forgotEmail.trim().toLowerCase(), "school");
       setForgotStep("reset");
       setForgotSuccess("A 6-digit verification code has been sent to your official email.");
       startForgotCooldown();

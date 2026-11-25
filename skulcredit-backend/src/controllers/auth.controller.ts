@@ -189,11 +189,11 @@ class AuthController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      await authService.forgotPassword(req.body.email);
+      await authService.forgotPassword(req.body.email, req.body.role);
       successResponse(
         res,
         200,
-        "If an account with that email exists, a password reset link has been sent.",
+        "A password reset code has been sent to your email address.",
       );
     } catch (error) {
       next(error);
@@ -225,17 +225,9 @@ class AuthController {
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {    try {
+  ): Promise<void> {
+    try {
       const { email } = req.body;
-
-      if (redis.status !== "ready") {
-        res.status(503).json({
-          success: false,
-          message: "OTP service is temporarily unavailable.",
-        });
-        return;
-      }
-
       await authService.resendVerificationEmail(email);
       successResponse(res, 200, "OTP sent successfully");
     } catch (error) {
@@ -250,15 +242,6 @@ class AuthController {
   ): Promise<void> {
     try {
       const { email, otp } = req.body;
-
-      if (redis.status !== "ready") {
-        res.status(503).json({
-          success: false,
-          message: "OTP service is temporarily unavailable.",
-        });
-        return;
-      }
-
       await authService.verifyEmailOtp(email, String(otp));
       successResponse(
         res,

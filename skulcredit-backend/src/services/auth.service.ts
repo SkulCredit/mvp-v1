@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 import {
   UserRepository,
   ParentRepository,
@@ -33,6 +35,31 @@ const OTP_TTL_SEC = 30 * 60;
 const isRedisReady = (): boolean => redis.status === "ready";
 
 const memStore = new Map<string, { value: string; expiresAt: number }>();
+const CACHE_FILE = path.resolve(process.cwd(), ".cache_otp.json");
+
+const loadMem = () => {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CACHE_FILE, "utf-8"));
+      for (const [k, v] of Object.entries(data)) {
+        memStore.set(k, v as { value: string; expiresAt: number });
+      }
+    }
+  } catch {
+    //
+  }
+};
+
+const saveMem = () => {
+  try {
+    const obj = Object.fromEntries(memStore.entries());
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(obj), "utf-8");
+  } catch {
+    //
+  }
+};
+
+loadMem();
 
 const setCache = async (key: string, value: string, ttlSec: number): Promise<void> => {
   if (isRedisReady()) {
@@ -44,6 +71,7 @@ const setCache = async (key: string, value: string, ttlSec: number): Promise<voi
     }
   }
   memStore.set(key, { value, expiresAt: Date.now() + ttlSec * 1000 });
+  saveMem();
 };
 
 const getCache = async (key: string): Promise<string | null> => {
@@ -55,10 +83,12 @@ const getCache = async (key: string): Promise<string | null> => {
       //
     }
   }
+  loadMem();
   const item = memStore.get(key);
   if (!item) return null;
   if (Date.now() > item.expiresAt) {
     memStore.delete(key);
+    saveMem();
     return null;
   }
   return item.value;
@@ -73,6 +103,7 @@ const delCache = async (key: string): Promise<void> => {
     }
   }
   memStore.delete(key);
+  saveMem();
 };
 
 interface RegisterParentData {
@@ -448,9 +479,17 @@ class AuthService {
     await redis.del(emailVerifyKey(token));
   }
 
-  async forgotPassword(email: string) {
+  async forgotPassword(email: string, expectedRole?: string) {
     const user = await UserRepository.findOne({ email });
-    if (!user) return;
+    if (!user) {
+      throw new ApiError(404, "No account found with this email address.");
+    }
+    if (expectedRole && user.role !== expectedRole) {
+      throw new ApiError(
+        400,
+        `This account is registered as a ${user.role}. Please use the ${user.role} portal.`,
+      );
+    }
     const otp = crypto.randomInt(100_000, 1_000_000).toString();
     await setCache(pwResetKey(email), otp, PW_RESET_TTL_SEC);
 

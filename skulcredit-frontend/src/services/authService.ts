@@ -140,8 +140,8 @@ export const authService = {
     await apiClient.post("/auth/send-otp", { email });
   },
 
-  forgotPassword: async (email: string): Promise<void> => {
-    await apiClient.post("/auth/forgot-password", { email });
+  forgotPassword: async (email: string, role?: string): Promise<void> => {
+    await apiClient.post("/auth/forgot-password", { email, role });
   },
 
   resetPassword: async (
