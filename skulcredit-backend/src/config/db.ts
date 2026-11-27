@@ -1,4 +1,5 @@
 import { Sequelize } from 'sequelize';
+import pg from 'pg';
 import env from './env';
 import logger from './logger';
 
@@ -7,6 +8,7 @@ let sequelize: Sequelize;
 if (env.databaseUrl) {
   sequelize = new Sequelize(env.databaseUrl, {
     dialect: 'postgres',
+    dialectModule: pg,
     dialectOptions: {
       ssl: env.nodeEnv === 'production' || env.databaseUrl.includes('supabase') || env.databaseUrl.includes('pooler')
         ? { require: true, rejectUnauthorized: false }
@@ -20,6 +22,7 @@ if (env.databaseUrl) {
     host:    env.db.host,
     port:    env.db.port,
     dialect: 'postgres',
+    dialectModule: pg,
     logging: (msg: string) => logger.debug(msg),
     pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
   });

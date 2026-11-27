@@ -12,3 +12,6 @@ declare module 'socket.io' {
   export const Server: any;
   export type Socket = any;
 }
+
+declare module 'pg';
+declare module 'pg-hstore';
