@@ -13,10 +13,20 @@ import { auditMiddleware } from "./middlewares/auditMiddleware";
 import routes from "./routes/index";
 import errorHandler from "./middlewares/errorHandler";
 import env from "./config/env";
+import { connectDB } from "./config/db";
 
 const app = express();
 
 app.set("trust proxy", 1);
+
+app.use(async (_req, _res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 app.use(helmet());
 
@@ -53,6 +63,10 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(requestTracker);
 app.use(auditMiddleware);
 app.use(requestMetricsMiddleware);
+
+app.get("/", (_req, res) => {
+  res.status(200).json({ status: "healthy", service: "skulcredit-backend-api" });
+});
 
 app.get("/metrics", async (req, res) => {
   try {

@@ -12,7 +12,7 @@ const redis = new Redis(env.redis.url, {
     return Math.min(times * 300, 5000);
   },
   enableOfflineQueue: false,
-  lazyConnect: false,
+  lazyConnect: true,
 });
 
 redis.on('connect', () => logger.info('Redis client connected'));
