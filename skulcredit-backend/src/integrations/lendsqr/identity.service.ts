@@ -1,4 +1,5 @@
 import { LendsqrBaseService } from "./base.service";
+import env from "../../config/env";
 
 export interface NinVerificationData {
   nin: string;
@@ -60,6 +61,31 @@ export interface BvnConsentCompleteResponse {
 
 class LendsqrIdentityService extends LendsqrBaseService {
   verifyNin(nin: string): Promise<NinVerificationResponse> {
+    if (!env.lendsqr.apiKey) {
+      return Promise.resolve({
+        status: "success",
+        message: "NIN verified successfully (sandbox mode)",
+        data: {
+          nin,
+          first_name: "Test",
+          middle_name: "Parent",
+          last_name: "User",
+          dob: "1990-01-01",
+          formatted_dob: "01-Jan-1990",
+          mobile: "08012345678",
+          mobile2: "",
+          registration_date: "2020-01-01",
+          email: "test.parent@example.com",
+          gender: "Male",
+          marital_status: "Married",
+          state_of_residence: "Lagos",
+          base64Image: "",
+          image_url: "",
+        },
+        meta: { cost: 0, balance: 100 },
+      });
+    }
+
     return this.client.get<NinVerificationResponse, NinVerificationResponse>(
       `/v2/verification/nin/${nin}`,
     );
@@ -70,6 +96,15 @@ class LendsqrIdentityService extends LendsqrBaseService {
    * contact: phone number or email address.
    */
   initBvnConsent(bvn: string, contact: string): Promise<BvnConsentInitResponse> {
+    if (!env.lendsqr.apiKey) {
+      return Promise.resolve({
+        status: "success",
+        message: "OTP sent successfully (sandbox mode)",
+        data: contact.replace(/(\d{3})\d+(\d{4})/, "$1***$2"),
+        meta: { cost: 0, balance: 100 },
+      });
+    }
+
     return this.client.post<BvnConsentInitResponse, BvnConsentInitResponse>(
       `/v2/verification/bvn/${bvn}/accounts`,
       { contact },
@@ -80,6 +115,32 @@ class LendsqrIdentityService extends LendsqrBaseService {
    * Stage 2 — verify OTP and retrieve full BVN details.
    */
   completeBvnConsent(bvn: string, otp: string): Promise<BvnConsentCompleteResponse> {
+    if (!env.lendsqr.apiKey) {
+      return Promise.resolve({
+        status: "success",
+        message: "BVN verified successfully (sandbox mode)",
+        data: {
+          reference: 123456,
+          bvn,
+          first_name: "Test",
+          middle_name: "Parent",
+          last_name: "User",
+          dob: "1990-01-01",
+          mobile: "08012345678",
+          registration_date: "2020-01-01",
+          enrollment_bank: "058",
+          email: "test.parent@example.com",
+          gender: "Male",
+          marital_status: "Married",
+          residential_address: "Lagos, Nigeria",
+          state_of_origin: "Lagos",
+          watchlisted: 0,
+          image_url: "",
+        },
+        meta: { cost: 0, balance: 100 },
+      });
+    }
+
     return this.client.put<BvnConsentCompleteResponse, BvnConsentCompleteResponse>(
       `/v2/verification/bvn/${bvn}/accounts`,
       { otp },

@@ -116,6 +116,8 @@ const HomePage: React.FC = () => {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [waitlistType, setWaitlistType] = useState<WaitlistType>("parent");
   const [waitlistStatus, setWaitlistStatus] = useState<WaitlistStatus>(null);
+  const [borrowAmount, setBorrowAmount] = useState<number>(710000);
+  const [repaymentMonths, setRepaymentMonths] = useState<number>(3);
 
   /* Intersection-observer for scroll-reveal */
   useEffect(() => {
@@ -209,7 +211,7 @@ const HomePage: React.FC = () => {
                               I want to borrow
                             </label>
                             <div className="text-4xl font-extrabold text-slate-900 tracking-tighter">
-                              ₦ 710,000
+                              ₦ {borrowAmount.toLocaleString()}
                             </div>
                           </div>
                           <div className="py-2">
@@ -218,7 +220,8 @@ const HomePage: React.FC = () => {
                               min="50000"
                               max="1000000"
                               step="10000"
-                              defaultValue="710000"
+                              value={borrowAmount}
+                              onChange={(e) => setBorrowAmount(Number(e.target.value))}
                               className="range-slider relative z-20 w-full"
                             />
                           </div>
@@ -232,10 +235,26 @@ const HomePage: React.FC = () => {
                             Repayment Period
                           </label>
                           <div className="flex gap-4">
-                            <button className="flex-1 py-4 rounded-2xl border border-rose-600 bg-rose-50 text-rose-900 font-bold text-sm">
+                            <button
+                              type="button"
+                              onClick={() => setRepaymentMonths(3)}
+                              className={`flex-1 py-4 rounded-2xl border font-bold text-sm transition-all ${
+                                repaymentMonths === 3
+                                  ? "border-rose-600 bg-rose-50 text-rose-900 shadow-sm"
+                                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                              }`}
+                            >
                               3 Months
                             </button>
-                            <button className="flex-1 py-4 rounded-2xl border border-slate-200 bg-white text-slate-500 font-bold text-sm hover:border-slate-300 transition-all">
+                            <button
+                              type="button"
+                              onClick={() => setRepaymentMonths(4)}
+                              className={`flex-1 py-4 rounded-2xl border font-bold text-sm transition-all ${
+                                repaymentMonths === 4
+                                  ? "border-rose-600 bg-rose-50 text-rose-900 shadow-sm"
+                                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                              }`}
+                            >
                               4 Months
                             </button>
                           </div>
@@ -247,11 +266,11 @@ const HomePage: React.FC = () => {
                             Monthly Repayment
                           </p>
                           <h3 className="text-6xl font-black text-rose-900 tracking-tighter leading-none">
-                            ₦ 236,667
+                            ₦ {Math.round(borrowAmount / repaymentMonths).toLocaleString()}
                           </h3>
                           <div className="pt-3">
                             <div className="inline-block text-xs font-bold text-rose-600 bg-rose-50 px-4 py-2 rounded-xl border border-rose-100 animate-pulse-slow">
-                              Service Charge: ₦ 142,000 (One-off payment)
+                              Service Charge: ₦ {Math.round(borrowAmount * 0.20).toLocaleString()} (One-off payment)
                             </div>
                           </div>
                         </div>
@@ -281,13 +300,13 @@ const HomePage: React.FC = () => {
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center mb-8">
                   Our Trusted Partners
                 </p>
-                <div className="flex flex-wrap justify-center items-center gap-10 md:gap-16 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-700">
-                  {["remita", "paystack", "goxi", "flutter", "crc"].map((p) => (
+                <div className="flex flex-wrap justify-center items-center gap-10 md:gap-16 opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-700">
+                  {["remita", "paystack", "flutter", "mono", "goxi", "crc", "debtrecuva", "prefect"].map((p) => (
                     <img
                       key={p}
                       src={`partners/${p}.png`}
                       alt={p}
-                      className="h-8 w-auto object-contain"
+                      className="h-8 md:h-10 w-auto object-contain"
                     />
                   ))}
                 </div>

@@ -23,7 +23,7 @@ const env = {
 
   lendsqr: {
     apiKey: process.env.LENDSQR_API_KEY,
-    baseUrl: process.env.LENDSQR_BASE_URL,
+    baseUrl: process.env.LENDSQR_BASE_URL || "https://adjutor.lendsqr.com",
   },
   paystack: {
     secretKey: process.env.PAYSTACK_SECRET_KEY,
@@ -45,11 +45,11 @@ const env = {
   },
   smtp: {
     host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT ?? "587", 10),
+    port: parseInt(process.env.SMTP_PORT ?? "465", 10),
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
     from: process.env.SMTP_FROM,
-    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === "true" : undefined,
+    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === "true" : true,
   },
   redis: {
     url: process.env.REDIS_URL ?? "redis://127.0.0.1:6379",
