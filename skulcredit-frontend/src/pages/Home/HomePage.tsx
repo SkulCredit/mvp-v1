@@ -300,13 +300,24 @@ const HomePage: React.FC = () => {
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center mb-8">
                   Our Trusted Partners
                 </p>
-                <div className="flex flex-wrap justify-center items-center gap-10 md:gap-16 opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-700">
-                  {["remita", "paystack", "flutter", "mono", "goxi", "crc", "debtrecuva", "prefect"].map((p) => (
+                <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12 transition-all duration-700">
+                  {[
+                    { name: "remita", src: "partners/remita.png", className: "h-7 md:h-9" },
+                    { name: "paystack", src: "partners/paystack.png", className: "h-7 md:h-9" },
+                    { name: "flutterwave", src: "partners/flutter.png", className: "h-7 md:h-9" },
+                    { name: "mono", src: "partners/mono.png", className: "h-6 md:h-8" },
+                    { name: "alatpay", src: "partners/alatpay.png", className: "h-7 md:h-9" },
+                    { name: "goxi", src: "partners/goxi.png", className: "h-8 md:h-10" },
+                    { name: "crc", src: "partners/crc.png", className: "h-8 md:h-10" },
+                    { name: "debtrecuva", src: "partners/debtrecuva.png", className: "h-7 md:h-9" },
+                    { name: "depth", src: "partners/depth.png", className: "h-8 md:h-10" },
+                    { name: "umfb", src: "partners/umfb.png", className: "h-10 md:h-12" },
+                  ].map((p) => (
                     <img
-                      key={p}
-                      src={`partners/${p}.png`}
-                      alt={p}
-                      className="h-8 md:h-10 w-auto object-contain"
+                      key={p.name}
+                      src={p.src}
+                      alt={p.name}
+                      className={`${p.className} w-auto object-contain`}
                     />
                   ))}
                 </div>
