@@ -15,7 +15,7 @@ if (env.databaseUrl) {
         : false,
     },
     logging: (msg: string) => logger.debug(msg),
-    pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
+    pool: { max: process.env.VERCEL || env.nodeEnv === 'production' ? 2 : 10, min: 0, acquire: 30000, idle: 5000 },
   });
 } else {
   sequelize = new Sequelize(env.db.name, env.db.user, env.db.password, {
@@ -24,7 +24,7 @@ if (env.databaseUrl) {
     dialect: 'postgres',
     dialectModule: pg,
     logging: (msg: string) => logger.debug(msg),
-    pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
+    pool: { max: process.env.VERCEL || env.nodeEnv === 'production' ? 2 : 10, min: 0, acquire: 30000, idle: 5000 },
   });
 }
 
