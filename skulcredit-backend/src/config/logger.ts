@@ -38,34 +38,14 @@ const consoleFormat = winston.format.combine(
   })
 );
 
-const transports: winston.transport[] = [
-  new winston.transports.Console({
-    format: env.nodeEnv === 'production' ? jsonFormat : consoleFormat,
-  }),
-];
-
-if (!process.env.VERCEL && env.nodeEnv !== 'production') {
-  transports.push(
-    new winston.transports.File({
-      filename: 'logs/error.log',
-      level: 'error',
-      format: jsonFormat,
-      maxsize: 10 * 1024 * 1024,
-      maxFiles: 5,
-    }),
-    new winston.transports.File({
-      filename: 'logs/combined.log',
-      format: jsonFormat,
-      maxsize: 20 * 1024 * 1024,
-      maxFiles: 7,
-    }),
-  );
-}
-
 const logger = winston.createLogger({
   level: env.nodeEnv === 'development' ? 'debug' : 'info',
   defaultMeta: { service: 'skulcredit-api' },
-  transports,
+  transports: [
+    new winston.transports.Console({
+      format: env.nodeEnv === 'production' ? jsonFormat : consoleFormat,
+    }),
+  ],
 });
 
 export default logger;
