@@ -8,7 +8,7 @@ if (env.databaseUrl) {
   sequelize = new Sequelize(env.databaseUrl, {
     dialect: 'postgres',
     dialectOptions: {
-      ssl: env.nodeEnv === 'production'
+      ssl: env.nodeEnv === 'production' || env.databaseUrl.includes('supabase') || env.databaseUrl.includes('pooler')
         ? { require: true, rejectUnauthorized: false }
         : false,
     },
