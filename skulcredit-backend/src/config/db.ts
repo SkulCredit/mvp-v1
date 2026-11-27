@@ -25,13 +25,20 @@ if (env.databaseUrl) {
   });
 }
 
+let isConnected = false;
+
 export const connectDB = async (): Promise<void> => {
+  if (isConnected) return;
   try {
     await sequelize.authenticate();
+    isConnected = true;
     logger.info('PostgreSQL connected successfully');
   } catch (error) {
     logger.error(`PostgreSQL connection error: ${(error as Error).message}`);
-    process.exit(1);
+    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+      process.exit(1);
+    }
+    throw error;
   }
 };
 
