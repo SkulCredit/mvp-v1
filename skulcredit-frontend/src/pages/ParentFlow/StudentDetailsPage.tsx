@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Pagination from "../../components/ui/Pagination";
 import {
@@ -57,24 +57,7 @@ interface TuitionDetails {
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
-const MOCK_CHILDREN: Child[] = [
-  {
-    id: "c1",
-    firstName: "Amara",
-    lastName: "Bello",
-    gradeLevel: "Primary 5",
-    schoolName: "Peershore Academy",
-    photo: "https://randomuser.me/api/portraits/women/44.jpg",
-  },
-  {
-    id: "c2",
-    firstName: "Chidi",
-    lastName: "Oke",
-    gradeLevel: "Primary 5",
-    schoolName: "Peershore Academy",
-    photo: "https://randomuser.me/api/portraits/men/32.jpg",
-  },
-];
+const MOCK_CHILDREN: Child[] = [];
 
 const MOCK_SCHOOLS: School[] = [
   {
@@ -1281,25 +1264,85 @@ const StepSelectSessionTerm: React.FC<{
 
 const StepTuitionDetails: React.FC<{
   tuitionAmount: number;
+  onTuitionAmountChange: (amount: number) => void;
   selectedPlanId: "2month" | "3month" | "4month" | null;
   onSelectPlan: (id: "2month" | "3month" | "4month") => void;
-}> = ({ tuitionAmount, selectedPlanId, onSelectPlan }) => {
+}> = ({
+  tuitionAmount,
+  onTuitionAmountChange,
+  selectedPlanId,
+  onSelectPlan,
+}) => {
   const amount = tuitionAmount > 0 ? tuitionAmount : FALLBACK_TUITION_AMOUNT;
   const plans = buildRepaymentPlans(amount);
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null;
 
+  const PRESETS = [100000, 250000, 450000, 750000, 1000000];
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
         <h2 className="text-lg sm:text-2xl font-extrabold text-[#881337]">
           Tuition &amp; repayment details
         </h2>
         <p className="mt-1 text-sm text-gray-500">
-          Choose a repayment plan that fits your budget
+          Enter your school fee amount and choose a flexible repayment plan
         </p>
       </div>
 
-      <div className="space-y-3 mt-2">
+      {/* Tuition Amount Input */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
+        <div>
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">
+            School Fee Amount (₦) <span className="text-rose-600">*</span>
+          </label>
+          <div className="relative">
+            <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 font-bold text-base">
+              ₦
+            </span>
+            <input
+              type="number"
+              min="10000"
+              step="5000"
+              placeholder="e.g. 450000"
+              value={tuitionAmount > 0 ? tuitionAmount : ""}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                onTuitionAmountChange(isNaN(val) ? 0 : val);
+              }}
+              className="w-full pl-9 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 font-bold text-lg focus:bg-white focus:border-[#881337] focus:ring-2 focus:ring-[#881337]/15 outline-none transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Quick presets */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 mb-2">
+            Quick Select
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => onTuitionAmountChange(p)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  tuitionAmount === p
+                    ? "bg-[#881337] text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {fmt(p)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3 mt-4">
+        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+          Select Repayment Plan
+        </label>
         {plans.map((plan) => {
           const selected = selectedPlanId === plan.id;
           return (
@@ -1948,7 +1991,11 @@ const StudentDetailsPage: React.FC = () => {
   const [isManualSchool, setIsManualSchool] = useState(false);
   const [manualSchoolPending, setManualSchoolPending] = useState(false);
   const [submittedRef, setSubmittedRef] = useState("");
-  const childTuitionAmount = selectedChild?.tuitionAmount ?? 0;
+  const [customTuitionAmount, setCustomTuitionAmount] = useState<number>(0);
+  const childTuitionAmount =
+    customTuitionAmount > 0
+      ? customTuitionAmount
+      : (selectedChild?.tuitionAmount ?? 0);
 
   const tuitionDetails: TuitionDetails = {
     institutionTypeId: selectedInstitutionTypeId,
@@ -2222,6 +2269,7 @@ const StudentDetailsPage: React.FC = () => {
         {step === 3 && (
           <StepTuitionDetails
             tuitionAmount={childTuitionAmount}
+            onTuitionAmountChange={setCustomTuitionAmount}
             selectedPlanId={selectedPlanId}
             onSelectPlan={setSelectedPlanId}
           />

@@ -381,8 +381,7 @@ const INCOME_RANGES = [
 const REPAYMENT_PLANS = [
   "2-month Installment",
   "3-month Installment",
-  "6-month Installment",
-  "12-month Installment",
+  "4-month Installment",
 ];
 const SESSIONS = [
   "2024/2025-First Term",
