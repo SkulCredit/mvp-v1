@@ -384,11 +384,9 @@ const REPAYMENT_PLANS = [
   "4-month Installment",
 ];
 const SESSIONS = [
-  "2024/2025-First Term",
-  "2024/2025-Second Term",
-  "2024/2025-Third Term",
-  "2025/2026-First Semester",
-  "2025/2026-Second Semester",
+  "2026/2027 First term",
+  "2026/2027 Second term",
+  "2026/2027 Third term",
 ];
 const DOCUMENT_TYPES = [
   "Bank Statement (Last 3 Months)",
@@ -1333,6 +1331,8 @@ const EligibilityPage: React.FC = () => {
       e.institutionType = "Institution type is required.";
     if (!s.schoolId) e.schoolId = "Please select a school.";
     if (!s.gradeLevel) e.gradeLevel = "Class/level is required.";
+    if (!s.tuitionAmount || Number(s.tuitionAmount) <= 0)
+      e.tuitionAmount = "Please enter the school fee amount.";
     if (!s.repaymentPlan) e.repaymentPlan = "Please choose a repayment plan.";
     if (!s.academicSession) e.academicSession = "Academic session is required.";
     setErrors(e);
@@ -3430,6 +3430,36 @@ const EligibilityPage: React.FC = () => {
                   >
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
+                </div>
+              </Field>
+
+              <Field
+                label="School Fees Amount (₦)"
+                required
+                error={errors.tuitionAmount}
+                hint="Enter the tuition or school fees amount for the term"
+              >
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 font-bold text-sm">
+                    ₦
+                  </span>
+                  <input
+                    type="number"
+                    min="10000"
+                    step="5000"
+                    placeholder="e.g. 250000"
+                    value={state.step3.tuitionAmount}
+                    onChange={(e) => {
+                      patch("step3", {
+                        ...state.step3,
+                        tuitionAmount: e.target.value,
+                      });
+                      clearErr("tuitionAmount");
+                    }}
+                    className={
+                      inputCls(errors.tuitionAmount) + " pl-8 font-semibold"
+                    }
+                  />
                 </div>
               </Field>
 
